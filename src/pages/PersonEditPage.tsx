@@ -5,7 +5,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { AddressFields } from "@/components/AddressFields";
 import { PhotoInput } from "@/components/PhotoInput";
 import { TagPicker } from "@/components/TagPicker";
-import { Checkbox, ConfirmButton, Field, LoadingScreen, Notice } from "@/components/ui";
+import { Avatar, Checkbox, ConfirmButton, Field, LoadingScreen, Notice } from "@/components/ui";
 import type { HouseholdRole, PersonRow } from "@/lib/database.types";
 import { removePhoto, uploadPhoto } from "@/lib/photos";
 import { createPerson, deletePerson, setTags, updatePerson } from "@/lib/queries";
@@ -178,15 +178,41 @@ export function PersonEditPage() {
             </div>
             <div className="card-body">
               <div className="field">
-                <PhotoInput
-                  path={photoRemoved ? null : form.photo_path}
-                  initials={`${form.first_name[0] ?? ""}${form.last_name[0] ?? ""}`}
-                  disabled={!canEdit}
-                  onChange={(blob, removed) => {
-                    setPhotoBlob(blob);
-                    setPhotoRemoved(removed);
-                  }}
-                />
+                {household ? (
+                  // In a family, the family portrait is the picture - it is
+                  // what their card in the book carries, because the family
+                  // prints once, together. Offering an individual upload here
+                  // would collect a photo that never appears anywhere.
+                  <div className="photo-inherited">
+                    <Avatar
+                      path={household.photo_path}
+                      initials={household.sort_name}
+                      size="lg"
+                      alt=""
+                    />
+                    <div>
+                      <div style={{ fontWeight: 600 }}>
+                        {household.photo_path ? "Family photo" : "No family photo yet"}
+                      </div>
+                      <p className="muted small" style={{ margin: "3px 0 8px" }}>
+                        People in a family share one picture, and it prints on the family card.
+                      </p>
+                      <Link className="btn small" to={`/families/${household.id}`}>
+                        {household.photo_path ? "Change it" : "Add one"} on {household.display_name}
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  <PhotoInput
+                    path={photoRemoved ? null : form.photo_path}
+                    initials={`${form.first_name[0] ?? ""}${form.last_name[0] ?? ""}`}
+                    disabled={!canEdit}
+                    onChange={(blob, removed) => {
+                      setPhotoBlob(blob);
+                      setPhotoRemoved(removed);
+                    }}
+                  />
+                )}
               </div>
 
               <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>

@@ -34,6 +34,21 @@ export function sortKey(...parts: (string | null | undefined)[]): string {
     .trim();
 }
 
+/**
+ * The photograph that stands for a person.
+ *
+ * Someone in a family is represented by the family portrait - that is what
+ * their card in the book carries, because a family prints once. Any individual
+ * photo taken before they joined is kept on the record but not shown, so the
+ * app and the printed page never disagree about whose face appears.
+ */
+export function personPhotoPath(
+  person: Pick<PersonRow, "photo_path">,
+  household: Pick<HouseholdRow, "photo_path"> | null | undefined,
+): string | null {
+  return household ? household.photo_path : person.photo_path;
+}
+
 /** The letter a record files under in an A-Z book. Anything else lands in "#". */
 export function alphaBucket(key: string): string {
   const first = key.charAt(0).toUpperCase();
@@ -44,10 +59,24 @@ export function alphaBucket(key: string): string {
  * Suggests "The Alvarez Family" from a surname. Only ever a suggestion - the
  * field stays editable because plenty of households are "Maria Alvarez & Sam Choi".
  */
-export function suggestHouseholdName(surname: string): string {
+export function suggestHouseholdName(surname: string, headFirstName?: string): string {
   const trimmed = surname.trim();
   if (!trimmed) return "";
-  return `The ${trimmed} Family`;
+  // Two families can share a surname, and two cards titled "The Smith Family"
+  // are indistinguishable on the page. When the head of the household is
+  // known, the suggestion names them.
+  const head = headFirstName?.trim();
+  return head ? `The ${head} ${trimmed} Family` : `The ${trimmed} Family`;
+}
+
+/**
+ * Two families whose names would read identically in the book. Compared on the
+ * sort key, so "The O'Neil Family" and "The ONeil family" count as the clash
+ * they are.
+ */
+export function sameDisplayName(a: string, b: string): boolean {
+  const left = sortKey(a);
+  return left.length > 0 && left === sortKey(b);
 }
 
 /** Formats 10- and 11-digit North American numbers; leaves anything else alone. */

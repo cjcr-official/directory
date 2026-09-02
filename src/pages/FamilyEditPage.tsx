@@ -17,7 +17,7 @@ import {
   updateHousehold,
   updatePerson,
 } from "@/lib/queries";
-import { suggestHouseholdName } from "@/lib/format";
+import { sameDisplayName, suggestHouseholdName } from "@/lib/format";
 
 const ROLES: { value: HouseholdRole; label: string }[] = [
   { value: "head", label: "Head of household" },
@@ -42,9 +42,11 @@ interface MemberDraft {
   email: string;
   phone: string;
   date_of_birth: string;
+  /**
+   * Kept only so it survives a save. Members of a family are pictured by the
+   * family portrait, so nothing here uploads or replaces it.
+   */
   photo_path: string | null;
-  photoBlob: Blob | null;
-  photoRemoved: boolean;
   /** Marked for removal on save; existing people are unlinked, not deleted. */
   removed: boolean;
 }
@@ -61,8 +63,6 @@ function draftFromPerson(person: PersonRow): MemberDraft {
     phone: person.phone ?? "",
     date_of_birth: person.date_of_birth ?? "",
     photo_path: person.photo_path,
-    photoBlob: null,
-    photoRemoved: false,
     removed: false,
   };
 }
@@ -79,8 +79,6 @@ function emptyDraft(lastName: string, role: HouseholdRole): MemberDraft {
     phone: "",
     date_of_birth: "",
     photo_path: null,
-    photoBlob: null,
-    photoRemoved: false,
     removed: false,
   };
 }
@@ -106,8 +104,16 @@ export function FamilyEditPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { canEdit } = useAuth();
-  const { householdById, personById, membersOf, tags, tagsOfHousehold, reload, loading } =
-    useDirectory();
+  const {
+    households,
+    householdById,
+    personById,
+    membersOf,
+    tags,
+    tagsOfHousehold,
+    reload,
+    loading,
+  } = useDirectory();
 
   const existing = id ? householdById.get(id) : undefined;
   const isNew = !id;
@@ -135,6 +141,28 @@ export function FamilyEditPage() {
 
   const visibleMembers = useMemo(() => members.filter((member) => !member.removed), [members]);
 
+  // Until someone edits the family name by hand it tracks the surname and the
+  // head's first name, so "The Smith Family" becomes "The John Smith Family"
+  // as soon as there is a John - which is what keeps two Smith families apart
+  // on the page.
+  useEffect(() => {
+    if (nameTouched) return;
+    const suggested = suggestHouseholdName(form.sort_name, headFirstName());
+    if (suggested !== form.display_name) patch({ display_name: suggested });
+  }); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Other families whose card would carry the same title as this one. */
+  const nameClashes = useMemo(
+    () =>
+      households.filter(
+        (other) =>
+          other.id !== existing?.id &&
+          other.is_active &&
+          sameDisplayName(other.display_name, form.display_name),
+      ),
+    [households, existing?.id, form.display_name],
+  );
+
   if (!isNew && loading && !existing) return <LoadingScreen />;
   if (!isNew && !loading && !existing) {
     return (
@@ -155,10 +183,7 @@ export function FamilyEditPage() {
 
   /** Typing a surname fills in the family name until someone edits it directly. */
   function setSurname(value: string) {
-    patch({
-      sort_name: value,
-      ...(nameTouched ? {} : { display_name: suggestHouseholdName(value) }),
-    });
+    patch({ sort_name: value });
     setMembers((current) =>
       current.map((member) =>
         member.id === null && (!member.last_name || member.last_name === form.sort_name)
@@ -166,6 +191,14 @@ export function FamilyEditPage() {
           : member,
       ),
     );
+  }
+
+  /** The head of the household, if one has been named yet. */
+  function headFirstName(): string {
+    const head =
+      members.find((m) => !m.removed && m.household_role === "head") ??
+      members.find((m) => !m.removed);
+    return (head?.preferred_name || head?.first_name || "").trim();
   }
 
   function updateMember(index: number, next: Partial<MemberDraft>) {
@@ -212,7 +245,7 @@ export function FamilyEditPage() {
       const payload = {
         ...form,
         sort_name: surname,
-        display_name: form.display_name.trim() || suggestHouseholdName(surname),
+        display_name: form.display_name.trim() || suggestHouseholdName(surname, headFirstName()),
         photo_path: photoPath,
       };
 
@@ -249,16 +282,6 @@ export function FamilyEditPage() {
         // person or an empty row the user left behind.
         if (!member.first_name.trim()) continue;
 
-        let memberPhoto = member.photo_path;
-        if (member.photoRemoved && member.photo_path) {
-          await removePhoto(member.photo_path);
-          memberPhoto = null;
-        }
-        if (member.photoBlob) {
-          if (member.photo_path && !member.photoRemoved) await removePhoto(member.photo_path);
-          memberPhoto = await uploadPhoto("people", member.photoBlob);
-        }
-
         const fields = {
           first_name: member.first_name.trim(),
           last_name: member.last_name.trim() || surname,
@@ -267,7 +290,7 @@ export function FamilyEditPage() {
           email: member.email.trim() || null,
           phone: member.phone.trim() || null,
           date_of_birth: member.date_of_birth || null,
-          photo_path: memberPhoto,
+          photo_path: member.photo_path,
           household_id: household.id,
           sort_order: order,
         };
@@ -345,7 +368,9 @@ export function FamilyEditPage() {
                   id="display_name"
                   type="text"
                   disabled={!canEdit}
-                  placeholder={suggestHouseholdName(form.sort_name) || "The Alvarez Family"}
+                  placeholder={
+                    suggestHouseholdName(form.sort_name, headFirstName()) || "The Alvarez Family"
+                  }
                   value={form.display_name}
                   onChange={(event) => {
                     setNameTouched(true);
@@ -353,6 +378,24 @@ export function FamilyEditPage() {
                   }}
                 />
               </Field>
+
+              {nameClashes.length ? (
+                <div style={{ marginTop: -4, marginBottom: 14 }}>
+                  <Notice kind="warn">
+                    {nameClashes.length === 1 ? "Another family is" : "Other families are"} already
+                    called <strong>{form.display_name}</strong>. Both cards will be headed the same
+                    way, so a reader cannot tell them apart. Naming the head of each — “The John{" "}
+                    {form.sort_name || "Smith"} Family” — is the usual fix.
+                    <div className="row tight" style={{ marginTop: 8 }}>
+                      {nameClashes.map((other) => (
+                        <Link key={other.id} className="btn small" to={`/families/${other.id}`}>
+                          Open the other one
+                        </Link>
+                      ))}
+                    </div>
+                  </Notice>
+                </div>
+              ) : null}
 
               <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <Field label="Home phone" htmlFor="phone">
@@ -459,118 +502,105 @@ export function FamilyEditPage() {
                     marginTop: index === members.indexOf(visibleMembers[0]) ? 0 : 16,
                   }}
                 >
-                  <div className="row" style={{ alignItems: "flex-start", gap: 16 }}>
-                    <div style={{ flex: 1, minWidth: 260 }}>
-                      <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                        <Field label="First name">
-                          <input
-                            type="text"
-                            disabled={!canEdit}
-                            value={member.first_name}
-                            onChange={(event) =>
-                              updateMember(index, { first_name: event.target.value })
-                            }
-                          />
-                        </Field>
-                        <Field label="Last name">
-                          <input
-                            type="text"
-                            disabled={!canEdit}
-                            value={member.last_name}
-                            onChange={(event) =>
-                              updateMember(index, { last_name: event.target.value })
-                            }
-                          />
-                        </Field>
-                      </div>
-
-                      <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                        <Field label="Goes by" hint="Prints instead of the first name.">
-                          <input
-                            type="text"
-                            disabled={!canEdit}
-                            placeholder={member.first_name}
-                            value={member.preferred_name}
-                            onChange={(event) =>
-                              updateMember(index, { preferred_name: event.target.value })
-                            }
-                          />
-                        </Field>
-                        <Field label="In the family">
-                          <select
-                            disabled={!canEdit}
-                            value={member.household_role}
-                            onChange={(event) =>
-                              updateMember(index, {
-                                household_role: event.target.value as HouseholdRole,
-                              })
-                            }
-                          >
-                            {ROLES.map((role) => (
-                              <option key={role.value} value={role.value}>
-                                {role.label}
-                              </option>
-                            ))}
-                          </select>
-                        </Field>
-                      </div>
-
-                      <div className="grid" style={{ gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-                        <Field label="Phone">
-                          <input
-                            type="tel"
-                            disabled={!canEdit}
-                            value={member.phone}
-                            onChange={(event) => updateMember(index, { phone: event.target.value })}
-                          />
-                        </Field>
-                        <Field label="Email">
-                          <input
-                            type="email"
-                            disabled={!canEdit}
-                            value={member.email}
-                            onChange={(event) => updateMember(index, { email: event.target.value })}
-                          />
-                        </Field>
-                        <Field label="Birthday">
-                          <input
-                            type="date"
-                            disabled={!canEdit}
-                            value={member.date_of_birth}
-                            onChange={(event) =>
-                              updateMember(index, { date_of_birth: event.target.value })
-                            }
-                          />
-                        </Field>
-                      </div>
-
-                      <div className="row tight">
-                        {member.id ? (
-                          <Link className="btn ghost small" to={`/people/${member.id}`}>
-                            Open full record
-                          </Link>
-                        ) : null}
-                        {canEdit ? (
-                          <button
-                            type="button"
-                            className="btn ghost small"
-                            onClick={() => removeMember(index)}
-                          >
-                            {member.id ? "Remove from family" : "Discard"}
-                          </button>
-                        ) : null}
-                      </div>
+                  <div>
+                    <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <Field label="First name">
+                        <input
+                          type="text"
+                          disabled={!canEdit}
+                          value={member.first_name}
+                          onChange={(event) =>
+                            updateMember(index, { first_name: event.target.value })
+                          }
+                        />
+                      </Field>
+                      <Field label="Last name">
+                        <input
+                          type="text"
+                          disabled={!canEdit}
+                          value={member.last_name}
+                          onChange={(event) =>
+                            updateMember(index, { last_name: event.target.value })
+                          }
+                        />
+                      </Field>
                     </div>
 
-                    <div style={{ width: 230 }}>
-                      <PhotoInput
-                        path={member.photoRemoved ? null : member.photo_path}
-                        initials={`${member.first_name[0] ?? ""}${member.last_name[0] ?? ""}`}
-                        disabled={!canEdit}
-                        onChange={(blob, removed) =>
-                          updateMember(index, { photoBlob: blob, photoRemoved: removed })
-                        }
-                      />
+                    <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <Field label="Goes by" hint="Prints instead of the first name.">
+                        <input
+                          type="text"
+                          disabled={!canEdit}
+                          placeholder={member.first_name}
+                          value={member.preferred_name}
+                          onChange={(event) =>
+                            updateMember(index, { preferred_name: event.target.value })
+                          }
+                        />
+                      </Field>
+                      <Field label="In the family">
+                        <select
+                          disabled={!canEdit}
+                          value={member.household_role}
+                          onChange={(event) =>
+                            updateMember(index, {
+                              household_role: event.target.value as HouseholdRole,
+                            })
+                          }
+                        >
+                          {ROLES.map((role) => (
+                            <option key={role.value} value={role.value}>
+                              {role.label}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                    </div>
+
+                    <div className="grid" style={{ gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                      <Field label="Phone">
+                        <input
+                          type="tel"
+                          disabled={!canEdit}
+                          value={member.phone}
+                          onChange={(event) => updateMember(index, { phone: event.target.value })}
+                        />
+                      </Field>
+                      <Field label="Email">
+                        <input
+                          type="email"
+                          disabled={!canEdit}
+                          value={member.email}
+                          onChange={(event) => updateMember(index, { email: event.target.value })}
+                        />
+                      </Field>
+                      <Field label="Birthday">
+                        <input
+                          type="date"
+                          disabled={!canEdit}
+                          value={member.date_of_birth}
+                          onChange={(event) =>
+                            updateMember(index, { date_of_birth: event.target.value })
+                          }
+                        />
+                      </Field>
+                    </div>
+
+                    <div className="row tight">
+                      {member.id ? (
+                        <Link className="btn ghost small" to={`/people/${member.id}`}>
+                          Open full record
+                        </Link>
+                      ) : null}
+                      {canEdit ? (
+                        <button
+                          type="button"
+                          className="btn ghost small"
+                          onClick={() => removeMember(index)}
+                        >
+                          {member.id ? "Remove from family" : "Discard"}
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 </div>

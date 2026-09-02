@@ -3,7 +3,14 @@ import { Link } from "react-router-dom";
 import { useDirectory } from "@/data/DirectoryContext";
 import { useAuth } from "@/auth/AuthProvider";
 import { Avatar, EmptyState, LoadingScreen, Notice, TagPill } from "@/components/ui";
-import { alphaBucket, fileAsName, formatPhone, formatShortDate, sortKey } from "@/lib/format";
+import {
+  alphaBucket,
+  fileAsName,
+  formatPhone,
+  formatShortDate,
+  personPhotoPath,
+  sortKey,
+} from "@/lib/format";
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
@@ -124,7 +131,7 @@ export function PeoplePage() {
                   <tr key={person.id}>
                     <td>
                       <Avatar
-                        path={person.photo_path ?? household?.photo_path}
+                        path={personPhotoPath(person, household)}
                         initials={`${person.first_name[0] ?? ""}${person.last_name[0] ?? ""}`}
                       />
                     </td>

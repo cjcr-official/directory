@@ -143,7 +143,11 @@ export function buildEntries(data: DirectoryData, includeInactive = false): Dire
     });
   }
 
-  return entries.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+  // The id breaks ties. Two families with one surname and no members between
+  // them produce the same sort key, and without this their order - and so
+  // their page numbers - would come down to whatever order the database
+  // happened to return, which can differ between two printings of one book.
+  return entries.sort((a, b) => a.sortKey.localeCompare(b.sortKey) || a.id.localeCompare(b.id));
 }
 
 /** People inside a record - one for an individual, all members for a household. */

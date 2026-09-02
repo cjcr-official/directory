@@ -516,6 +516,12 @@ th.num {
 .pill.role {
   text-transform: capitalize;
 }
+/* Not an error - two families may genuinely want one name - but worth seeing. */
+.pill.warn {
+  background: var(--warn-soft);
+  border-color: #e6d0a0;
+  color: #7a5713;
+}
 
 .muted {
   color: var(--ink-3);
@@ -748,6 +754,24 @@ th.num {
   letter-spacing: 0.02em;
   color: var(--ink-3);
   opacity: 0.72;
+}
+
+/* Stands in for the photo uploader on someone who belongs to a family: their
+   picture comes from the family record, so this shows it and points there. */
+.photo-inherited {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--canvas);
+}
+
+@media (max-width: 820px) {
+  .photo-inherited {
+    flex-direction: column;
+  }
 }
 
 /* --- updating -------------------------------------------------------------

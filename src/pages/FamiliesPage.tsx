@@ -15,6 +15,19 @@ export function FamiliesPage() {
 
   const tagsById = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags]);
 
+  // Names carried by more than one family. Both cards would be headed the same
+  // way in the printed book, which is worth spotting from the list rather than
+  // from the proof.
+  const sharedNames = useMemo(() => {
+    const seen = new Map<string, number>();
+    for (const household of households) {
+      if (!household.is_active) continue;
+      const key = sortKey(household.display_name);
+      if (key) seen.set(key, (seen.get(key) ?? 0) + 1);
+    }
+    return new Set([...seen].filter(([, count]) => count > 1).map(([key]) => key));
+  }, [households]);
+
   const filtered = useMemo(() => {
     const needle = sortKey(query);
     return households.filter((household) => {
@@ -121,6 +134,15 @@ export function FamiliesPage() {
                       {!household.is_active ? (
                         <span className="pill" style={{ marginLeft: 6 }}>
                           Archived
+                        </span>
+                      ) : null}
+                      {sharedNames.has(sortKey(household.display_name)) ? (
+                        <span
+                          className="pill warn"
+                          style={{ marginLeft: 6 }}
+                          title="Another family prints under this same name"
+                        >
+                          Shared name
                         </span>
                       ) : null}
                     </td>

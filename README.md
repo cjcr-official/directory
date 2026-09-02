@@ -220,6 +220,37 @@ TypeScript 7 compiler. The strict compiler flags — `strict`, `noUnusedLocals`,
 `noUnusedParameters`, `noFallthroughCasesInSwitch` — cover much of the same
 ground in the meantime.
 
+### Photographs
+
+One picture per record, because a record is what prints on a card.
+
+Someone who belongs to a family is pictured by the family portrait — a family
+prints once, together, so an individual photo of a member would never appear.
+Their edit page shows the family photo and a way through to change it, rather
+than an uploader that collects a picture nothing will use. Someone in no family
+prints on their own and keeps their own photo, uploader and all.
+
+Moving into a family does not delete a photo taken before: it stays on the
+record, unused, and comes back if they later print on their own. `personPhotoPath`
+in `lib/format.ts` is the single rule, used by the browse lists and matching what
+`lib/layout/compose.ts` puts on the page, so screen and print never disagree
+about whose face appears.
+
+### Two families, one surname
+
+They stay two records and never merge. Both file under the surname and then sort
+on the head of household's first name, so the Johns come before the Roberts; the
+record id breaks any remaining tie, which keeps page numbers stable between two
+printings of the same book. The index lists people rather than families, so
+"Smith, John" and "Smith, Robert" point at their own pages.
+
+What does not resolve itself is the heading on the card. Two families both named
+"The Smith Family" print two cards with the same title. So the suggested name
+includes the head as soon as there is one — "The John Smith Family" — the family
+form warns while a name is still shared with another family, and the families
+list marks the rows involved. The printed name stays editable throughout: plenty
+of households are "Maria Alvarez & Sam Choi".
+
 ### Staying up to date
 
 Added to the Home Screen the app is suspended rather than closed, so one page
