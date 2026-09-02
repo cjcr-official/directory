@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { LoginPage } from "@/auth/LoginPage";
+import { AccountNotReady } from "@/auth/AccountNotReady";
 import { AppShell } from "@/components/AppShell";
 import { DirectoryProvider } from "@/data/DirectoryContext";
 import { LoadingScreen, Notice } from "@/components/ui";
@@ -20,14 +21,16 @@ import { AdministratorsPage } from "@/pages/AdministratorsPage";
 import { BackupPage } from "@/pages/BackupPage";
 
 function Protected() {
-  const { session, profile, ready, role, signOut } = useAuth();
+  const { session, profile, profileLoaded, ready, role, signOut } = useAuth();
 
   if (!ready) return <LoadingScreen />;
   if (!session) return <LoginPage />;
 
-  // The profile row is written by a database trigger the first time someone
-  // signs up; give it a beat before deciding anything is wrong.
-  if (!profile) return <LoadingScreen label="Setting up your account…" />;
+  if (!profileLoaded) return <LoadingScreen label="Signing you in…" />;
+
+  // Signed in, but nothing behind it. Never a spinner: that state has causes a
+  // person can actually fix, so say which one it is.
+  if (!profile) return <AccountNotReady />;
 
   if (!role) {
     return (

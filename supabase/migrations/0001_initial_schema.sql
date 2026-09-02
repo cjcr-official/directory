@@ -76,6 +76,34 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
+-- Repair pass, for accounts that already existed when this file was first run.
+--
+-- Sign up before the trigger exists and auth.users has your account while
+-- public.profiles has nothing, so the app signs you in and then finds no
+-- profile. Re-running this file fixes that. Ownership is only handed out when
+-- nobody active holds it, and only to the earliest account - the same outcome
+-- the trigger would have produced.
+do $$
+declare
+  has_owner boolean;
+  first_user uuid;
+begin
+  select exists (select 1 from public.profiles where role = 'owner' and is_active)
+    into has_owner;
+  select id into first_user from auth.users order by created_at limit 1;
+
+  insert into public.profiles (id, email, full_name, role, is_active)
+  select
+    u.id,
+    coalesce(u.email, ''),
+    coalesce(u.raw_user_meta_data ->> 'full_name', ''),
+    case when not has_owner and u.id = first_user then 'owner' else 'viewer' end,
+    (not has_owner and u.id = first_user)
+  from auth.users u
+  where not exists (select 1 from public.profiles p where p.id = u.id);
+end
+$$;
+
 -- Role lookups used by every policy below. SECURITY DEFINER so that reading a
 -- caller's own role does not itself go through the profiles policies (which
 -- would recurse).
