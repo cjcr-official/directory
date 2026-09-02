@@ -44,6 +44,10 @@ it to a committee meeting before anyone types in a real address.
 inches wide. The browser resizes before uploading, so uploads finish on church
 hall wifi and a 200-family PDF builds in seconds.
 
+**A backup you can actually read.** One file, holding spreadsheets, the
+photographs as plain JPEGs, and a complete JSON copy. Nothing about restoring it
+depends on this app still existing.
+
 **First sign-up owns it.** No secret key, no seeding an admin row by hand — and
 the second person to sign up lands as a viewer, so a stranger who finds the URL
 cannot promote themselves.
@@ -124,9 +128,9 @@ useful and also the thing people photograph and text around. Some suggestions:
 with data entry but not see everyone's address, that needs a fourth role — worth
 adding if it comes up, but do not build it speculatively.
 
-**Backups.** Supabase does its own, but a monthly export you can hold onto is
-worth more than a restore procedure you have never run. A "download everything as
-a spreadsheet" button would cover it.
+**Backups.** Built — see _Backup_ in the app. Supabase keeps its own, but a
+monthly file you can hold onto is worth more than a restore procedure you have
+never run. Keep it somewhere other than the database.
 
 ---
 

@@ -41,12 +41,9 @@ export function AppShell() {
         <div className="nav-section">Printing</div>
         <Item to="/projects" label="Directories" />
 
-        {isOwner ? (
-          <>
-            <div className="nav-section">Settings</div>
-            <Item to="/administrators" label="Administrators" />
-          </>
-        ) : null}
+        <div className="nav-section">Settings</div>
+        <Item to="/backup" label="Backup" />
+        {isOwner ? <Item to="/administrators" label="Administrators" /> : null}
 
         <div className="sidebar-foot">
           <div style={{ fontWeight: 600 }}>{profile?.full_name || profile?.email}</div>

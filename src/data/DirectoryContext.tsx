@@ -10,6 +10,9 @@ interface DirectoryState {
   households: HouseholdRow[];
   people: PersonRow[];
   tags: TagRow[];
+  /** Raw join rows, for anything that needs the whole graph - the backup. */
+  householdTags: { household_id: string; tag_id: string }[];
+  personTags: { person_id: string; tag_id: string }[];
   /** Every printable record, already in alphabetical order. */
   entries: DirectoryEntry[];
   householdById: Map<string, HouseholdRow>;
@@ -94,6 +97,8 @@ export function DirectoryProvider({ children }: { children: React.ReactNode }) {
         sortKey(a.last_name, a.first_name).localeCompare(sortKey(b.last_name, b.first_name)),
       ),
       tags: data.tags,
+      householdTags: data.householdTags,
+      personTags: data.personTags,
       entries: buildEntries(data),
       householdById,
       personById,

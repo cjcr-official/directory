@@ -17,6 +17,7 @@ import { ProjectsPage } from "@/pages/ProjectsPage";
 import { ProjectEditPage } from "@/pages/ProjectEditPage";
 import { ProjectPreviewPage } from "@/pages/ProjectPreviewPage";
 import { AdministratorsPage } from "@/pages/AdministratorsPage";
+import { BackupPage } from "@/pages/BackupPage";
 
 function Protected() {
   const { session, profile, ready, role, signOut } = useAuth();
@@ -67,6 +68,7 @@ function Protected() {
           <Route path="projects" element={<ProjectsPage />} />
           <Route path="projects/new" element={<ProjectEditPage />} />
           <Route path="projects/:id" element={<ProjectEditPage />} />
+          <Route path="backup" element={<BackupPage />} />
           <Route path="administrators" element={<AdministratorsPage />} />
         </Route>
         {/* Full-bleed, outside the shell: the preview needs the whole window. */}

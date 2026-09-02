@@ -31,6 +31,12 @@ in it, and how it looks. Keep a main directory for the whole congregation and as
 many small ones as you like for events. The data stays live, so reprinting next
 year is one click.
 
+**Backups.** One button downloads the whole directory as a ZIP: the records as
+CSVs that open in any spreadsheet, every photograph as an ordinary JPEG, and a
+`directory.json` complete enough to rebuild from. Editors can delete a family and
+there is no undo, so this is what turns a bad click into an annoyance. Once a
+month, and again before a print run.
+
 **Printing.** A preview that matches the PDF line for line, then either a
 downloaded PDF or a straight browser print. Optional cover page, alphabetical
 index, A–Z letter tabs, page numbers, and booklet page ordering for folding and
