@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { Logo } from "@/components/Logo";
 import { useAuth } from "@/auth/AuthProvider";
 import { useDirectory } from "@/data/DirectoryContext";
 
@@ -25,10 +26,8 @@ export function AppShell() {
     <div className="shell">
       <nav className="sidebar">
         <div className="brand">
-          <span className="brand-mark" aria-hidden>
-            ✝
-          </span>
-          <span>Directory</span>
+          <Logo />
+          <span className="app-name">Church Directory</span>
         </div>
 
         <Item to="/" label="Overview" />

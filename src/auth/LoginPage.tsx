@@ -1,13 +1,14 @@
 import { useState } from "react";
+import { Logo } from "@/components/Logo";
 import { useAuth } from "./AuthProvider";
 
 /**
  * Sign in, or create the very first account.
  *
- * The database gives the first person to sign up the owner role and everybody
- * after them read-only access, so a brand new project can be claimed without
- * anyone touching a service key - and a stranger who finds the URL cannot
- * promote themselves.
+ * The database gives the first person to sign up the owner role and creates
+ * every later account with no access at all, so a brand new project can be
+ * claimed without anyone touching a service key — and a stranger who finds the
+ * URL cannot see a single name until an owner lets them in.
  */
 export function LoginPage() {
   const { signIn, signUp, loading } = useAuth();
@@ -38,23 +39,18 @@ export function LoginPage() {
   }
 
   return (
-    <div className="centered">
-      <div className="card">
-        <div className="card-body">
-          <div className="brand" style={{ padding: "0 0 16px" }}>
-            <span className="brand-mark" aria-hidden>
-              ✝
-            </span>
-            <span>Church Directory</span>
-          </div>
+    <div className="auth-screen">
+      <div className="auth-inner">
+        <Logo className="auth-logo" />
 
-          <h1 style={{ fontSize: "1.25rem", marginBottom: 4 }}>
-            {mode === "signin" ? "Sign in" : "Create an account"}
+        <div className="auth-card">
+          <h1 className="auth-title">
+            {mode === "signin" ? "Church Directory" : "Create an account"}
           </h1>
-          <p className="muted small" style={{ marginBottom: 18 }}>
+          <p className="auth-sub">
             {mode === "signin"
-              ? "Administrators only. Directory information is not public."
-              : "The first account created owns this directory. Any later account starts with no access until an owner grants it."}
+              ? "Sign in to manage the directory. Administrators only."
+              : "The first account created owns the directory. Any later account waits for an owner to grant access."}
           </p>
 
           <form onSubmit={submit}>
@@ -78,6 +74,8 @@ export function LoginPage() {
                 id="email"
                 type="email"
                 autoComplete="email"
+                autoCapitalize="none"
+                spellCheck={false}
                 value={email}
                 required
                 onChange={(event) => setEmail(event.target.value)}
@@ -98,40 +96,41 @@ export function LoginPage() {
             </div>
 
             {error ? (
-              <div className="notice error" style={{ marginBottom: 12 }}>
+              <div className="notice error" style={{ marginBottom: 14 }}>
                 {error}
               </div>
             ) : null}
             {message ? (
-              <div className="notice ok" style={{ marginBottom: 12 }}>
+              <div className="notice ok" style={{ marginBottom: 14 }}>
                 {message}
               </div>
             ) : null}
 
-            <button
-              type="submit"
-              className="btn primary"
-              disabled={loading}
-              style={{ width: "100%", justifyContent: "center" }}
-            >
+            <button type="submit" className="btn primary auth-submit" disabled={loading}>
               {loading ? "Working…" : mode === "signin" ? "Sign in" : "Create account"}
             </button>
           </form>
 
-          <p className="muted small" style={{ marginTop: 16, textAlign: "center" }}>
-            {mode === "signin" ? "First time setting this up? " : "Already have an account? "}
+          <div className="auth-switch">
+            {mode === "signin"
+              ? "Setting this up for the first time? "
+              : "Already have an account? "}
             <button
               type="button"
-              className="btn ghost small"
               onClick={() => {
                 setMode(mode === "signin" ? "signup" : "signin");
                 setError(null);
+                setMessage(null);
               }}
             >
               {mode === "signin" ? "Create the first account" : "Sign in instead"}
             </button>
-          </p>
+          </div>
         </div>
+
+        <p className="auth-foot">
+          Directory information is private to this church and is not published.
+        </p>
       </div>
     </div>
   );

@@ -26,7 +26,12 @@
   --shadow: 0 1px 2px rgb(20 32 31 / 6%), 0 6px 20px -12px rgb(20 32 31 / 22%);
 
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* Matches the printed directory, which is set in a serif. */
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --brand-dark: #10211e;
+  --brand-dark-2: #17332c;
 }
 
 * {
@@ -101,25 +106,29 @@ p:last-child {
   overflow-y: auto;
 }
 
+/* A dark band: the logo is white artwork and would vanish on the sidebar's
+   own background. */
 .brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 4px 8px 18px;
-  font-weight: 680;
-  letter-spacing: -0.015em;
+  margin: -20px -14px 16px;
+  padding: 16px 18px 14px;
+  background: var(--brand-dark);
 }
 
-.brand-mark {
-  width: 28px;
-  height: 28px;
-  flex: none;
-  border-radius: 8px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  display: grid;
-  place-items: center;
-  font-size: 15px;
+.brand img {
+  display: block;
+  width: 100%;
+  max-width: 148px;
+  height: auto;
+}
+
+.brand .app-name {
+  display: block;
+  margin-top: 9px;
+  font-size: 0.72rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: rgb(255 255 255 / 52%);
 }
 
 .nav-section {
@@ -600,6 +609,96 @@ th.num {
   cursor: default;
 }
 
+/* --- the sign-in screen -------------------------------------------------- */
+
+/*
+ * The first thing anyone sees, and the church's logo is white artwork on
+ * transparency - so the whole screen goes dark and the mark sits on it
+ * directly, rather than being boxed into a light card where it would vanish.
+ */
+.auth-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 40px 20px;
+  background:
+    radial-gradient(120% 90% at 50% -10%, var(--brand-dark-2) 0%, transparent 60%),
+    var(--brand-dark);
+}
+
+.auth-inner {
+  width: 100%;
+  max-width: 400px;
+}
+
+.auth-logo {
+  display: block;
+  width: 100%;
+  max-width: 262px;
+  height: auto;
+  margin: 0 auto 30px;
+}
+
+.auth-card {
+  background: var(--paper);
+  border-radius: 14px;
+  padding: 28px 24px 24px;
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 20%),
+    0 18px 48px -20px rgb(0 0 0 / 55%);
+}
+
+.auth-title {
+  font-family: var(--serif);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-bottom: 5px;
+}
+
+.auth-sub {
+  color: var(--ink-3);
+  font-size: 0.88rem;
+  margin-bottom: 20px;
+}
+
+.auth-submit {
+  width: 100%;
+  justify-content: center;
+  padding: 11px 16px;
+  font-size: 0.95rem;
+}
+
+.auth-switch {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--ink-3);
+}
+
+.auth-switch button {
+  font: inherit;
+  font-weight: 620;
+  color: var(--accent);
+  background: none;
+  border: none;
+  padding: 4px 2px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.auth-foot {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 0.78rem;
+  color: rgb(255 255 255 / 46%);
+  line-height: 1.6;
+}
+
 /* --- centred single-card screens (login, setup) -------------------------- */
 
 .centered {
@@ -656,7 +755,16 @@ th.num {
     padding: 10px 12px;
   }
   .brand {
-    padding: 0 12px 0 4px;
+    margin: 0;
+    padding: 6px 12px 6px 4px;
+    background: transparent;
+  }
+  .brand img {
+    max-width: 112px;
+    filter: invert(1) brightness(0.22);
+  }
+  .brand .app-name {
+    display: none;
   }
   .nav-section {
     display: none;
@@ -759,5 +867,27 @@ th.num {
   }
   .fold-line {
     border-left-color: #e8eceb;
+  }
+}
+
+/* --- touch devices ------------------------------------------------------- */
+
+@media (hover: none) and (pointer: coarse) {
+  /* Safari on iOS zooms the page when a focused field is under 16px, which
+     shunts the layout sideways mid-typing. */
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="password"],
+  input[type="date"],
+  input[type="search"],
+  input[type="number"],
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  .btn {
+    padding: 9px 15px;
   }
 }
