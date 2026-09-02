@@ -621,7 +621,8 @@ th.num {
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: 40px 20px;
+  padding: calc(40px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right))
+    calc(40px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
   background:
     radial-gradient(120% 90% at 50% -10%, var(--brand-dark-2) 0%, transparent 60%),
     var(--brand-dark);
@@ -768,7 +769,10 @@ th.num {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 14px;
+    /* Installed to the Home Screen the page runs under the status bar and the
+       home indicator; env() is 0 in a normal browser, so this is inert there. */
+    padding: calc(10px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) 10px
+      calc(14px + env(safe-area-inset-left));
     background: var(--brand-dark);
     color: #fff;
   }
@@ -831,7 +835,7 @@ th.num {
     max-width: 84vw;
     height: 100dvh;
     flex-direction: column;
-    padding: 0 14px 20px;
+    padding: 0 14px calc(20px + env(safe-area-inset-bottom));
     overflow-y: auto;
     transform: translateX(-100%);
     transition: transform 0.22s ease;
@@ -843,7 +847,7 @@ th.num {
 
   .brand {
     margin: 0 -14px 14px;
-    padding: 18px 18px 16px;
+    padding: calc(18px + env(safe-area-inset-top)) 18px 16px;
   }
 
   .nav-link {
@@ -852,7 +856,8 @@ th.num {
   }
 
   .page {
-    padding: 18px 16px 48px;
+    padding: 18px calc(16px + env(safe-area-inset-right)) calc(48px + env(safe-area-inset-bottom))
+      calc(16px + env(safe-area-inset-left));
   }
 
   .page-head h1 {

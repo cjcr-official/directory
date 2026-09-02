@@ -9,5 +9,9 @@
   # A church directory has no business being indexed.
   X-Robots-Tag: noindex, nofollow
 
+/manifest.webmanifest
+  Content-Type: application/manifest+json
+  Cache-Control: public, max-age=3600
+
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
