@@ -52,7 +52,7 @@ export function LoginPage() {
           <p className="muted small" style={{ marginBottom: 18 }}>
             {mode === "signin"
               ? "Administrators only. Directory information is not public."
-              : "The first account created becomes the owner of this directory."}
+              : "The first account created owns this directory. Any later account starts with no access until an owner grants it."}
           </p>
 
           <form onSubmit={submit}>

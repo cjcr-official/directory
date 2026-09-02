@@ -27,6 +27,12 @@ const ROLES: { value: HouseholdRole; label: string }[] = [
 ];
 
 interface MemberDraft {
+  /**
+   * Stable for the life of the form. Array indices are not: discarding an
+   * unsaved member shifts every row after it, and React would then reuse the
+   * discarded row's photo state for its neighbour.
+   */
+  key: string;
   /** Present when the person already exists in the database. */
   id: string | null;
   first_name: string;
@@ -45,6 +51,7 @@ interface MemberDraft {
 
 function draftFromPerson(person: PersonRow): MemberDraft {
   return {
+    key: person.id,
     id: person.id,
     first_name: person.first_name,
     last_name: person.last_name,
@@ -62,6 +69,7 @@ function draftFromPerson(person: PersonRow): MemberDraft {
 
 function emptyDraft(lastName: string, role: HouseholdRole): MemberDraft {
   return {
+    key: crypto.randomUUID(),
     id: null,
     first_name: "",
     last_name: lastName,
@@ -98,7 +106,8 @@ export function FamilyEditPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { canEdit } = useAuth();
-  const { householdById, membersOf, tags, tagsOfHousehold, reload, loading } = useDirectory();
+  const { householdById, personById, membersOf, tags, tagsOfHousehold, reload, loading } =
+    useDirectory();
 
   const existing = id ? householdById.get(id) : undefined;
   const isNew = !id;
@@ -210,10 +219,29 @@ export function FamilyEditPage() {
       let order = 0;
       for (const member of members) {
         if (member.removed) {
-          if (member.id) await setPersonHousehold(member.id, null, null, 0);
+          if (member.id) {
+            // They keep living where they lived: copy the household address
+            // down, or their standalone card would print with none at all.
+            const previous = personById.get(member.id);
+            if (previous?.use_household_address) {
+              await updatePerson(member.id, {
+                use_household_address: false,
+                address_line1: form.address_line1,
+                address_line2: form.address_line2,
+                city: form.city,
+                state: form.state,
+                postal_code: form.postal_code,
+                country: form.country,
+              });
+            }
+            await setPersonHousehold(member.id, null, null, 0);
+          }
           continue;
         }
-        if (!member.first_name.trim() && !member.last_name.trim()) continue;
+        // A row added and never filled in still carries the pre-filled
+        // surname, so the first name is what decides whether it is a real
+        // person or an empty row the user left behind.
+        if (!member.first_name.trim()) continue;
 
         let memberPhoto = member.photo_path;
         if (member.photoRemoved && member.photo_path) {
@@ -401,7 +429,7 @@ export function FamilyEditPage() {
               const index = members.indexOf(member);
               return (
                 <div
-                  key={member.id ?? `draft-${index}`}
+                  key={member.key}
                   style={{
                     borderTop: index === members.indexOf(visibleMembers[0]) ? "none" : "1px solid var(--line)",
                     paddingTop: index === members.indexOf(visibleMembers[0]) ? 0 : 16,

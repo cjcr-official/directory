@@ -15,12 +15,35 @@ function unwrap<T>(result: { data: T | null; error: { message: string } | null }
   return result.data as T;
 }
 
+/**
+ * Supabase caps an unqualified select at 1000 rows and says nothing about it,
+ * which for a congregation of 1200 would quietly print a directory missing 200
+ * people. Every full-table read pages explicitly instead.
+ */
+const PAGE_SIZE = 1000;
+
+async function fetchAll<T>(
+  table: "households" | "people" | "tags" | "household_tags" | "person_tags",
+  orderBy?: string,
+): Promise<T[]> {
+  const rows: T[] = [];
+
+  for (let from = 0; ; from += PAGE_SIZE) {
+    let query = supabase.from(table).select("*").range(from, from + PAGE_SIZE - 1);
+    if (orderBy) query = query.order(orderBy);
+
+    const page = unwrap(await query) as T[];
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) return rows;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Directory data
 // ---------------------------------------------------------------------------
 
 /**
- * Pulls the whole directory in five queries.
+ * Pulls the whole directory.
  *
  * A congregation is small data - a thousand people is well under a megabyte -
  * so the app loads it once and does all filtering, sorting and pagination in
@@ -29,20 +52,14 @@ function unwrap<T>(result: { data: T | null; error: { message: string } | null }
  */
 export async function fetchDirectory(): Promise<DirectoryData> {
   const [households, people, tags, householdTags, personTags] = await Promise.all([
-    supabase.from("households").select("*").order("sort_name"),
-    supabase.from("people").select("*").order("last_name"),
-    supabase.from("tags").select("*").order("name"),
-    supabase.from("household_tags").select("*"),
-    supabase.from("person_tags").select("*"),
+    fetchAll<HouseholdRow>("households", "sort_name"),
+    fetchAll<PersonRow>("people", "last_name"),
+    fetchAll<TagRow>("tags", "name"),
+    fetchAll<{ household_id: string; tag_id: string }>("household_tags"),
+    fetchAll<{ person_id: string; tag_id: string }>("person_tags"),
   ]);
 
-  return {
-    households: unwrap(households) as HouseholdRow[],
-    people: unwrap(people) as PersonRow[],
-    tags: unwrap(tags) as TagRow[],
-    householdTags: unwrap(householdTags),
-    personTags: unwrap(personTags),
-  };
+  return { households, people, tags, householdTags, personTags };
 }
 
 // ---------------------------------------------------------------------------

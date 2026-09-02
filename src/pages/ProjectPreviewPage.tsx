@@ -26,6 +26,8 @@ export function ProjectPreviewPage() {
   const [building, setBuilding] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [showGuides, setShowGuides] = useState(true);
+  /** Set while printing so every sheet is in the DOM, not just the preview's. */
+  const [printingAll, setPrintingAll] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -82,6 +84,23 @@ export function ProjectPreviewPage() {
     () => (project ? normalizeSettings(project.settings) : null),
     [project],
   );
+
+  /**
+   * The preview caps how many sheets it draws to stay responsive, but the
+   * browser prints the DOM - so a long book has to be fully rendered first, or
+   * the printout silently stops at the cap.
+   */
+  useEffect(() => {
+    if (!printingAll) return;
+    // One frame for React to commit the remaining sheets, one for layout.
+    const frame = requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        window.print();
+        setPrintingAll(false);
+      }),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [printingAll]);
 
   async function generatePdf() {
     if (!book || !project) return;
@@ -172,8 +191,8 @@ export function ProjectPreviewPage() {
           </span>
         ) : null}
 
-        <button type="button" className="btn" onClick={() => window.print()}>
-          Print
+        <button type="button" className="btn" onClick={() => setPrintingAll(true)}>
+          {printingAll ? "Preparing…" : "Print"}
         </button>
         <button type="button" className="btn primary" disabled={building} onClick={() => void generatePdf()}>
           {building ? "Building PDF…" : "Download PDF"}
@@ -181,7 +200,7 @@ export function ProjectPreviewPage() {
       </div>
 
       {settings.bookletOrder ? (
-        <div style={{ padding: "10px 18px 0" }}>
+        <div className="screen-only" style={{ padding: "10px 18px 0" }}>
           <Notice>
             <strong>Booklet order is on.</strong> The pages below are arranged for printing
             double-sided, folding the whole stack down the middle and stapling the spine — so they
@@ -192,16 +211,21 @@ export function ProjectPreviewPage() {
       ) : null}
 
       {truncated ? (
-        <div style={{ padding: "10px 18px 0" }}>
+        <div className="screen-only" style={{ padding: "10px 18px 0" }}>
           <Notice kind="warn">
             Showing the first {PREVIEW_SHEET_LIMIT} of {book.sheets.length} sheets to keep this
-            screen quick. The downloaded PDF contains all of them.
+            screen quick. Printing and the downloaded PDF both use all of them.
           </Notice>
         </div>
       ) : null}
 
       <div className="preview-canvas" ref={canvasRef}>
-        <BookPreview book={book} photoUrls={photoUrls} zoom={zoom} limit={PREVIEW_SHEET_LIMIT} />
+        <BookPreview
+          book={book}
+          photoUrls={photoUrls}
+          zoom={zoom}
+          limit={printingAll ? undefined : PREVIEW_SHEET_LIMIT}
+        />
       </div>
     </div>
   );

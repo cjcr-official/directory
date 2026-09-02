@@ -143,7 +143,7 @@ export function SamplePage() {
         </button>
       </div>
 
-      <div style={{ padding: "12px 18px 0" }}>
+      <div className="screen-only" style={{ padding: "12px 18px 0" }}>
         <Notice>
           Every name, address, photograph and phone number below is invented. This is the exact
           layout your own directory will print in: landscape paper, folded down the middle, three

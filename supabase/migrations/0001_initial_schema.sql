@@ -31,11 +31,17 @@ create table if not exists public.profiles (
 );
 
 comment on table public.profiles is
-  'Administrators of the directory. The first account to sign up becomes the owner.';
+  'Administrators of the directory. The first account to sign up becomes the owner; every later account starts with no access at all.';
 
--- The first person to sign up owns the directory; everyone after them lands as
--- a viewer and has to be promoted by an owner. That removes the chicken-and-egg
--- problem of granting the very first role without a service key.
+-- The first person to sign up owns the directory, which solves the
+-- chicken-and-egg problem of granting the very first role without a service key.
+--
+-- Everyone after them is created INACTIVE. Sign-up is open to anyone who can
+-- reach the app, so an active row here would hand a stranger the whole
+-- congregation's addresses and phone numbers - every read policy below is
+-- satisfied by is_member(), and a viewer is a member. An inactive row passes
+-- nothing, so a new account sees the "waiting for access" screen until an owner
+-- turns it on.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -45,14 +51,19 @@ as $$
 declare
   is_first boolean;
 begin
+  -- Serialise concurrent sign-ups so two people cannot both read an empty
+  -- table and both become owner.
+  lock table public.profiles in exclusive mode;
+
   select count(*) = 0 into is_first from public.profiles;
 
-  insert into public.profiles (id, email, full_name, role)
+  insert into public.profiles (id, email, full_name, role, is_active)
   values (
     new.id,
     coalesce(new.email, ''),
     coalesce(new.raw_user_meta_data ->> 'full_name', ''),
-    case when is_first then 'owner' else 'viewer' end
+    case when is_first then 'owner' else 'viewer' end,
+    is_first
   )
   on conflict (id) do nothing;
 

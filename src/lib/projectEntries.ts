@@ -9,19 +9,21 @@ export interface Selection {
 }
 
 /**
- * Works out which records a project prints, and in what order.
+ * Works out which records a project prints.
  *
- * "all" and "tags" stay alphabetical and pick up new families automatically -
- * add someone to the choir in March and the choir booklet includes them in
- * April without anyone editing the project. "manual" is the escape hatch for a
- * one-off handout where the order matters.
+ * Every mode stays alphabetical, because the point of the book is that you can
+ * look someone up in it. "all" and "tags" also pick up new families on their
+ * own - add someone to the choir in March and the choir booklet includes them
+ * in April without anyone editing the project. "manual" is the escape hatch for
+ * a one-off handout, and it filters the alphabetical list rather than following
+ * the order the boxes happened to be ticked in.
  */
 export function resolveEntries(all: DirectoryEntry[], selection: Selection): DirectoryEntry[] {
   if (selection.mode === "manual") {
-    const byKey = new Map(all.map((entry) => [`${entry.type}:${entry.id}`, entry]));
-    return selection.entries
-      .map((row) => byKey.get(`${row.entry_type}:${row.ref_id}`))
-      .filter((entry): entry is DirectoryEntry => Boolean(entry));
+    const picked = new Set(
+      selection.entries.map((row) => `${row.entry_type}:${row.ref_id}`),
+    );
+    return all.filter((entry) => picked.has(`${entry.type}:${entry.id}`));
   }
 
   if (selection.mode === "tags") {
@@ -31,21 +33,4 @@ export function resolveEntries(all: DirectoryEntry[], selection: Selection): Dir
   }
 
   return all;
-}
-
-/** A short sentence describing the selection, for project cards and headers. */
-export function describeSelection(
-  selection: Selection,
-  tagNames: Map<string, string>,
-  count: number,
-): string {
-  if (selection.mode === "all") {
-    return `Everyone in the directory — ${count} record${count === 1 ? "" : "s"}`;
-  }
-  if (selection.mode === "tags") {
-    const names = selection.tagIds.map((id) => tagNames.get(id)).filter(Boolean);
-    if (!names.length) return "No groups chosen yet";
-    return `${names.join(", ")} — ${count} record${count === 1 ? "" : "s"}`;
-  }
-  return `${count} hand-picked record${count === 1 ? "" : "s"}`;
 }

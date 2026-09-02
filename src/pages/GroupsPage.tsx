@@ -69,6 +69,11 @@ export function GroupsPage() {
       <div className="grid two" style={{ alignItems: "start" }}>
         <div className="card">
           <div className="card-head"><h2>Your groups</h2></div>
+          {formError ? (
+            <div style={{ padding: "12px 18px 0" }}>
+              <Notice kind="error">{formError}</Notice>
+            </div>
+          ) : null}
           {tags.length ? (
             <table>
               <thead>
@@ -93,13 +98,24 @@ export function GroupsPage() {
                             defaultValue={tag.name}
                             style={{ maxWidth: 220, border: "1px solid transparent", background: "transparent" }}
                             onBlur={async (event) => {
-                              const next = event.target.value.trim();
+                              const field = event.target;
+                              const next = field.value.trim();
                               if (!next || next === tag.name) {
-                                event.target.value = tag.name;
+                                field.value = tag.name;
                                 return;
                               }
-                              await updateTag(tag.id, { name: next });
-                              await reload();
+                              try {
+                                setFormError(null);
+                                await updateTag(tag.id, { name: next });
+                                await reload();
+                              } catch (cause) {
+                                // Group names are unique; a clash must not leave
+                                // the new name on screen and the old one stored.
+                                field.value = tag.name;
+                                setFormError(
+                                  cause instanceof Error ? cause.message : String(cause),
+                                );
+                              }
                             }}
                           />
                         ) : (
@@ -168,8 +184,6 @@ export function GroupsPage() {
                     ))}
                   </div>
                 </Field>
-
-                {formError ? <Notice kind="error">{formError}</Notice> : null}
 
                 <button type="submit" className="btn primary" disabled={busy || !name.trim()} style={{ marginTop: 10 }}>
                   {busy ? "Adding…" : "Add group"}

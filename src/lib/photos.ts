@@ -82,6 +82,7 @@ export async function removePhoto(path: string | null | undefined): Promise<void
 // ---------------------------------------------------------------------------
 
 const SIGNED_URL_TTL = 60 * 60; // one hour
+const SIGN_BATCH = 100;
 const signedUrls = new Map<string, { url: string; expires: number }>();
 
 /**
@@ -102,13 +103,16 @@ export async function getPhotoUrls(paths: string[]): Promise<Map<string, string>
     else missing.push(path);
   }
 
-  if (missing.length) {
+  // Signing is one round trip per batch, but a whole-congregation request can
+  // be hundreds of paths, which is a large POST body and a slow single call.
+  const expires = now + (SIGNED_URL_TTL - 60) * 1000;
+  for (let i = 0; i < missing.length; i += SIGN_BATCH) {
+    const batch = missing.slice(i, i + SIGN_BATCH);
     const { data, error } = await supabase.storage
       .from(PHOTO_BUCKET)
-      .createSignedUrls(missing, SIGNED_URL_TTL);
+      .createSignedUrls(batch, SIGNED_URL_TTL);
     if (error) throw new Error(error.message);
 
-    const expires = now + (SIGNED_URL_TTL - 60) * 1000;
     for (const item of data ?? []) {
       if (!item.signedUrl || !item.path) continue;
       signedUrls.set(item.path, { url: item.signedUrl, expires });

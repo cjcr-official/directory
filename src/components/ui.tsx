@@ -158,6 +158,7 @@ export function ConfirmButton({
 }) {
   const [armed, setArmed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!armed) return;
@@ -167,14 +168,20 @@ export function ConfirmButton({
 
   if (!armed) {
     return (
-      <button
-        type="button"
-        className={subtle ? "btn ghost small danger-hover" : "btn danger"}
-        disabled={disabled}
-        onClick={() => setArmed(true)}
-      >
-        {label}
-      </button>
+      <span className="row tight">
+        <button
+          type="button"
+          className={subtle ? "btn ghost small danger-hover" : "btn danger"}
+          disabled={disabled}
+          onClick={() => {
+            setError(null);
+            setArmed(true);
+          }}
+        >
+          {label}
+        </button>
+        {error ? <span className="small" style={{ color: "var(--danger)" }}>{error}</span> : null}
+      </span>
     );
   }
 
@@ -186,11 +193,17 @@ export function ConfirmButton({
         disabled={busy}
         onClick={async () => {
           setBusy(true);
+          setError(null);
           try {
             await onConfirm();
+            setArmed(false);
+          } catch (cause) {
+            // Without this the rejection is swallowed and a failed delete
+            // looks exactly like a successful one.
+            setError(cause instanceof Error ? cause.message : String(cause));
+            setArmed(false);
           } finally {
             setBusy(false);
-            setArmed(false);
           }
         }}
       >

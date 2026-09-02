@@ -79,7 +79,11 @@ export function ProjectEditPage() {
   );
 
   const included = useMemo(() => resolveEntries(entries, selection), [entries, selection]);
-  const sheets = Math.ceil(included.length / recordsPerSheet(settings));
+  // The rows/columns inputs can hold a half-typed or empty value; the summary
+  // and the saved record both use the clamped version so neither can show or
+  // store "0 records to a sheet".
+  const safeSettings = useMemo(() => normalizeSettings(settings), [settings]);
+  const sheets = Math.ceil(included.length / recordsPerSheet(safeSettings));
 
   if (loading) return <LoadingScreen label="Loading directory…" />;
 
@@ -98,7 +102,7 @@ export function ProjectEditPage() {
         kind,
         description: description.trim() || null,
         selection_mode: mode,
-        settings: settings as unknown as Record<string, unknown>,
+        settings: safeSettings as unknown as Record<string, unknown>,
       };
 
       const project = id ? await updateProject(id, payload) : await createProject(payload);
@@ -129,7 +133,8 @@ export function ProjectEditPage() {
           <h1>{isNew ? "New directory" : name}</h1>
           <div className="sub">
             {included.length} record{included.length === 1 ? "" : "s"} ·{" "}
-            {recordsPerSheet(settings)} to a sheet · about {sheets} sheet{sheets === 1 ? "" : "s"} of paper
+            {recordsPerSheet(safeSettings)} to a sheet · about {sheets} sheet
+            {sheets === 1 ? "" : "s"} of paper
           </div>
         </div>
         <div className="row tight">
@@ -278,9 +283,10 @@ export function ProjectEditPage() {
                 </div>
 
                 <Notice>
-                  <strong>{recordsPerSheet(settings)} records on one sheet of paper</strong> —{" "}
-                  {settings.rows} down each half, {settings.columns} halves across. Fold the sheet
-                  down the middle for a {settings.pageSize === "a4" ? "A5" : "half-letter"} booklet.
+                  <strong>{recordsPerSheet(safeSettings)} records on one sheet of paper</strong> —{" "}
+                  {safeSettings.rows} down each half, {safeSettings.columns} halves across. Fold the
+                  sheet down the middle for a{" "}
+                  {safeSettings.pageSize === "a4" ? "A5" : "half-letter"} booklet.
                 </Notice>
 
                 <Field label="Text size" htmlFor="text_scale">

@@ -394,6 +394,9 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
 @media print {
   .preview-bar { display: none !important; }
+  /* Anything that explains the preview belongs on screen only; left in, it
+     pushes the first sheet off an exactly-sized page and drifts the fold. */
+  .screen-only { display: none !important; }
   .preview-canvas { background: #fff; padding: 0; min-height: 0; }
   .sheet-stack { gap: 0; }
   .sheet-frame { overflow: visible; }

@@ -51,8 +51,8 @@ export function AdministratorsPage() {
         <div className="grow">
           <h1>Administrators</h1>
           <div className="sub">
-            People who can sign in. Anyone who signs up arrives as a viewer until you give them
-            more.
+            People who can sign in. A new account can see nothing at all until you turn it on
+            here.
           </div>
         </div>
       </div>
@@ -60,9 +60,10 @@ export function AdministratorsPage() {
       {error ? <Notice kind="error">{error}</Notice> : null}
 
       <Notice>
-        To add someone, send them the address of this app and ask them to choose{" "}
-        <strong>Create the first account</strong> on the sign-in screen. They will land here as a
-        viewer, and you can promote them below.
+        To add someone, send them the address of this app and ask them to create an account on the
+        sign-in screen. They arrive here with <strong>no access</strong> — they cannot see a single
+        name or address until you choose <strong>Grant access</strong> and pick a role. Anyone can
+        reach the sign-up form, so this is what keeps the congregation's details private.
       </Notice>
 
       <div className="card" style={{ marginTop: 16 }}>
@@ -111,10 +112,10 @@ export function AdministratorsPage() {
                         disabled={busy === row.id}
                         onClick={() => void change(row.id, { is_active: !row.is_active })}
                       >
-                        {row.is_active ? "Suspend" : "Restore"}
+                        {row.is_active ? "Suspend" : "Grant access"}
                       </button>
                     ) : (
-                      <span className="muted small">{row.is_active ? "Active" : "Suspended"}</span>
+                      <span className="muted small">{row.is_active ? "Active" : "No access"}</span>
                     )}
                   </td>
                 </tr>

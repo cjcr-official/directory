@@ -36,7 +36,7 @@ function Protected() {
             <h1 style={{ fontSize: "1.15rem", marginBottom: 10 }}>Waiting for access</h1>
             <Notice kind="warn">
               Your account exists but has not been given access to this directory yet. Ask an owner
-              to grant you a role under Administrators.
+              to grant it — they will find you listed under Administrators.
             </Notice>
             <button type="button" className="btn" style={{ marginTop: 14 }} onClick={() => void signOut()}>
               Sign out

@@ -46,7 +46,8 @@ export function PersonEditPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { canEdit } = useAuth();
-  const { personById, householdById, households, tags, tagsOfPerson, reload, loading } = useDirectory();
+  const { personById, householdById, households, membersOf, tags, tagsOfPerson, reload, loading } =
+    useDirectory();
 
   const existing = id ? personById.get(id) : undefined;
   const isNew = !id;
@@ -108,12 +109,21 @@ export function PersonEditPage() {
         photoPath = await uploadPhoto("people", photoBlob);
       }
 
+      // Joining a family with the default sort_order of 0 would file them
+      // ahead of the head of household on the printed card.
+      const joiningId =
+        form.household_id && form.household_id !== existing?.household_id
+          ? form.household_id
+          : null;
+      const sortOrder = joiningId ? membersOf(joiningId).length : form.sort_order;
+
       const payload = {
         ...form,
         first_name: form.first_name.trim(),
         last_name: form.last_name.trim(),
         preferred_name: form.preferred_name?.trim() || null,
         household_role: form.household_id ? (form.household_role ?? "other") : null,
+        sort_order: sortOrder,
         photo_path: photoPath,
       };
 

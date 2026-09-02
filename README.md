@@ -63,10 +63,13 @@ cp .env.example .env.local     # then paste in your two values
 npm run dev
 ```
 
-Open the address it prints. The first account to sign up becomes the **owner**;
-everyone who signs up after that arrives as a **viewer** until an owner promotes
-them. That means you can claim a fresh project without touching a secret key,
-and a stranger who finds the URL cannot give themselves access.
+Open the address it prints. The first account to sign up becomes the **owner**,
+so you can claim a fresh project without touching a secret key.
+
+Every account created after that starts with **no access at all** — it can sign
+in and see nothing until an owner grants it a role under *Administrators*. Sign-up
+is open to anyone who reaches the app, so this is the line that keeps the
+congregation's details private.
 
 ### 3. Hosting (Cloudflare)
 
@@ -115,10 +118,11 @@ to work, and it is not what protects anything.
 
 What protects the congregation's details is **row level security**, defined in
 `supabase/migrations/0001_initial_schema.sql`. Every table refuses to return a
-single row unless the request carries a signed-in account that has an active
-row in `profiles`. Photographs live in a **private** bucket and are served
-through short-lived signed URLs. Nothing is readable anonymously, and nothing is
-indexed.
+single row unless the request carries a signed-in account that has an *active*
+row in `profiles` — and new sign-ups are created inactive, so having an account
+is not the same as having access. Photographs live in a **private** bucket and
+are served through short-lived signed URLs. Nothing is readable anonymously, and
+nothing is indexed.
 
 Three roles:
 
@@ -127,6 +131,7 @@ Three roles:
 | **Owner** | Everything, including adding and removing administrators |
 | **Editor** | Add and edit people, families, groups and directories |
 | **Viewer** | Browse and print; no changes |
+| *(no access)* | A new sign-up, until an owner turns it on |
 
 ---
 

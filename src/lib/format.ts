@@ -149,27 +149,33 @@ export function monthDayOrder(iso: string | null | undefined): number {
 
 /**
  * The standard PDF fonts speak WinAnsi (Latin-1) only, and pdf-lib throws on
- * anything outside it. Accents are folded to their base letter and any
- * remaining character becomes "?" so an unusual name degrades instead of
- * breaking the whole book.
+ * anything outside it.
+ *
+ * Typographic punctuation is folded to ASCII first - a curly apostrophe in
+ * O'Neil is outside Latin-1's useful range, and it has no combining marks to
+ * strip, so the accent fold below would otherwise turn it into "?". Accents are
+ * then folded to their base letter, and only a character that survives neither
+ * pass becomes "?", so an unusual name degrades instead of breaking the book.
  */
 export function toWinAnsi(text: string): string {
+  const normalised = text
+    .replace(/[\u2018\u2019\u201a\u201b]/g, "'")
+    .replace(/[\u201c\u201d\u201e\u201f]/g, '"')
+    .replace(/[\u2010-\u2015]/g, "-")
+    .replace(/\u2026/g, "...")
+    .replace(/[\u2000-\u200a\u202f\u205f]/g, " ")
+    .replace(/\u00a0/g, " ");
+
   let out = "";
-  for (const char of text) {
+  for (const char of normalised) {
     if (char.charCodeAt(0) < 256) {
       out += char;
       continue;
     }
     const folded = char.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    out += /^[\x20-\xff]*$/.test(folded) && folded.length > 0 ? folded : "?";
+    out += folded.length > 0 && /^[\x20-\xff]*$/.test(folded) ? folded : "?";
   }
-  // Typographic quotes and dashes are outside Latin-1's useful range in some
-  // viewers; normalise them to their ASCII equivalents.
-  return out
-    .replace(/[‘’]/g, "'")
-    .replace(/[“”]/g, '"')
-    .replace(/[–—]/g, "-")
-    .replace(/…/g, "...");
+  return out;
 }
 
 /** Joins non-empty pieces with a separator. */
