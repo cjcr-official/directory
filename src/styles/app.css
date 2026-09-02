@@ -845,6 +845,288 @@ th.num {
   }
 }
 
+/* --- the proof screen ------------------------------------------------------
+ *
+ * Where a book is checked before it costs paper. The sheets are the subject,
+ * so they sit as real pages on a dark ground with the light behind them, and
+ * everything else - the bar, the captions - stays quiet and out of the way.
+ *
+ * This screen renders outside the app shell, which is why it carries its own
+ * safe-area padding: without it the back button sits under the status bar on
+ * a phone and cannot be tapped.
+ * -------------------------------------------------------------------------- */
+
+.preview-bar {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 10px calc(18px + env(safe-area-inset-right)) 10px calc(18px + env(safe-area-inset-left));
+  padding-top: calc(10px + env(safe-area-inset-top));
+  background: var(--brand-dark);
+  color: #fff;
+  box-shadow: 0 1px 0 rgb(255 255 255 / 8%);
+}
+
+.preview-bar-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* A real target, not a line of text: 40px square clears the 44px guidance
+   once its padding is counted, and it is the only way back from here. */
+.preview-back {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgb(255 255 255 / 22%);
+  color: #fff;
+  font-size: 1.05rem;
+  text-decoration: none;
+}
+.preview-back:hover {
+  background: rgb(255 255 255 / 12%);
+}
+
+.preview-titles {
+  min-width: 0;
+}
+
+.preview-title {
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.preview-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin-top: 1px;
+  font-size: 0.76rem;
+  color: rgb(255 255 255 / 58%);
+}
+.preview-stats strong {
+  color: rgb(255 255 255 / 92%);
+  font-weight: 620;
+}
+
+.preview-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+.preview-tools-spacer {
+  flex: 1;
+}
+
+.preview-check,
+.preview-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  font-size: 0.82rem;
+  color: rgb(255 255 255 / 74%);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.preview-zoom input[type="range"] {
+  width: 108px;
+  accent-color: var(--accent);
+}
+.preview-check input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+/* The default button is drawn for a white card and turns into a pale slab up
+   here; this is the same button wearing the bar's clothes. */
+.btn.on-dark {
+  background: rgb(255 255 255 / 10%);
+  border-color: rgb(255 255 255 / 26%);
+  color: #fff;
+}
+.btn.on-dark:hover:not(:disabled) {
+  background: rgb(255 255 255 / 18%);
+}
+
+.preview-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: rgb(255 255 255 / 14%);
+}
+.preview-progress > div {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+
+.preview-notice {
+  padding: 14px calc(18px + env(safe-area-inset-right)) 0 calc(18px + env(safe-area-inset-left));
+}
+
+/* The ground, painted once for the whole screen. Dark, so a sheet of paper
+   reads as paper rather than as more screen, and lit from above like
+   something on a light table. It lives on the wrapper rather than the canvas
+   so the notices do not sit in a pale band between two dark areas. */
+.preview {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background:
+    radial-gradient(90% 46% at 50% 0%, var(--brand-dark-2) 0%, transparent 62%), var(--brand-dark);
+}
+
+.preview-canvas {
+  padding: 26px calc(16px + env(safe-area-inset-right)) calc(48px + env(safe-area-inset-bottom))
+    calc(16px + env(safe-area-inset-left));
+}
+
+.sheet-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 30px;
+}
+
+.sheet-holder {
+  max-width: 100%;
+}
+
+.sheet-caption {
+  margin-bottom: 7px;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 42%);
+}
+
+/* The frame is the paper: it carries the size, so the scaled sheet inside can
+   be taken out of the layout entirely. */
+.sheet-frame {
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+  border-radius: 3px;
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 34%),
+    0 26px 54px -20px rgb(0 0 0 / 72%);
+}
+
+.sheet {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.fold-line {
+  position: absolute;
+  width: 0;
+  border-left: 1px dashed rgb(20 32 31 / 26%);
+}
+
+@media (max-width: 820px) {
+  /* Two rows: what this is, then what you can do to it. One row of six
+     controls is what turned this screen into a heap. */
+  .preview-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .preview-tools {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .preview-tools-spacer {
+    display: none;
+  }
+  .preview-zoom {
+    flex: 1;
+    min-width: 140px;
+  }
+  .preview-zoom input[type="range"] {
+    width: 100%;
+    flex: 1;
+  }
+  .preview-tools .btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+/* --- printing -------------------------------------------------------------
+ *
+ * The browser prints the DOM, so without this it would print the toolbar, the
+ * notices and a stack of sheets scaled to whatever the zoom slider happened to
+ * be on. Every sheet goes back to true size, one to a page.
+ * -------------------------------------------------------------------------- */
+
+@media print {
+  .screen-only,
+  .preview-bar,
+  .preview-notice,
+  .sidebar,
+  .topbar,
+  .scrim,
+  .update-bar {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .preview,
+  .preview-canvas {
+    min-height: 0;
+    padding: 0;
+    background: none;
+  }
+
+  .sheet-stack {
+    display: block;
+  }
+
+  .sheet-holder {
+    break-after: page;
+    page-break-after: always;
+  }
+  .sheet-holder:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  /* Both sizes are set inline from the zoom, which has no business deciding
+     how large a printed page is. */
+  .sheet-frame {
+    width: auto !important;
+    height: auto !important;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+  }
+  .sheet {
+    position: relative;
+    transform: none !important;
+  }
+}
+
 /* --- updating -------------------------------------------------------------
  *
  * Shown for a beat before the page reloads onto a newer build. It covers

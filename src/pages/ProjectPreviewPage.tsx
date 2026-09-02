@@ -147,72 +147,85 @@ export function ProjectPreviewPage() {
   const truncated = book.sheets.length > PREVIEW_SHEET_LIMIT;
 
   return (
-    <div>
+    <div className="preview">
       {/* The @page rule has to match the composed sheet or the browser's own
           print dialog would scale it and the fold would drift. */}
       <style>{`@page { size: ${book.width}pt ${book.height}pt; margin: 0; }`}</style>
 
-      <div className="preview-bar">
-        <Link className="btn ghost" to={`/projects/${project.id}`}>
-          ← {project.name}
-        </Link>
+      <header className="preview-bar">
+        <div className="preview-bar-main">
+          <Link className="preview-back" to={`/projects/${project.id}`} aria-label="Back">
+            <span aria-hidden>←</span>
+          </Link>
+          <div className="preview-titles">
+            <div className="preview-title">{project.name}</div>
+            <div className="preview-stats">
+              <span>
+                <strong>{book.recordCount}</strong> {book.recordCount === 1 ? "record" : "records"}
+              </span>
+              <span>
+                <strong>{book.pageCount}</strong> {book.pageCount === 1 ? "page" : "pages"}
+              </span>
+              <span>
+                <strong>{book.sheets.length}</strong>{" "}
+                {book.sheets.length === 1 ? "sheet" : "sheets"}
+              </span>
+              <span>{recordsPerSheet(settings)} to a sheet</span>
+            </div>
+          </div>
+        </div>
 
-        <span className="muted small nowrap">
-          {book.recordCount} records · {book.pageCount} pages · {book.sheets.length} sheets ·{" "}
-          {recordsPerSheet(settings)} to a sheet
-        </span>
+        <div className="preview-tools">
+          <label className="preview-check">
+            <input
+              type="checkbox"
+              checked={showGuides}
+              onChange={(event) => setShowGuides(event.target.checked)}
+            />
+            Fold guides
+          </label>
 
-        <span className="spacer" />
+          <label className="preview-zoom">
+            <span>Zoom</span>
+            <input
+              type="range"
+              min={0.25}
+              max={1.5}
+              step={0.05}
+              value={zoom}
+              aria-label="Zoom"
+              onChange={(event) => setZoom(Number(event.target.value))}
+            />
+          </label>
 
-        <label className="row tight small nowrap" style={{ gap: 6 }}>
-          <input
-            type="checkbox"
-            checked={showGuides}
-            onChange={(event) => setShowGuides(event.target.checked)}
-          />
-          Fold guides
-        </label>
+          <span className="preview-tools-spacer" />
 
-        <label className="row tight small nowrap" style={{ gap: 6 }}>
-          Zoom
-          <input
-            type="range"
-            min={0.25}
-            max={1.5}
-            step={0.05}
-            value={zoom}
-            style={{ width: 110 }}
-            onChange={(event) => setZoom(Number(event.target.value))}
-          />
-        </label>
+          <button type="button" className="btn on-dark" onClick={() => setPrintingAll(true)}>
+            {printingAll ? "Preparing…" : "Print"}
+          </button>
+          <button
+            type="button"
+            className="btn primary"
+            disabled={building}
+            onClick={() => void generatePdf()}
+          >
+            {building ? "Building PDF…" : "Download PDF"}
+          </button>
+        </div>
 
         {progress ? (
-          <span className="row tight">
-            <span className="progress-track">
-              <div
-                style={{
-                  width: `${Math.round((progress.done / Math.max(progress.total, 1)) * 100)}%`,
-                }}
-              />
-            </span>
-          </span>
+          <div className="preview-progress" role="progressbar">
+            <div
+              style={{
+                width: `${Math.round((progress.done / Math.max(progress.total, 1)) * 100)}%`,
+              }}
+            />
+          </div>
         ) : null}
-
-        <button type="button" className="btn" onClick={() => setPrintingAll(true)}>
-          {printingAll ? "Preparing…" : "Print"}
-        </button>
-        <button
-          type="button"
-          className="btn primary"
-          disabled={building}
-          onClick={() => void generatePdf()}
-        >
-          {building ? "Building PDF…" : "Download PDF"}
-        </button>
-      </div>
+      </header>
 
       {settings.bookletOrder ? (
-        <div className="screen-only" style={{ padding: "10px 18px 0" }}>
+        <div className="preview-notice screen-only">
           <Notice>
             <strong>Booklet order is on.</strong> The pages below are arranged for printing
             double-sided, folding the whole stack down the middle and stapling the spine — so they
@@ -223,7 +236,7 @@ export function ProjectPreviewPage() {
       ) : null}
 
       {truncated ? (
-        <div className="screen-only" style={{ padding: "10px 18px 0" }}>
+        <div className="preview-notice screen-only">
           <Notice kind="warn">
             Showing the first {PREVIEW_SHEET_LIMIT} of {book.sheets.length} sheets to keep this
             screen quick. Printing and the downloaded PDF both use all of them.

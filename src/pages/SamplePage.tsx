@@ -124,42 +124,59 @@ export function SamplePage() {
   if (!book) return <LoadingScreen label="Building a sample directory…" />;
 
   return (
-    <div>
+    <div className="preview">
       <style>{`@page { size: ${book.width}pt ${book.height}pt; margin: 0; }`}</style>
 
-      <div className="preview-bar">
-        <Link className="btn ghost" to="/">
-          ← Back
-        </Link>
-        <strong className="small">Sample directory</strong>
-        <span className="muted small nowrap">
-          {book.recordCount} records · {recordsPerSheet(book.settings)} to a sheet ·{" "}
-          {book.sheets.length} sheets · {book.pageCount} pages
-        </span>
-        <span className="spacer" />
-        <label className="row tight small nowrap" style={{ gap: 6 }}>
-          Zoom
-          <input
-            type="range"
-            min={0.25}
-            max={1.5}
-            step={0.05}
-            value={zoom}
-            style={{ width: 110 }}
-            onChange={(event) => setZoom(Number(event.target.value))}
-          />
-        </label>
-        <button
-          type="button"
-          className="btn primary"
-          disabled={building}
-          onClick={() => void download()}
-        >
-          {building ? "Building…" : "Download sample PDF"}
-        </button>
-      </div>
+      <header className="preview-bar">
+        <div className="preview-bar-main">
+          <Link className="preview-back" to="/" aria-label="Back">
+            <span aria-hidden>←</span>
+          </Link>
+          <div className="preview-titles">
+            <div className="preview-title">Sample directory</div>
+            <div className="preview-stats">
+              <span>
+                <strong>{book.recordCount}</strong> records
+              </span>
+              <span>
+                <strong>{book.pageCount}</strong> pages
+              </span>
+              <span>
+                <strong>{book.sheets.length}</strong> sheets
+              </span>
+              <span>{recordsPerSheet(book.settings)} to a sheet</span>
+            </div>
+          </div>
+        </div>
 
-      <div className="screen-only" style={{ padding: "12px 18px 0" }}>
+        <div className="preview-tools">
+          <label className="preview-zoom">
+            <span>Zoom</span>
+            <input
+              type="range"
+              min={0.25}
+              max={1.5}
+              step={0.05}
+              value={zoom}
+              aria-label="Zoom"
+              onChange={(event) => setZoom(Number(event.target.value))}
+            />
+          </label>
+
+          <span className="preview-tools-spacer" />
+
+          <button
+            type="button"
+            className="btn primary"
+            disabled={building}
+            onClick={() => void download()}
+          >
+            {building ? "Building…" : "Download sample PDF"}
+          </button>
+        </div>
+      </header>
+
+      <div className="preview-notice screen-only">
         <Notice>
           Every name, address, photograph and phone number below is invented. This is the exact
           layout your own directory will print in: landscape paper, folded down the middle, three

@@ -177,35 +177,39 @@ export function BookPreview({ book, photoUrls, zoom, limit }: Props) {
   return (
     <div className="sheet-stack">
       {sheets.map((sheet) => (
-        <div
-          key={sheet.index}
-          className="sheet-frame"
-          style={{ width: `${book.width * zoom}pt`, height: `${book.height * zoom}pt` }}
-        >
+        <div key={sheet.index} className="sheet-holder">
+          <div className="sheet-caption screen-only">
+            Sheet {sheet.index + 1} of {book.sheets.length}
+          </div>
           <div
-            className="sheet"
-            style={{
-              width: `${book.width}pt`,
-              height: `${book.height}pt`,
-              transform: `scale(${zoom})`,
-              transformOrigin: "top left",
-            }}
+            className="sheet-frame"
+            style={{ width: `${book.width * zoom}pt`, height: `${book.height * zoom}pt` }}
           >
-            {sheet.foldX.map((x, i) => (
-              <div
-                key={`fold-${i}`}
-                className="fold-line"
-                style={{ left: `${x}pt`, top: "14pt", height: `${book.height - 28}pt` }}
-              />
-            ))}
-            {sheet.pages.map((page, i) => (
-              <Page
-                key={`${sheet.index}-${i}`}
-                page={page}
-                photoUrls={photoUrls}
-                fontStack={fontStack}
-              />
-            ))}
+            <div
+              className="sheet"
+              style={{
+                width: `${book.width}pt`,
+                height: `${book.height}pt`,
+                transform: `scale(${zoom})`,
+                transformOrigin: "top left",
+              }}
+            >
+              {sheet.foldX.map((x, i) => (
+                <div
+                  key={`fold-${i}`}
+                  className="fold-line"
+                  style={{ left: `${x}pt`, top: "14pt", height: `${book.height - 28}pt` }}
+                />
+              ))}
+              {sheet.pages.map((page, i) => (
+                <Page
+                  key={`${sheet.index}-${i}`}
+                  page={page}
+                  photoUrls={photoUrls}
+                  fontStack={fontStack}
+                />
+              ))}
+            </div>
           </div>
         </div>
       ))}
