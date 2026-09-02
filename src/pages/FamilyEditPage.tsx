@@ -5,19 +5,26 @@ import { useAuth } from "@/auth/AuthProvider";
 import { AddressFields } from "@/components/AddressFields";
 import { PhotoInput } from "@/components/PhotoInput";
 import { TagPicker } from "@/components/TagPicker";
-import { Checkbox, ConfirmButton, Field, LoadingScreen, Notice } from "@/components/ui";
-import type { HouseholdRole, HouseholdRow, PersonRow } from "@/lib/database.types";
+import { Avatar, Checkbox, ConfirmButton, Field, LoadingScreen, Notice } from "@/components/ui";
+import type { HouseholdRole, HouseholdRow } from "@/lib/database.types";
 import { removePhoto, uploadPhoto } from "@/lib/photos";
 import {
   createHousehold,
-  createPerson,
   deleteHousehold,
   setPersonHousehold,
   setTags,
   updateHousehold,
   updatePerson,
 } from "@/lib/queries";
-import { sameDisplayName, suggestHouseholdName } from "@/lib/format";
+import {
+  firstName,
+  formatPhone,
+  fullName,
+  personPhotoPath,
+  sameDisplayName,
+  sortKey,
+  suggestHouseholdName,
+} from "@/lib/format";
 
 const ROLES: { value: HouseholdRole; label: string }[] = [
   { value: "head", label: "Head of household" },
@@ -26,61 +33,21 @@ const ROLES: { value: HouseholdRole; label: string }[] = [
   { value: "other", label: "Other" },
 ];
 
-interface MemberDraft {
-  /**
-   * Stable for the life of the form. Array indices are not: discarding an
-   * unsaved member shifts every row after it, and React would then reuse the
-   * discarded row's photo state for its neighbour.
-   */
-  key: string;
-  /** Present when the person already exists in the database. */
-  id: string | null;
-  first_name: string;
-  last_name: string;
-  preferred_name: string;
-  household_role: HouseholdRole;
-  email: string;
-  phone: string;
-  date_of_birth: string;
-  /**
-   * Kept only so it survives a save. Members of a family are pictured by the
-   * family portrait, so nothing here uploads or replaces it.
-   */
-  photo_path: string | null;
-  /** Marked for removal on save; existing people are unlinked, not deleted. */
-  removed: boolean;
+/**
+ * A person's place in the family. People themselves are created and edited on
+ * their own record; this only says who is in the family, in what role, and in
+ * what order they are listed on the card.
+ */
+interface MemberLink {
+  id: string;
+  role: HouseholdRole;
 }
 
-function draftFromPerson(person: PersonRow): MemberDraft {
-  return {
-    key: person.id,
-    id: person.id,
-    first_name: person.first_name,
-    last_name: person.last_name,
-    preferred_name: person.preferred_name ?? "",
-    household_role: person.household_role ?? "other",
-    email: person.email ?? "",
-    phone: person.phone ?? "",
-    date_of_birth: person.date_of_birth ?? "",
-    photo_path: person.photo_path,
-    removed: false,
-  };
-}
-
-function emptyDraft(lastName: string, role: HouseholdRole): MemberDraft {
-  return {
-    key: crypto.randomUUID(),
-    id: null,
-    first_name: "",
-    last_name: lastName,
-    preferred_name: "",
-    household_role: role,
-    email: "",
-    phone: "",
-    date_of_birth: "",
-    photo_path: null,
-    removed: false,
-  };
+/** Head, then spouse, then children - the role a newly added person likely has. */
+function suggestRole(current: MemberLink[]): HouseholdRole {
+  if (!current.some((m) => m.role === "head")) return "head";
+  if (!current.some((m) => m.role === "spouse")) return "spouse";
+  return "child";
 }
 
 const BLANK: Omit<HouseholdRow, "id" | "created_at" | "updated_at"> = {
@@ -107,6 +74,7 @@ export function FamilyEditPage() {
   const {
     households,
     householdById,
+    people,
     personById,
     membersOf,
     tags,
@@ -119,7 +87,8 @@ export function FamilyEditPage() {
   const isNew = !id;
 
   const [form, setForm] = useState(BLANK);
-  const [members, setMembers] = useState<MemberDraft[]>([]);
+  const [members, setMembers] = useState<MemberLink[]>([]);
+  const [memberQuery, setMemberQuery] = useState("");
   const [tagIds, setTagIds] = useState<string[]>([]);
   const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
   const [photoRemoved, setPhotoRemoved] = useState(false);
@@ -128,18 +97,35 @@ export function FamilyEditPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isNew) {
-      setMembers([emptyDraft("", "head")]);
-      return;
-    }
-    if (!existing) return;
+    if (isNew || !existing) return;
     setForm({ ...existing });
-    setMembers(membersOf(existing.id).map(draftFromPerson));
+    setMembers(
+      membersOf(existing.id).map((person) => ({
+        id: person.id,
+        role: person.household_role ?? "other",
+      })),
+    );
     setTagIds(tagsOfHousehold(existing.id));
     setNameTouched(true);
   }, [existing?.id, isNew]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const visibleMembers = useMemo(() => members.filter((member) => !member.removed), [members]);
+  const memberPeople = useMemo(
+    () => members.map((m) => ({ link: m, person: personById.get(m.id) })).filter((m) => m.person),
+    [members, personById],
+  );
+
+  /** People who could be added: anyone not already listed here. */
+  const candidates = useMemo(() => {
+    const taken = new Set(members.map((m) => m.id));
+    const needle = sortKey(memberQuery);
+    return people
+      .filter((person) => !taken.has(person.id))
+      .filter((person) => !needle || sortKey(fullName(person), person.email).includes(needle))
+      .sort((a, b) =>
+        sortKey(a.last_name, a.first_name).localeCompare(sortKey(b.last_name, b.first_name)),
+      )
+      .slice(0, 8);
+  }, [people, members, memberQuery]);
 
   // Until someone edits the family name by hand it tracks the surname and the
   // head's first name, so "The Smith Family" becomes "The John Smith Family"
@@ -163,6 +149,13 @@ export function FamilyEditPage() {
     [households, existing?.id, form.display_name],
   );
 
+  /** "The John Smith Family" - available once the family has a head. */
+  const qualifiedName = useMemo(() => {
+    const head = members.find((m) => m.role === "head") ?? members[0];
+    const person = head ? personById.get(head.id) : undefined;
+    return person ? suggestHouseholdName(form.sort_name, firstName(person)) : "";
+  }, [members, personById, form.sort_name]);
+
   if (!isNew && loading && !existing) return <LoadingScreen />;
   if (!isNew && !loading && !existing) {
     return (
@@ -184,124 +177,123 @@ export function FamilyEditPage() {
   /** Typing a surname fills in the family name until someone edits it directly. */
   function setSurname(value: string) {
     patch({ sort_name: value });
-    setMembers((current) =>
-      current.map((member) =>
-        member.id === null && (!member.last_name || member.last_name === form.sort_name)
-          ? { ...member, last_name: value }
-          : member,
-      ),
-    );
   }
 
   /** The head of the household, if one has been named yet. */
   function headFirstName(): string {
-    const head =
-      members.find((m) => !m.removed && m.household_role === "head") ??
-      members.find((m) => !m.removed);
-    return (head?.preferred_name || head?.first_name || "").trim();
+    const head = members.find((m) => m.role === "head") ?? members[0];
+    const person = head ? personById.get(head.id) : undefined;
+    return person ? firstName(person) : "";
   }
 
-  function updateMember(index: number, next: Partial<MemberDraft>) {
-    setMembers((current) =>
-      current.map((member, i) => (i === index ? { ...member, ...next } : member)),
-    );
+  function setRole(id: string, role: HouseholdRole) {
+    setMembers((current) => current.map((m) => (m.id === id ? { ...m, role } : m)));
   }
 
-  function removeMember(index: number) {
-    setMembers((current) =>
-      current.flatMap((member, i) => {
-        if (i !== index) return [member];
-        // A person who was never saved just disappears; a saved one is
-        // unlinked from the family on save so their record survives.
-        return member.id ? [{ ...member, removed: true }] : [];
-      }),
-    );
+  /** Moves a member one place up or down the order they print in. */
+  function moveMember(index: number, delta: number) {
+    setMembers((current) => {
+      const next = [...current];
+      const target = index + delta;
+      if (target < 0 || target >= next.length) return current;
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
+  /**
+   * Writes the family and its membership, and hands back the id. Split out of
+   * the submit handler so "add a new person" can save first and come back to a
+   * family that exists, rather than losing what was typed.
+   */
+  async function persist(): Promise<string> {
+    let photoPath = form.photo_path;
+    if (photoRemoved && form.photo_path) {
+      await removePhoto(form.photo_path);
+      photoPath = null;
+    }
+    if (photoBlob) {
+      if (form.photo_path && !photoRemoved) await removePhoto(form.photo_path);
+      photoPath = await uploadPhoto("households", photoBlob);
+    }
+
+    const surname = form.sort_name.trim();
+    const payload = {
+      ...form,
+      sort_name: surname,
+      display_name: form.display_name.trim() || suggestHouseholdName(surname, headFirstName()),
+      photo_path: photoPath,
+    };
+
+    const household = existing
+      ? await updateHousehold(existing.id, payload)
+      : await createHousehold(payload);
+
+    await setTags("household", household.id, tagIds);
+
+    // Anyone who was in the family and no longer is. Their record survives -
+    // they simply print on their own from now on.
+    const before = existing ? membersOf(existing.id) : [];
+    const staying = new Set(members.map((m) => m.id));
+    for (const person of before) {
+      if (staying.has(person.id)) continue;
+      // They keep living where they lived: copy the family address down, or
+      // their standalone card would print with none at all.
+      if (person.use_household_address) {
+        await updatePerson(person.id, {
+          use_household_address: false,
+          address_line1: form.address_line1,
+          address_line2: form.address_line2,
+          city: form.city,
+          state: form.state,
+          postal_code: form.postal_code,
+          country: form.country,
+        });
+      }
+      await setPersonHousehold(person.id, null, null, 0);
+    }
+
+    for (const [order, member] of members.entries()) {
+      await setPersonHousehold(member.id, household.id, member.role, order);
+    }
+
+    await reload();
+    return household.id;
   }
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
     if (!canEdit) return;
 
-    const surname = form.sort_name.trim();
-    if (!surname) {
+    if (!form.sort_name.trim()) {
       setError("A family needs a surname so it can be filed alphabetically.");
       return;
     }
 
     setSaving(true);
     setError(null);
-
     try {
-      let photoPath = form.photo_path;
-      if (photoRemoved && form.photo_path) {
-        await removePhoto(form.photo_path);
-        photoPath = null;
-      }
-      if (photoBlob) {
-        if (form.photo_path && !photoRemoved) await removePhoto(form.photo_path);
-        photoPath = await uploadPhoto("households", photoBlob);
-      }
+      const householdId = await persist();
+      navigate(`/families/${householdId}`, { replace: true });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setSaving(false);
+    }
+  }
 
-      const payload = {
-        ...form,
-        sort_name: surname,
-        display_name: form.display_name.trim() || suggestHouseholdName(surname, headFirstName()),
-        photo_path: photoPath,
-      };
-
-      const household = existing
-        ? await updateHousehold(existing.id, payload)
-        : await createHousehold(payload);
-
-      await setTags("household", household.id, tagIds);
-
-      let order = 0;
-      for (const member of members) {
-        if (member.removed) {
-          if (member.id) {
-            // They keep living where they lived: copy the household address
-            // down, or their standalone card would print with none at all.
-            const previous = personById.get(member.id);
-            if (previous?.use_household_address) {
-              await updatePerson(member.id, {
-                use_household_address: false,
-                address_line1: form.address_line1,
-                address_line2: form.address_line2,
-                city: form.city,
-                state: form.state,
-                postal_code: form.postal_code,
-                country: form.country,
-              });
-            }
-            await setPersonHousehold(member.id, null, null, 0);
-          }
-          continue;
-        }
-        // A row added and never filled in still carries the pre-filled
-        // surname, so the first name is what decides whether it is a real
-        // person or an empty row the user left behind.
-        if (!member.first_name.trim()) continue;
-
-        const fields = {
-          first_name: member.first_name.trim(),
-          last_name: member.last_name.trim() || surname,
-          preferred_name: member.preferred_name.trim() || null,
-          household_role: member.household_role,
-          email: member.email.trim() || null,
-          phone: member.phone.trim() || null,
-          date_of_birth: member.date_of_birth || null,
-          photo_path: member.photo_path,
-          household_id: household.id,
-          sort_order: order,
-        };
-        order += 1;
-
-        if (member.id) await updatePerson(member.id, fields);
-        else await createPerson({ ...blankPersonFields(), ...fields });
-      }
-
-      await reload();
-      navigate(`/families/${household.id}`, { replace: true });
+  /** Save what is here, then go and make a person who lands in this family. */
+  async function addNewPerson() {
+    if (!canEdit) return;
+    if (!form.sort_name.trim()) {
+      setError("A family needs a surname so it can be filed alphabetically.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const householdId = await persist();
+      navigate(`/people/new?household=${householdId}`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -384,9 +376,24 @@ export function FamilyEditPage() {
                   <Notice kind="warn">
                     {nameClashes.length === 1 ? "Another family is" : "Other families are"} already
                     called <strong>{form.display_name}</strong>. Both cards will be headed the same
-                    way, so a reader cannot tell them apart. Naming the head of each — “The John{" "}
-                    {form.sort_name || "Smith"} Family” — is the usual fix.
+                    way, so a reader cannot tell them apart. Naming the head of each is the usual
+                    fix.
                     <div className="row tight" style={{ marginTop: 8 }}>
+                      {/* Only once a head is in the family is there a name to
+                          offer - which is usually after the family was created,
+                          so it is a button rather than something typed for you. */}
+                      {qualifiedName && qualifiedName !== form.display_name ? (
+                        <button
+                          type="button"
+                          className="btn small"
+                          onClick={() => {
+                            setNameTouched(true);
+                            patch({ display_name: qualifiedName });
+                          }}
+                        >
+                          Use “{qualifiedName}”
+                        </button>
+                      ) : null}
                       {nameClashes.map((other) => (
                         <Link key={other.id} className="btn small" to={`/families/${other.id}`}>
                           Open the other one
@@ -488,64 +495,38 @@ export function FamilyEditPage() {
             <span className="muted small">Listed on the card in this order.</span>
           </div>
           <div className="card-body">
-            {visibleMembers.map((member) => {
-              const index = members.indexOf(member);
-              return (
-                <div
-                  key={member.key}
-                  style={{
-                    borderTop:
-                      index === members.indexOf(visibleMembers[0])
-                        ? "none"
-                        : "1px solid var(--line)",
-                    paddingTop: index === members.indexOf(visibleMembers[0]) ? 0 : 16,
-                    marginTop: index === members.indexOf(visibleMembers[0]) ? 0 : 16,
-                  }}
-                >
-                  <div>
-                    <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                      <Field label="First name">
-                        <input
-                          type="text"
-                          disabled={!canEdit}
-                          value={member.first_name}
-                          onChange={(event) =>
-                            updateMember(index, { first_name: event.target.value })
-                          }
+            {isNew ? (
+              <p className="muted small" style={{ margin: 0 }}>
+                Create the family first. You can then put people into it — either ones already in
+                the directory, or new records made here.
+              </p>
+            ) : (
+              <>
+                {memberPeople.length ? (
+                  <ul className="member-list">
+                    {memberPeople.map(({ link, person }, index) => (
+                      <li key={link.id} className="member-row">
+                        <Avatar
+                          path={personPhotoPath(person!, form)}
+                          initials={`${person!.first_name[0] ?? ""}${person!.last_name[0] ?? ""}`}
                         />
-                      </Field>
-                      <Field label="Last name">
-                        <input
-                          type="text"
-                          disabled={!canEdit}
-                          value={member.last_name}
-                          onChange={(event) =>
-                            updateMember(index, { last_name: event.target.value })
-                          }
-                        />
-                      </Field>
-                    </div>
-
-                    <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                      <Field label="Goes by" hint="Prints instead of the first name.">
-                        <input
-                          type="text"
-                          disabled={!canEdit}
-                          placeholder={member.first_name}
-                          value={member.preferred_name}
-                          onChange={(event) =>
-                            updateMember(index, { preferred_name: event.target.value })
-                          }
-                        />
-                      </Field>
-                      <Field label="In the family">
+                        <div className="member-name">
+                          <Link className="list-link" to={`/people/${person!.id}`}>
+                            {fullName(person!)}
+                          </Link>
+                          <div className="muted small">
+                            {[formatPhone(person!.phone), person!.email]
+                              .filter(Boolean)
+                              .join(" · ") || "No phone or email"}
+                          </div>
+                        </div>
                         <select
+                          aria-label={`${fullName(person!)} in the family`}
+                          className="member-role"
                           disabled={!canEdit}
-                          value={member.household_role}
+                          value={link.role}
                           onChange={(event) =>
-                            updateMember(index, {
-                              household_role: event.target.value as HouseholdRole,
-                            })
+                            setRole(link.id, event.target.value as HouseholdRole)
                           }
                         >
                           {ROLES.map((role) => (
@@ -554,81 +535,123 @@ export function FamilyEditPage() {
                             </option>
                           ))}
                         </select>
-                      </Field>
-                    </div>
+                        {canEdit ? (
+                          <div className="row tight member-actions">
+                            <button
+                              type="button"
+                              className="btn ghost small"
+                              aria-label="Move up"
+                              disabled={index === 0}
+                              onClick={() => moveMember(index, -1)}
+                            >
+                              ↑
+                            </button>
+                            <button
+                              type="button"
+                              className="btn ghost small"
+                              aria-label="Move down"
+                              disabled={index === memberPeople.length - 1}
+                              onClick={() => moveMember(index, 1)}
+                            >
+                              ↓
+                            </button>
+                            <button
+                              type="button"
+                              className="btn ghost small"
+                              onClick={() =>
+                                setMembers((current) => current.filter((m) => m.id !== link.id))
+                              }
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="muted small" style={{ marginTop: 0 }}>
+                    Nobody in this family yet.
+                  </p>
+                )}
 
-                    <div className="grid" style={{ gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-                      <Field label="Phone">
-                        <input
-                          type="tel"
-                          disabled={!canEdit}
-                          value={member.phone}
-                          onChange={(event) => updateMember(index, { phone: event.target.value })}
-                        />
-                      </Field>
-                      <Field label="Email">
-                        <input
-                          type="email"
-                          disabled={!canEdit}
-                          value={member.email}
-                          onChange={(event) => updateMember(index, { email: event.target.value })}
-                        />
-                      </Field>
-                      <Field label="Birthday">
-                        <input
-                          type="date"
-                          disabled={!canEdit}
-                          value={member.date_of_birth}
-                          onChange={(event) =>
-                            updateMember(index, { date_of_birth: event.target.value })
-                          }
-                        />
-                      </Field>
-                    </div>
+                {canEdit ? (
+                  <div className="member-add">
+                    <Field
+                      label="Put someone in this family"
+                      hint="Search the directory. Adding someone moves them out of any family they are in now."
+                      htmlFor="member-search"
+                    >
+                      <input
+                        id="member-search"
+                        className="search"
+                        type="search"
+                        placeholder="Search by name or email…"
+                        value={memberQuery}
+                        onChange={(event) => setMemberQuery(event.target.value)}
+                      />
+                    </Field>
 
-                    <div className="row tight">
-                      {member.id ? (
-                        <Link className="btn ghost small" to={`/people/${member.id}`}>
-                          Open full record
-                        </Link>
-                      ) : null}
-                      {canEdit ? (
-                        <button
-                          type="button"
-                          className="btn ghost small"
-                          onClick={() => removeMember(index)}
-                        >
-                          {member.id ? "Remove from family" : "Discard"}
-                        </button>
-                      ) : null}
+                    {candidates.length ? (
+                      <ul className="member-list picker">
+                        {candidates.map((person) => {
+                          const current = person.household_id
+                            ? householdById.get(person.household_id)
+                            : null;
+                          return (
+                            <li key={person.id} className="member-row">
+                              <Avatar
+                                path={personPhotoPath(person, current)}
+                                initials={`${person.first_name[0] ?? ""}${person.last_name[0] ?? ""}`}
+                              />
+                              <div className="member-name">
+                                <div style={{ fontWeight: 600 }}>{fullName(person)}</div>
+                                <div className="muted small">
+                                  {current
+                                    ? `Currently in ${current.display_name}`
+                                    : "On their own"}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                className="btn small"
+                                onClick={() => {
+                                  setMembers((c) => [
+                                    ...c,
+                                    { id: person.id, role: suggestRole(c) },
+                                  ]);
+                                  setMemberQuery("");
+                                }}
+                              >
+                                Add
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <p className="muted small">
+                        {memberQuery ? "Nobody matches." : "Everyone is already in a family here."}
+                      </p>
+                    )}
+
+                    <div className="row tight" style={{ marginTop: 14 }}>
+                      <button
+                        type="button"
+                        className="btn"
+                        disabled={saving}
+                        onClick={() => void addNewPerson()}
+                      >
+                        + Create a new person
+                      </button>
+                      <span className="muted small">
+                        Saves this family, then opens a blank record already in it.
+                      </span>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-
-            {canEdit ? (
-              <button
-                type="button"
-                className="btn"
-                style={{ marginTop: visibleMembers.length ? 16 : 0 }}
-                onClick={() =>
-                  setMembers((current) => [
-                    ...current,
-                    emptyDraft(
-                      form.sort_name,
-                      current.some((m) => !m.removed && m.household_role === "head")
-                        ? current.some((m) => !m.removed && m.household_role === "spouse")
-                          ? "child"
-                          : "spouse"
-                        : "head",
-                    ),
-                  ])
-                }
-              >
-                + Add a member
-              </button>
-            ) : null}
+                ) : null}
+              </>
+            )}
           </div>
         </div>
 
@@ -666,25 +689,4 @@ export function FamilyEditPage() {
       ) : null}
     </div>
   );
-}
-
-/** Column defaults for a person created from the family form. */
-function blankPersonFields() {
-  return {
-    preferred_name: null,
-    email: null,
-    phone: null,
-    date_of_birth: null,
-    anniversary: null,
-    use_household_address: true,
-    address_line1: null,
-    address_line2: null,
-    city: null,
-    state: null,
-    postal_code: null,
-    country: null,
-    photo_path: null,
-    notes: null,
-    is_active: true,
-  };
 }

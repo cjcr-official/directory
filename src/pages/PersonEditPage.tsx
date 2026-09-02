@@ -137,7 +137,12 @@ export function PersonEditPage() {
         : await createPerson(payload);
       await setTags("person", person.id, tagIds);
       await reload();
-      navigate(`/people/${person.id}`, { replace: true });
+      // Made from a family's page, so go back there - that is the job that
+      // was interrupted, and the next member is added from the same screen.
+      const cameFromFamily = isNew ? params.get("household") : null;
+      navigate(cameFromFamily ? `/families/${cameFromFamily}` : `/people/${person.id}`, {
+        replace: true,
+      });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {

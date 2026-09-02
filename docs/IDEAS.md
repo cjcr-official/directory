@@ -14,17 +14,25 @@ everyone listed on it, and a person who is not in a family gets their own card.
 Both sort into one alphabetical run by surname, which is what someone flipping
 through expects.
 
-**Add a whole family on one screen.** The slowest possible way to build a
-directory is one person at a time. The family form lets you add a spouse and
-three children inline, with their photos, and saves the lot in one go.
+**People are made once; a family groups them.** Every person is created on
+their own record, with the full form — photo, address, birthday, groups. A
+family is a container you then put those people into: its page lists who is in
+it, in what order they print, and what each one is to the household. Adding
+someone is a search over the directory, not a second place to type a name, so
+one person can never end up as two records who happen to share a spelling.
+
+Building a family from scratch is still one screen: create the family, then
+"Create a new person" saves it and opens a blank record already inside it, and
+saving that person brings you straight back for the next one.
 
 **Only the surname is required.** Everything else — photo, address, phone,
 birthday, anniversary — is optional. A directory with gaps is normal; a form
 that refuses to save until you find someone's ZIP code is how a project dies.
 
 **Typing a surname fills in the family name.** "Alvarez" suggests "The Alvarez
-Family" until you edit it yourself, at which point it stops guessing. Same for
-members' last names.
+Family" until you edit it yourself, at which point it stops guessing. If that
+name is already taken by another family, the form says so and offers the
+head-qualified version — "The Maria Alvarez Family" — in one tap.
 
 **"Goes by".** William prints as Bill without losing the legal first name.
 

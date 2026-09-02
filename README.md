@@ -220,6 +220,24 @@ TypeScript 7 compiler. The strict compiler flags — `strict`, `noUnusedLocals`,
 `noUnusedParameters`, `noFallthroughCasesInSwitch` — cover much of the same
 ground in the meantime.
 
+### People and families
+
+A person is created once, on their own record. A family is a grouping laid over
+those records: its page lists who is in it, the role each one holds, and the
+order they print in, and people are put into it by searching the directory
+rather than by being typed in a second time. There is no path that creates a
+person as a side effect of filling in a family, so the same person cannot end up
+as two records.
+
+A new family has to be saved before it can hold anyone — it needs an id for the
+membership to point at. "Create a new person" on a saved family saves the family
+first and opens a blank person record already assigned to it; saving that person
+returns to the family, ready for the next one.
+
+Membership is applied when the family is saved, the same way groups are. Someone
+taken out of a family keeps their record and their address: the family's address
+is copied onto them on the way out, or their own card would print with none.
+
 ### Photographs
 
 One picture per record, because a record is what prints on a card.
