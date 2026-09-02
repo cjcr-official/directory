@@ -91,8 +91,12 @@ Either route works. The first needs no command line.
    `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
 5. Save and deploy.
 
-Every push to `main` redeploys. `public/_redirects` already tells Pages to serve
-`index.html` for app routes, and `public/_headers` sets the security headers.
+Every push to `main` redeploys, and `public/_headers` sets the security headers.
+
+One extra step on this route: Pages does not fall back to `index.html` on its
+own, so refreshing a page like `/families` would 404. In the project's
+**Settings → Build → Single Page Application**, turn the SPA fallback on. (The
+Actions route below needs nothing — `wrangler.jsonc` already declares it.)
 
 ### Route B — GitHub Actions
 
@@ -148,8 +152,9 @@ If step 4 shows any directory data, stop and re-run
 **"Connect your database" instead of a sign-in screen** — the two `VITE_`
 variables were not set at build time. Set them and redeploy.
 
-**A route 404s on refresh** — `public/_redirects` did not make it into the
-deploy. Confirm the output directory is `dist`.
+**A route 404s on refresh** — the single-page-app fallback is off. On the
+Actions route that comes from `not_found_handling` in `wrangler.jsonc`; on the
+Pages route it is a setting in the project's build configuration.
 
 **Sign-in works but every screen is empty** — expected for a new account that has
 not been granted a role. Sign in as the owner and check Administrators.

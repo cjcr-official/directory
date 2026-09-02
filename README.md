@@ -98,8 +98,9 @@ Pages → Create → Pages → Connect to Git_, pick this repository, and set
 | Output directory      | `dist`                                        |
 | Environment variables | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
 
-Every push to your branch redeploys. `public/_redirects` already tells Pages to
-serve `index.html` for app routes.
+Every push to your branch redeploys. Turn on the project's Single Page
+Application setting so a refresh on `/families` does not 404 — the Workers route
+gets that from `wrangler.jsonc` instead.
 
 **Or from your machine:**
 
