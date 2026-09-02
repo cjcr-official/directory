@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+.wrangler/
+
+# local environment (never commit real keys)
+.env
+.env.local
+.env.*.local
+
+# generated sample directories
+*.pdf
+
+# editors and OS
+.DS_Store
+*.log
+.vscode/
+.idea/
+
+# TypeScript incremental build state
+*.tsbuildinfo

@@ -1,0 +1,36 @@
+name: Build
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      # Renders the sample book, which fails the build if the layout engine
+      # throws on a real end-to-end run.
+      - name: Render the sample directory
+        run: npm run sample:pdf -- /tmp/sample-directory.pdf
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sample-directory-pdf
+          path: /tmp/sample-directory.pdf
+          if-no-files-found: error

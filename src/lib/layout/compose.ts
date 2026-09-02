@@ -1,0 +1,963 @@
+import type { DirectoryEntry } from "../entries";
+import type { PersonRow } from "../database.types";
+import {
+  addressLines,
+  alphaBucket,
+  effectiveAddress,
+  fileAsName,
+  firstName,
+  formatMonthDay,
+  formatPhone,
+  formatShortDate,
+  fullName,
+  join,
+} from "../format";
+import {
+  PAGE_SIZES,
+  TEXT_SCALES,
+  type PhotoFit,
+  type ProjectSettings,
+} from "./settings";
+import { truncate, wrapText, type FontWeight, type Metrics } from "./metrics";
+
+// ---------------------------------------------------------------------------
+// Model
+//
+// Coordinates are PDF points with a TOP-LEFT origin, matching CSS. The PDF
+// writer flips y at the last moment; the HTML preview uses them as-is. Keeping
+// one coordinate system is what lets both renderers share this file.
+// ---------------------------------------------------------------------------
+
+export interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export type Align = "left" | "center" | "right";
+
+export interface TextRun {
+  x: number;
+  /** Top of the line box. */
+  y: number;
+  /** Width of the box the run is aligned within. */
+  w: number;
+  size: number;
+  weight: FontWeight;
+  color: string;
+  align: Align;
+  text: string;
+}
+
+export interface PhotoSlot {
+  box: Box;
+  path: string | null;
+  fit: PhotoFit;
+  /** Drawn in a soft placeholder when there is no photograph yet. */
+  initials: string;
+}
+
+export interface CardModel {
+  entryId: string;
+  entryType: "household" | "person";
+  box: Box;
+  border: boolean;
+  photo: PhotoSlot | null;
+  runs: TextRun[];
+}
+
+export interface RuleModel {
+  x: number;
+  y: number;
+  w: number;
+  color: string;
+}
+
+/** One page of the finished book - a half of a landscape sheet. */
+export interface BookPage {
+  kind: "cover" | "records" | "index" | "blank";
+  /** 1-based page number as printed. Blank filler pages carry 0. */
+  number: number;
+  box: Box;
+  cards: CardModel[];
+  runs: TextRun[];
+  rules: RuleModel[];
+}
+
+/** One sheet of paper. */
+export interface SheetModel {
+  index: number;
+  pages: BookPage[];
+  /** The fold line, drawn faintly as a trim guide. */
+  foldX: number[];
+}
+
+export interface IndexRecord {
+  name: string;
+  page: number;
+}
+
+export interface BookModel {
+  width: number;
+  height: number;
+  sheets: SheetModel[];
+  /** Numbered pages, excluding blank filler. */
+  pageCount: number;
+  recordCount: number;
+  index: IndexRecord[];
+  /** Storage paths of every photo the book needs, deduplicated. */
+  photoPaths: string[];
+  settings: ProjectSettings;
+}
+
+export const COLORS = {
+  ink: "#14201f",
+  strong: "#0f1a19",
+  muted: "#4a5a58",
+  soft: "#758583",
+  accent: "#2f6d63",
+  rule: "#d5dedd",
+  border: "#c8d4d2",
+  placeholder: "#e6ecea",
+};
+
+// ---------------------------------------------------------------------------
+// Geometry
+// ---------------------------------------------------------------------------
+
+export interface Geometry {
+  width: number;
+  height: number;
+  margin: number;
+  gutter: number;
+  pageWidth: number;
+  pageHeight: number;
+  headerHeight: number;
+  footerHeight: number;
+  cardGap: number;
+  cardHeight: number;
+  contentTop: number;
+  contentHeight: number;
+  columns: number;
+  rows: number;
+}
+
+const MARGIN = 28.8; // 0.4in
+const GUTTER = 36; // 0.5in fold channel
+const CARD_GAP = 8;
+
+export function computeGeometry(settings: ProjectSettings): Geometry {
+  const { width, height } = PAGE_SIZES[settings.pageSize];
+  const columns = settings.columns;
+  const rows = settings.rows;
+  const gutter = columns > 1 ? GUTTER : 0;
+
+  const pageWidth = (width - 2 * MARGIN - gutter * (columns - 1)) / columns;
+  const pageHeight = height - 2 * MARGIN;
+
+  const headerHeight = settings.runningHeader || settings.showLetterTabs ? 18 : 0;
+  const footerHeight = settings.showPageNumbers || settings.footerText.trim() ? 15 : 0;
+
+  const contentTop = headerHeight;
+  const contentHeight = pageHeight - headerHeight - footerHeight;
+  const cardHeight = (contentHeight - CARD_GAP * (rows - 1)) / rows;
+
+  return {
+    width,
+    height,
+    margin: MARGIN,
+    gutter,
+    pageWidth,
+    pageHeight,
+    headerHeight,
+    footerHeight,
+    cardGap: CARD_GAP,
+    cardHeight,
+    contentTop,
+    contentHeight,
+    columns,
+    rows,
+  };
+}
+
+interface TypeScale {
+  title: number;
+  body: number;
+  small: number;
+  tiny: number;
+  cover: number;
+}
+
+function typeScale(settings: ProjectSettings): TypeScale {
+  const s = TEXT_SCALES[settings.textScale];
+  return {
+    title: 12 * s,
+    body: 9.4 * s,
+    small: 8.6 * s,
+    tiny: 7.8 * s,
+    cover: 30,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Card content
+// ---------------------------------------------------------------------------
+
+interface Block {
+  text: string;
+  size: number;
+  weight: FontWeight;
+  color: string;
+  /** Extra leading above this block, in points. */
+  spaceBefore: number;
+  /** Blocks that must never be dropped when a card runs out of room. */
+  essential?: boolean;
+}
+
+function initialsFor(entry: DirectoryEntry): string {
+  if (entry.type === "person") {
+    return `${entry.person.first_name.charAt(0)}${entry.person.last_name.charAt(0)}`.toUpperCase();
+  }
+  return entry.household.sort_name.slice(0, 2).toUpperCase();
+}
+
+/** A member's name on the card - surname included only when it differs. */
+function memberLabel(person: PersonRow, householdSurname: string): string {
+  const given = firstName(person);
+  return person.last_name.toLowerCase() === householdSurname.toLowerCase()
+    ? given
+    : `${given} ${person.last_name}`;
+}
+
+function personDates(person: PersonRow, settings: ProjectSettings): string[] {
+  const parts: string[] = [];
+  if (settings.showBirthdays && person.date_of_birth) {
+    parts.push(`b. ${formatShortDate(person.date_of_birth)}`);
+  }
+  if (settings.showAnniversary && person.anniversary) {
+    parts.push(`anniv. ${formatShortDate(person.anniversary)}`);
+  }
+  return parts;
+}
+
+function householdBlocks(
+  entry: Extract<DirectoryEntry, { type: "household" }>,
+  settings: ProjectSettings,
+  type: TypeScale,
+): Block[] {
+  const household = entry.household;
+  const blocks: Block[] = [
+    {
+      text: household.display_name,
+      size: type.title,
+      weight: "bold",
+      color: COLORS.strong,
+      spaceBefore: 0,
+      essential: true,
+    },
+  ];
+
+  const members = household.members;
+
+  if (settings.showMembers && members.length) {
+    if (settings.memberStyle === "detailed") {
+      for (const member of members) {
+        const detail = join(
+          [
+            settings.showPhone ? formatPhone(member.phone) : "",
+            settings.showEmail ? (member.email ?? "") : "",
+            ...personDates(member, settings),
+          ],
+          " · ",
+        );
+        blocks.push({
+          text: detail
+            ? `${memberLabel(member, household.sort_name)} — ${detail}`
+            : memberLabel(member, household.sort_name),
+          size: type.body,
+          weight: "regular",
+          color: COLORS.ink,
+          spaceBefore: blocks.length === 1 ? 3 : 1,
+        });
+      }
+    } else {
+      blocks.push({
+        text: members.map((m) => memberLabel(m, household.sort_name)).join(", "),
+        size: type.body,
+        weight: "regular",
+        color: COLORS.ink,
+        spaceBefore: 3,
+      });
+    }
+  }
+
+  if (settings.showAddress) {
+    const lines = addressLines(household);
+    lines.forEach((line, i) => {
+      blocks.push({
+        text: line,
+        size: type.small,
+        weight: "regular",
+        color: COLORS.muted,
+        spaceBefore: i === 0 ? 4 : 0,
+      });
+    });
+  }
+
+  const contact = join(
+    [
+      settings.showPhone ? formatPhone(household.phone) : "",
+      settings.showEmail ? (household.email ?? "") : "",
+    ],
+    " · ",
+  );
+  if (contact) {
+    blocks.push({
+      text: contact,
+      size: type.small,
+      weight: "regular",
+      color: COLORS.muted,
+      spaceBefore: 3,
+    });
+  }
+
+  // In compact mode the dates for the whole family collapse onto one line;
+  // in detailed mode they already sit beside each member's name.
+  if (settings.memberStyle === "compact") {
+    const dateParts: string[] = [];
+    if (settings.showAnniversary && household.anniversary) {
+      dateParts.push(`Anniversary ${formatMonthDay(household.anniversary)}`);
+    }
+    if (settings.showBirthdays) {
+      const birthdays = members
+        .filter((m) => m.date_of_birth)
+        .map((m) => `${firstName(m)} ${formatShortDate(m.date_of_birth)}`);
+      if (birthdays.length) dateParts.push(`Birthdays: ${birthdays.join(", ")}`);
+    }
+    if (dateParts.length) {
+      blocks.push({
+        text: dateParts.join("  ·  "),
+        size: type.tiny,
+        weight: "italic",
+        color: COLORS.soft,
+        spaceBefore: 3,
+      });
+    }
+  }
+
+  return blocks;
+}
+
+function personBlocks(
+  entry: Extract<DirectoryEntry, { type: "person" }>,
+  settings: ProjectSettings,
+  type: TypeScale,
+): Block[] {
+  const person = entry.person;
+  const blocks: Block[] = [
+    {
+      text: fullName(person),
+      size: type.title,
+      weight: "bold",
+      color: COLORS.strong,
+      spaceBefore: 0,
+      essential: true,
+    },
+  ];
+
+  if (settings.showAddress) {
+    const lines = addressLines(effectiveAddress(person, entry.person.household));
+    lines.forEach((line, i) => {
+      blocks.push({
+        text: line,
+        size: type.small,
+        weight: "regular",
+        color: COLORS.muted,
+        spaceBefore: i === 0 ? 4 : 0,
+      });
+    });
+  }
+
+  if (settings.showPhone && person.phone) {
+    blocks.push({
+      text: formatPhone(person.phone),
+      size: type.small,
+      weight: "regular",
+      color: COLORS.muted,
+      spaceBefore: 3,
+    });
+  }
+
+  if (settings.showEmail && person.email) {
+    blocks.push({
+      text: person.email,
+      size: type.small,
+      weight: "regular",
+      color: COLORS.muted,
+      spaceBefore: 1,
+    });
+  }
+
+  const dateParts: string[] = [];
+  if (settings.showBirthdays && person.date_of_birth) {
+    dateParts.push(`Birthday ${formatMonthDay(person.date_of_birth)}`);
+  }
+  if (settings.showAnniversary && person.anniversary) {
+    dateParts.push(`Anniversary ${formatMonthDay(person.anniversary)}`);
+  }
+  if (dateParts.length) {
+    blocks.push({
+      text: dateParts.join("  ·  "),
+      size: type.tiny,
+      weight: "italic",
+      color: COLORS.soft,
+      spaceBefore: 3,
+    });
+  }
+
+  return blocks;
+}
+
+const CARD_PADDING = 8;
+const PHOTO_GAP = 10;
+const PHOTO_ASPECT = 1.25; // height / width, a 4:5 portrait
+/** Ceiling on how much of a card's width the photograph may take. */
+const PHOTO_MAX_WIDTH_RATIO = 0.4;
+
+interface LaidOutBlock extends Block {
+  lines: string[];
+  height: number;
+}
+
+/**
+ * Lays one record into its slot: portrait on the left, text flowed down the
+ * right and centred against the photo.
+ *
+ * Two passes. The first wraps every block and measures it; the second places
+ * the lines, either centred when there is room to spare or from the top when
+ * there is not. Anything that still will not fit is dropped from the bottom and
+ * the last surviving line gets an ellipsis, so a card can never bleed into its
+ * neighbour.
+ */
+function composeCard(
+  entry: DirectoryEntry,
+  box: Box,
+  settings: ProjectSettings,
+  type: TypeScale,
+  metrics: Metrics,
+): CardModel {
+  const blocks =
+    entry.type === "household"
+      ? householdBlocks(entry, settings, type)
+      : personBlocks(entry, settings, type);
+
+  const innerX = box.x + CARD_PADDING;
+  const innerY = box.y + CARD_PADDING;
+  const innerW = box.w - CARD_PADDING * 2;
+  const innerH = box.h - CARD_PADDING * 2;
+
+  let photo: PhotoSlot | null = null;
+  let textX = innerX;
+  let textW = innerW;
+
+  if (settings.showPhotos) {
+    // The portrait runs the full height of the card - it is the thing an eye
+    // lands on first when leafing through - unless that would make it too wide.
+    let photoH = innerH;
+    let photoW = photoH / PHOTO_ASPECT;
+    const maxWidth = innerW * PHOTO_MAX_WIDTH_RATIO;
+    if (photoW > maxWidth) {
+      photoW = maxWidth;
+      photoH = photoW * PHOTO_ASPECT;
+    }
+
+    const photoPath =
+      entry.type === "household" ? entry.household.photo_path : entry.person.photo_path;
+
+    photo = {
+      box: { x: innerX, y: innerY + (innerH - photoH) / 2, w: photoW, h: photoH },
+      path: photoPath,
+      fit: settings.photoFit,
+      initials: initialsFor(entry),
+    };
+    textX = innerX + photoW + PHOTO_GAP;
+    textW = innerX + innerW - textX;
+  }
+
+  // Pass one: wrap and measure.
+  const laidOut: LaidOutBlock[] = [];
+  let contentHeight = 0;
+  for (const block of blocks) {
+    const lines = wrapText(block.text, textW, block.size, block.weight, metrics);
+    if (!lines.length) continue;
+    const spaceBefore = laidOut.length ? block.spaceBefore : 0;
+    const height = lines.length * metrics.lineHeight(block.size);
+    laidOut.push({ ...block, lines, spaceBefore, height });
+    contentHeight += spaceBefore + height;
+  }
+
+  // Pass two: place.
+  const runs: TextRun[] = [];
+  const overflowing = contentHeight > innerH;
+  let cursor = overflowing ? innerY : innerY + (innerH - contentHeight) / 2;
+  const bottom = innerY + innerH;
+
+  for (const block of laidOut) {
+    const lineHeight = metrics.lineHeight(block.size);
+    cursor += runs.length ? block.spaceBefore : 0;
+
+    for (const line of block.lines) {
+      if (cursor + lineHeight > bottom + 0.01) {
+        const last = runs[runs.length - 1];
+        if (last && !block.essential) {
+          last.text = truncate(`${last.text} ...`, textW, last.size, last.weight, metrics);
+        }
+        return {
+          entryId: entry.id,
+          entryType: entry.type,
+          box,
+          border: settings.cardBorders,
+          photo,
+          runs,
+        };
+      }
+      runs.push({
+        x: textX,
+        y: cursor,
+        w: textW,
+        size: block.size,
+        weight: block.weight,
+        color: block.color,
+        align: "left",
+        text: line,
+      });
+      cursor += lineHeight;
+    }
+  }
+
+  return { entryId: entry.id, entryType: entry.type, box, border: settings.cardBorders, photo, runs };
+}
+
+// ---------------------------------------------------------------------------
+// Page furniture
+// ---------------------------------------------------------------------------
+
+function translate(page: BookPage, dx: number, dy: number): BookPage {
+  const moveRun = (run: TextRun): TextRun => ({ ...run, x: run.x + dx, y: run.y + dy });
+  return {
+    ...page,
+    box: { ...page.box, x: page.box.x + dx, y: page.box.y + dy },
+    runs: page.runs.map(moveRun),
+    rules: page.rules.map((rule) => ({ ...rule, x: rule.x + dx, y: rule.y + dy })),
+    cards: page.cards.map((card) => ({
+      ...card,
+      box: { ...card.box, x: card.box.x + dx, y: card.box.y + dy },
+      photo: card.photo
+        ? { ...card.photo, box: { ...card.photo.box, x: card.photo.box.x + dx, y: card.photo.box.y + dy } }
+        : null,
+      runs: card.runs.map(moveRun),
+    })),
+  };
+}
+
+/** Running header, letter tab and page number. Covers and blanks get none. */
+function addFurniture(
+  page: BookPage,
+  letter: string | null,
+  settings: ProjectSettings,
+  geo: Geometry,
+): void {
+  if (page.kind === "cover" || page.kind === "blank") return;
+
+  const scale = TEXT_SCALES[settings.textScale];
+
+  if (geo.headerHeight > 0) {
+    const headerY = 1;
+    if (settings.runningHeader) {
+      const heading = settings.churchName.trim() || settings.coverTitle.trim();
+      if (heading) {
+        page.runs.push({
+          x: 0,
+          y: headerY,
+          w: geo.pageWidth,
+          size: 8 * scale,
+          weight: "regular",
+          color: COLORS.soft,
+          align: "left",
+          text: heading,
+        });
+      }
+    }
+    if (settings.showLetterTabs && letter) {
+      page.runs.push({
+        x: 0,
+        y: headerY - 2,
+        w: geo.pageWidth,
+        size: 11 * scale,
+        weight: "bold",
+        color: COLORS.accent,
+        align: "right",
+        text: letter,
+      });
+    }
+    page.rules.push({
+      x: 0,
+      y: geo.headerHeight - 5,
+      w: geo.pageWidth,
+      color: COLORS.rule,
+    });
+  }
+
+  if (geo.footerHeight > 0) {
+    const footerY = geo.pageHeight - geo.footerHeight + 4;
+    if (settings.footerText.trim()) {
+      page.runs.push({
+        x: 0,
+        y: footerY,
+        w: geo.pageWidth,
+        size: 7.2 * scale,
+        weight: "regular",
+        color: COLORS.soft,
+        align: "left",
+        text: settings.footerText.trim(),
+      });
+    }
+    if (settings.showPageNumbers && page.number > 0) {
+      page.runs.push({
+        x: 0,
+        y: footerY,
+        w: geo.pageWidth,
+        size: 8 * scale,
+        weight: "regular",
+        color: COLORS.muted,
+        align: "center",
+        text: String(page.number),
+      });
+    }
+  }
+}
+
+function blankPage(geo: Geometry): BookPage {
+  return {
+    kind: "blank",
+    number: 0,
+    box: { x: 0, y: 0, w: geo.pageWidth, h: geo.pageHeight },
+    cards: [],
+    runs: [],
+    rules: [],
+  };
+}
+
+function composeCover(settings: ProjectSettings, geo: Geometry, type: TypeScale, metrics: Metrics): BookPage {
+  const page = blankPage(geo);
+  page.kind = "cover";
+
+  const centerY = geo.pageHeight * 0.34;
+  const inner = geo.pageWidth - 48;
+
+  if (settings.churchName.trim()) {
+    page.runs.push({
+      x: 24,
+      y: centerY - 34,
+      w: inner,
+      size: 11,
+      weight: "regular",
+      color: COLORS.accent,
+      align: "center",
+      text: settings.churchName.trim().toUpperCase(),
+    });
+  }
+
+  const titleSize = Math.min(
+    type.cover,
+    // Shrink an unusually long title until it fits on one line.
+    (type.cover * inner) / Math.max(metrics.widthOf(settings.coverTitle, type.cover, "bold"), 1),
+  );
+  const titleLines = wrapText(settings.coverTitle, inner, titleSize, "bold", metrics);
+  titleLines.forEach((line, i) => {
+    page.runs.push({
+      x: 24,
+      y: centerY + i * metrics.lineHeight(titleSize),
+      w: inner,
+      size: titleSize,
+      weight: "bold",
+      color: COLORS.strong,
+      align: "center",
+      text: line,
+    });
+  });
+
+  let y = centerY + titleLines.length * metrics.lineHeight(titleSize) + 14;
+  page.rules.push({ x: geo.pageWidth / 2 - 40, y: y + 2, w: 80, color: COLORS.accent });
+  y += 16;
+
+  if (settings.coverSubtitle.trim()) {
+    for (const line of wrapText(settings.coverSubtitle, inner, 11, "regular", metrics)) {
+      page.runs.push({
+        x: 24,
+        y,
+        w: inner,
+        size: 11,
+        weight: "regular",
+        color: COLORS.muted,
+        align: "center",
+        text: line,
+      });
+      y += metrics.lineHeight(11);
+    }
+  }
+
+  return page;
+}
+
+function composeIndexPages(
+  records: IndexRecord[],
+  settings: ProjectSettings,
+  geo: Geometry,
+  metrics: Metrics,
+): BookPage[] {
+  if (!records.length) return [];
+
+  const scale = TEXT_SCALES[settings.textScale];
+  const size = 8 * scale;
+  const lineHeight = metrics.lineHeight(size) + 1.4;
+  const pad = 4;
+  const columnGap = 14;
+  const columnWidth = (geo.pageWidth - pad * 2 - columnGap) / 2;
+  const headingHeight = metrics.lineHeight(13) + 8;
+
+  const pages: BookPage[] = [];
+  let page = blankPage(geo);
+  page.kind = "index";
+  let column = 0;
+  let y = geo.contentTop + headingHeight;
+  let first = true;
+
+  const columnTop = (isFirst: boolean) => geo.contentTop + (isFirst ? headingHeight : 4);
+  const columnBottom = geo.contentTop + geo.contentHeight;
+
+  const startPage = (isFirst: boolean) => {
+    page = blankPage(geo);
+    page.kind = "index";
+    if (isFirst) {
+      page.runs.push({
+        x: pad,
+        y: geo.contentTop + 2,
+        w: geo.pageWidth - pad * 2,
+        size: 13,
+        weight: "bold",
+        color: COLORS.strong,
+        align: "left",
+        text: "Index",
+      });
+    }
+    column = 0;
+    y = columnTop(isFirst);
+  };
+
+  startPage(true);
+
+  for (const record of records) {
+    if (y + lineHeight > columnBottom) {
+      column += 1;
+      if (column > 1) {
+        pages.push(page);
+        first = false;
+        startPage(false);
+      } else {
+        y = columnTop(first);
+      }
+    }
+
+    const x = pad + column * (columnWidth + columnGap);
+    const pageLabel = String(record.page);
+    const numberWidth = metrics.widthOf(pageLabel, size, "regular") + 4;
+
+    page.runs.push({
+      x,
+      y,
+      w: columnWidth - numberWidth,
+      size,
+      weight: "regular",
+      color: COLORS.ink,
+      align: "left",
+      text: truncate(record.name, columnWidth - numberWidth, size, "regular", metrics),
+    });
+    page.runs.push({
+      x,
+      y,
+      w: columnWidth,
+      size,
+      weight: "regular",
+      color: COLORS.soft,
+      align: "right",
+      text: pageLabel,
+    });
+    y += lineHeight;
+  }
+
+  pages.push(page);
+  return pages;
+}
+
+// ---------------------------------------------------------------------------
+// Sheet assembly
+// ---------------------------------------------------------------------------
+
+/**
+ * Saddle-stitch imposition: print double-sided, fold the stack down the
+ * middle, staple the spine, and the pages read 1, 2, 3... in order.
+ *
+ * For a stack of P pages (padded to a multiple of four) sheet s carries
+ * [P-2s, 1+2s] on the front and [2+2s, P-1-2s] on the back.
+ */
+function bookletOrder(pageCount: number): number[] {
+  const order: number[] = [];
+  const sheets = pageCount / 4;
+  for (let s = 0; s < sheets; s += 1) {
+    order.push(pageCount - 2 * s, 1 + 2 * s); // front of the sheet
+    order.push(2 + 2 * s, pageCount - 1 - 2 * s); // back of the sheet
+  }
+  return order;
+}
+
+function assembleSheets(pages: BookPage[], settings: ProjectSettings, geo: Geometry): SheetModel[] {
+  const perSheet = geo.columns;
+  // Booklet folding only makes sense with two pages to a side; anything else
+  // prints in straight reading order.
+  const useBooklet = settings.bookletOrder && perSheet === 2;
+
+  const padded = [...pages];
+  const multiple = useBooklet ? 4 : perSheet;
+  while (padded.length % multiple !== 0) padded.push(blankPage(geo));
+
+  const ordered = useBooklet
+    ? bookletOrder(padded.length).map((position) => padded[position - 1])
+    : padded;
+
+  const foldX: number[] = [];
+  for (let i = 0; i < geo.columns - 1; i += 1) {
+    foldX.push(geo.margin + (i + 1) * geo.pageWidth + i * geo.gutter + geo.gutter / 2);
+  }
+
+  const sheets: SheetModel[] = [];
+  for (let i = 0; i < ordered.length; i += perSheet) {
+    const slots = ordered.slice(i, i + perSheet);
+    sheets.push({
+      index: sheets.length,
+      foldX,
+      pages: slots.map((page, column) =>
+        translate(page, geo.margin + column * (geo.pageWidth + geo.gutter), geo.margin),
+      ),
+    });
+  }
+
+  return sheets;
+}
+
+// ---------------------------------------------------------------------------
+// Entry point
+// ---------------------------------------------------------------------------
+
+/**
+ * Turns an ordered list of records into a finished book: paginated, numbered,
+ * indexed, and positioned down to the point.
+ *
+ * The result is consumed unchanged by both renderers - `renderPdf` writes it
+ * with pdf-lib and the preview screen draws it as absolutely positioned HTML -
+ * so what an administrator sees on screen is what comes out of the printer.
+ */
+export function composeBook(
+  entries: DirectoryEntry[],
+  settings: ProjectSettings,
+  metrics: Metrics,
+): BookModel {
+  const geo = computeGeometry(settings);
+  const type = typeScale(settings);
+  const perPage = geo.rows;
+
+  // --- records ------------------------------------------------------------
+  const recordPages: BookPage[] = [];
+  const letters: (string | null)[] = [];
+  const entryPageIndex = new Map<string, number>();
+
+  for (let i = 0; i < entries.length; i += perPage) {
+    const slice = entries.slice(i, i + perPage);
+    const page = blankPage(geo);
+    page.kind = "records";
+
+    slice.forEach((entry, row) => {
+      const box: Box = {
+        x: 0,
+        y: geo.contentTop + row * (geo.cardHeight + geo.cardGap),
+        w: geo.pageWidth,
+        h: geo.cardHeight,
+      };
+      page.cards.push(composeCard(entry, box, settings, type, metrics));
+      entryPageIndex.set(entry.id, recordPages.length);
+    });
+
+    const from = alphaBucket(slice[0].sortKey);
+    const to = alphaBucket(slice[slice.length - 1].sortKey);
+    letters.push(from === to ? from : `${from}-${to}`);
+    recordPages.push(page);
+  }
+
+  // --- numbering ----------------------------------------------------------
+  const cover = settings.includeCover ? composeCover(settings, geo, type, metrics) : null;
+  const coverOffset = cover ? 1 : 0;
+
+  // --- index --------------------------------------------------------------
+  const indexRecords: IndexRecord[] = [];
+  if (settings.includeIndex) {
+    for (const entry of entries) {
+      const pageIndex = entryPageIndex.get(entry.id);
+      if (pageIndex === undefined) continue;
+      const number = pageIndex + 1 + coverOffset;
+
+      if (entry.type === "person") {
+        indexRecords.push({ name: fileAsName(entry.person), page: number });
+      } else {
+        for (const member of entry.household.members) {
+          indexRecords.push({ name: fileAsName(member), page: number });
+        }
+        if (!entry.household.members.length) {
+          indexRecords.push({ name: entry.household.display_name, page: number });
+        }
+      }
+    }
+    indexRecords.sort((a, b) => a.name.localeCompare(b.name) || a.page - b.page);
+  }
+
+  const indexPages = composeIndexPages(indexRecords, settings, geo, metrics);
+
+  // --- assemble -----------------------------------------------------------
+  const pages: BookPage[] = [];
+  if (cover) pages.push(cover);
+  pages.push(...recordPages, ...indexPages);
+
+  pages.forEach((page, i) => {
+    page.number = i + 1;
+    const letter = page.kind === "records" ? (letters[i - coverOffset] ?? null) : null;
+    addFurniture(page, letter, settings, geo);
+  });
+
+  const photoPaths = new Set<string>();
+  for (const page of pages) {
+    for (const card of page.cards) {
+      if (card.photo?.path) photoPaths.add(card.photo.path);
+    }
+  }
+
+  return {
+    width: geo.width,
+    height: geo.height,
+    sheets: assembleSheets(pages, settings, geo),
+    pageCount: pages.length,
+    recordCount: entries.length,
+    index: indexRecords,
+    photoPaths: [...photoPaths],
+    settings,
+  };
+}

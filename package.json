@@ -1,0 +1,32 @@
+{
+  "name": "church-directory",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Church directory: people, families, and print-ready alphabetical directory books.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --force",
+    "deploy": "npm run build && npx wrangler deploy",
+    "sample:pdf": "node scripts/run.mjs scripts/sample-book.ts",
+    "seed": "node scripts/run.mjs scripts/seed.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.4",
+    "pdf-lib": "^1.17.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^6.1.1",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
+  }
+}

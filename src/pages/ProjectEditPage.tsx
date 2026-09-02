@@ -1,0 +1,509 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { useDirectory } from "@/data/DirectoryContext";
+import { useAuth } from "@/auth/AuthProvider";
+import { Checkbox, ConfirmButton, Field, LoadingScreen, Notice } from "@/components/ui";
+import { TagPicker } from "@/components/TagPicker";
+import {
+  createProject,
+  deleteProject,
+  fetchProject,
+  setProjectEntries,
+  setProjectTags,
+  updateProject,
+} from "@/lib/queries";
+import type { ProjectKind, SelectionMode } from "@/lib/database.types";
+import {
+  DEFAULT_SETTINGS,
+  PAGE_SIZES,
+  normalizeSettings,
+  recordsPerSheet,
+  type PageSizeName,
+  type ProjectSettings,
+  type TextScale,
+} from "@/lib/layout/settings";
+import { resolveEntries, type Selection } from "@/lib/projectEntries";
+
+export function ProjectEditPage() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { canEdit } = useAuth();
+  const { entries, tags, reload } = useDirectory();
+  const isNew = !id;
+
+  const [name, setName] = useState("Church Directory");
+  const [kind, setKind] = useState<ProjectKind>("directory");
+  const [description, setDescription] = useState("");
+  const [mode, setMode] = useState<SelectionMode>("all");
+  const [tagIds, setTagIds] = useState<string[]>([]);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [settings, setSettings] = useState<ProjectSettings>(DEFAULT_SETTINGS);
+
+  const [loading, setLoading] = useState(!isNew);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    let active = true;
+    setLoading(true);
+    fetchProject(id)
+      .then((loaded) => {
+        if (!active) return;
+        setName(loaded.project.name);
+        setKind(loaded.project.kind);
+        setDescription(loaded.project.description ?? "");
+        setMode(loaded.project.selection_mode);
+        setTagIds(loaded.tagIds);
+        setPicked(loaded.entries.map((row) => `${row.entry_type}:${row.ref_id}`));
+        setSettings(normalizeSettings(loaded.project.settings));
+      })
+      .catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)))
+      .finally(() => active && setLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [id]);
+
+  const selection: Selection = useMemo(
+    () => ({
+      mode,
+      tagIds,
+      entries: picked.map((key, position) => {
+        const [entry_type, ref_id] = key.split(":");
+        return { project_id: id ?? "", entry_type: entry_type as "household" | "person", ref_id, position };
+      }),
+    }),
+    [mode, tagIds, picked, id],
+  );
+
+  const included = useMemo(() => resolveEntries(entries, selection), [entries, selection]);
+  const sheets = Math.ceil(included.length / recordsPerSheet(settings));
+
+  if (loading) return <LoadingScreen label="Loading directory…" />;
+
+  function set(patch: Partial<ProjectSettings>) {
+    setSettings((current) => ({ ...current, ...patch }));
+  }
+
+  async function save(event?: React.FormEvent) {
+    event?.preventDefault();
+    if (!canEdit) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const payload = {
+        name: name.trim() || "Untitled directory",
+        kind,
+        description: description.trim() || null,
+        selection_mode: mode,
+        settings: settings as unknown as Record<string, unknown>,
+      };
+
+      const project = id ? await updateProject(id, payload) : await createProject(payload);
+      await setProjectTags(project.id, mode === "tags" ? tagIds : []);
+      await setProjectEntries(
+        project.id,
+        mode === "manual"
+          ? picked.map((key) => {
+              const [entry_type, ref_id] = key.split(":");
+              return { entry_type: entry_type as "household" | "person", ref_id };
+            })
+          : [],
+      );
+
+      setSavedAt(Date.now());
+      if (!id) navigate(`/projects/${project.id}`, { replace: true });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="page">
+      <div className="page-head">
+        <div className="grow">
+          <h1>{isNew ? "New directory" : name}</h1>
+          <div className="sub">
+            {included.length} record{included.length === 1 ? "" : "s"} ·{" "}
+            {recordsPerSheet(settings)} to a sheet · about {sheets} sheet{sheets === 1 ? "" : "s"} of paper
+          </div>
+        </div>
+        <div className="row tight">
+          {!isNew ? (
+            <Link className="btn" to={`/projects/${id}/preview`}>Preview &amp; print</Link>
+          ) : null}
+          {canEdit ? (
+            <button type="button" className="btn primary" disabled={saving} onClick={() => void save()}>
+              {saving ? "Saving…" : isNew ? "Create" : "Save"}
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      {error ? <Notice kind="error">{error}</Notice> : null}
+      {savedAt ? <Notice kind="ok">Saved. Open the preview to see it laid out.</Notice> : null}
+
+      <form onSubmit={save}>
+        <div className="grid two" style={{ alignItems: "start", marginTop: 16 }}>
+          <div>
+            <div className="card">
+              <div className="card-head"><h2>About this directory</h2></div>
+              <div className="card-body">
+                <Field label="Name" hint="For your own list of directories." htmlFor="project_name">
+                  <input
+                    id="project_name"
+                    type="text"
+                    value={name}
+                    disabled={!canEdit}
+                    onChange={(event) => setName(event.target.value)}
+                  />
+                </Field>
+
+                <Field label="Kind" htmlFor="project_kind">
+                  <select
+                    id="project_kind"
+                    value={kind}
+                    disabled={!canEdit}
+                    onChange={(event) => setKind(event.target.value as ProjectKind)}
+                  >
+                    <option value="directory">Main directory</option>
+                    <option value="event">Smaller / event directory</option>
+                  </select>
+                </Field>
+
+                <Field label="Description" htmlFor="project_description">
+                  <textarea
+                    id="project_description"
+                    value={description}
+                    disabled={!canEdit}
+                    onChange={(event) => setDescription(event.target.value)}
+                  />
+                </Field>
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="card-head"><h2>Who is in it</h2></div>
+              <div className="card-body">
+                <Field label="Include" htmlFor="mode">
+                  <select
+                    id="mode"
+                    value={mode}
+                    disabled={!canEdit}
+                    onChange={(event) => setMode(event.target.value as SelectionMode)}
+                  >
+                    <option value="all">Everyone in the directory</option>
+                    <option value="tags">People in certain groups</option>
+                    <option value="manual">Hand-picked records</option>
+                  </select>
+                </Field>
+
+                {mode === "tags" ? (
+                  <>
+                    <TagPicker
+                      tags={tags}
+                      selected={tagIds}
+                      disabled={!canEdit}
+                      onChange={setTagIds}
+                    />
+                    <p className="hint" style={{ marginTop: 8 }}>
+                      A family is included when the family or any member carries one of these
+                      groups. New people added to a group appear here automatically.
+                    </p>
+                  </>
+                ) : null}
+
+                {mode === "manual" ? (
+                  <ManualPicker
+                    entries={entries}
+                    picked={picked}
+                    disabled={!canEdit}
+                    onChange={setPicked}
+                  />
+                ) : null}
+
+                {mode === "all" ? (
+                  <p className="hint">
+                    Everyone marked “include in printed directories” prints, in alphabetical order.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div className="card">
+              <div className="card-head"><h2>The page</h2></div>
+              <div className="card-body">
+                <Field label="Paper" htmlFor="page_size">
+                  <select
+                    id="page_size"
+                    value={settings.pageSize}
+                    disabled={!canEdit}
+                    onChange={(event) => set({ pageSize: event.target.value as PageSizeName })}
+                  >
+                    {(Object.keys(PAGE_SIZES) as PageSizeName[]).map((key) => (
+                      <option key={key} value={key}>{PAGE_SIZES[key].label} landscape</option>
+                    ))}
+                  </select>
+                </Field>
+
+                <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <Field label="Records per half-page" htmlFor="rows">
+                    <input
+                      id="rows"
+                      type="number"
+                      min={1}
+                      max={8}
+                      value={settings.rows}
+                      disabled={!canEdit}
+                      onChange={(event) => set({ rows: Number(event.target.value) })}
+                    />
+                  </Field>
+                  <Field label="Halves per sheet" htmlFor="columns">
+                    <input
+                      id="columns"
+                      type="number"
+                      min={1}
+                      max={3}
+                      value={settings.columns}
+                      disabled={!canEdit}
+                      onChange={(event) => set({ columns: Number(event.target.value) })}
+                    />
+                  </Field>
+                </div>
+
+                <Notice>
+                  <strong>{recordsPerSheet(settings)} records on one sheet of paper</strong> —{" "}
+                  {settings.rows} down each half, {settings.columns} halves across. Fold the sheet
+                  down the middle for a {settings.pageSize === "a4" ? "A5" : "half-letter"} booklet.
+                </Notice>
+
+                <Field label="Text size" htmlFor="text_scale">
+                  <select
+                    id="text_scale"
+                    value={settings.textScale}
+                    disabled={!canEdit}
+                    onChange={(event) => set({ textScale: event.target.value as TextScale })}
+                  >
+                    <option value="compact">Compact — fits more</option>
+                    <option value="normal">Normal</option>
+                    <option value="large">Large — easier to read</option>
+                  </select>
+                </Field>
+
+                <Checkbox
+                  label="Booklet page order"
+                  hint="Reorders pages for double-sided printing, folding and stapling the spine. Leave off for a straight-through PDF."
+                  checked={settings.bookletOrder}
+                  disabled={!canEdit || settings.columns !== 2}
+                  onChange={(value) => set({ bookletOrder: value })}
+                />
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="card-head"><h2>What each card shows</h2></div>
+              <div className="card-body">
+                <Checkbox label="Photographs" checked={settings.showPhotos} disabled={!canEdit}
+                  onChange={(value) => set({ showPhotos: value })} />
+                {settings.showPhotos ? (
+                  <Field label="Photo shape" htmlFor="photo_fit">
+                    <select
+                      id="photo_fit"
+                      value={settings.photoFit}
+                      disabled={!canEdit}
+                      onChange={(event) => set({ photoFit: event.target.value as "fill" | "fit" })}
+                    >
+                      <option value="fill">Crop to a matching portrait (tidiest)</option>
+                      <option value="fit">Show the whole photo</option>
+                    </select>
+                  </Field>
+                ) : null}
+                <Checkbox label="Family members' names" checked={settings.showMembers} disabled={!canEdit}
+                  onChange={(value) => set({ showMembers: value })} />
+                {settings.showMembers ? (
+                  <Field label="Member style" htmlFor="member_style">
+                    <select
+                      id="member_style"
+                      value={settings.memberStyle}
+                      disabled={!canEdit}
+                      onChange={(event) => set({ memberStyle: event.target.value as "compact" | "detailed" })}
+                    >
+                      <option value="compact">One line of first names</option>
+                      <option value="detailed">A line each, with their own contact details</option>
+                    </select>
+                  </Field>
+                ) : null}
+                <Checkbox label="Address" checked={settings.showAddress} disabled={!canEdit}
+                  onChange={(value) => set({ showAddress: value })} />
+                <Checkbox label="Phone numbers" checked={settings.showPhone} disabled={!canEdit}
+                  onChange={(value) => set({ showPhone: value })} />
+                <Checkbox label="Email addresses" checked={settings.showEmail} disabled={!canEdit}
+                  onChange={(value) => set({ showEmail: value })} />
+                <Checkbox label="Birthdays" checked={settings.showBirthdays} disabled={!canEdit}
+                  onChange={(value) => set({ showBirthdays: value })} />
+                <Checkbox label="Anniversaries" checked={settings.showAnniversary} disabled={!canEdit}
+                  onChange={(value) => set({ showAnniversary: value })} />
+                <Checkbox label="A light border around each record" checked={settings.cardBorders} disabled={!canEdit}
+                  onChange={(value) => set({ cardBorders: value })} />
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="card-head"><h2>Cover &amp; furniture</h2></div>
+              <div className="card-body">
+                <Field label="Church name" hint="Runs along the top of every page." htmlFor="church_name">
+                  <input
+                    id="church_name"
+                    type="text"
+                    value={settings.churchName}
+                    disabled={!canEdit}
+                    onChange={(event) => set({ churchName: event.target.value })}
+                  />
+                </Field>
+                <Field label="Cover title" htmlFor="cover_title">
+                  <input
+                    id="cover_title"
+                    type="text"
+                    value={settings.coverTitle}
+                    disabled={!canEdit}
+                    onChange={(event) => set({ coverTitle: event.target.value })}
+                  />
+                </Field>
+                <Field label="Cover subtitle" hint="A season or year works well." htmlFor="cover_subtitle">
+                  <input
+                    id="cover_subtitle"
+                    type="text"
+                    value={settings.coverSubtitle}
+                    placeholder="Spring 2026"
+                    disabled={!canEdit}
+                    onChange={(event) => set({ coverSubtitle: event.target.value })}
+                  />
+                </Field>
+                <Field label="Footer note" htmlFor="footer_text">
+                  <input
+                    id="footer_text"
+                    type="text"
+                    value={settings.footerText}
+                    placeholder="Please keep this directory for church use only."
+                    disabled={!canEdit}
+                    onChange={(event) => set({ footerText: event.target.value })}
+                  />
+                </Field>
+
+                <Checkbox label="Cover page" checked={settings.includeCover} disabled={!canEdit}
+                  onChange={(value) => set({ includeCover: value })} />
+                <Checkbox
+                  label="Alphabetical index at the back"
+                  hint="Every person by surname, with the page their family is on."
+                  checked={settings.includeIndex}
+                  disabled={!canEdit}
+                  onChange={(value) => set({ includeIndex: value })}
+                />
+                <Checkbox label="Church name in the running header" checked={settings.runningHeader} disabled={!canEdit}
+                  onChange={(value) => set({ runningHeader: value })} />
+                <Checkbox label="Letter tabs (A, B, C…)" checked={settings.showLetterTabs} disabled={!canEdit}
+                  onChange={(value) => set({ showLetterTabs: value })} />
+                <Checkbox label="Page numbers" checked={settings.showPageNumbers} disabled={!canEdit}
+                  onChange={(value) => set({ showPageNumbers: value })} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {canEdit ? (
+          <div className="row" style={{ marginTop: 18 }}>
+            <button type="submit" className="btn primary" disabled={saving}>
+              {saving ? "Saving…" : isNew ? "Create directory" : "Save changes"}
+            </button>
+            {!isNew ? <Link className="btn" to={`/projects/${id}/preview`}>Preview &amp; print</Link> : null}
+            <Link className="btn ghost" to="/projects">Back</Link>
+            <span className="spacer" />
+            {!isNew && id ? (
+              <ConfirmButton
+                label="Delete directory"
+                confirmLabel="Delete permanently"
+                onConfirm={async () => {
+                  await deleteProject(id);
+                  await reload();
+                  navigate("/projects");
+                }}
+              />
+            ) : null}
+          </div>
+        ) : (
+          <Notice kind="warn">You have read-only access. You can still preview and print.</Notice>
+        )}
+      </form>
+    </div>
+  );
+}
+
+/** Checklist of every record, for the hand-picked mode. */
+function ManualPicker({
+  entries,
+  picked,
+  onChange,
+  disabled,
+}: {
+  entries: { type: "household" | "person"; id: string; title: string }[];
+  picked: string[];
+  onChange: (next: string[]) => void;
+  disabled?: boolean;
+}) {
+  const [query, setQuery] = useState("");
+  const chosen = new Set(picked);
+
+  const visible = entries.filter((entry) =>
+    entry.title.toLowerCase().includes(query.trim().toLowerCase()),
+  );
+
+  return (
+    <div>
+      <div className="toolbar" style={{ marginBottom: 8 }}>
+        <input
+          className="search"
+          type="search"
+          placeholder="Search records…"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+        <span className="muted small">{picked.length} chosen</span>
+        {picked.length ? (
+          <button type="button" className="btn ghost small" disabled={disabled} onClick={() => onChange([])}>
+            Clear
+          </button>
+        ) : null}
+      </div>
+
+      <div
+        style={{
+          maxHeight: 320,
+          overflowY: "auto",
+          border: "1px solid var(--line)",
+          borderRadius: "var(--radius-sm)",
+          padding: 10,
+        }}
+      >
+        {visible.map((entry) => {
+          const key = `${entry.type}:${entry.id}`;
+          return (
+            <Checkbox
+              key={key}
+              label={entry.title}
+              checked={chosen.has(key)}
+              disabled={disabled}
+              onChange={(on) => onChange(on ? [...picked, key] : picked.filter((k) => k !== key))}
+            />
+          );
+        })}
+        {!visible.length ? <p className="muted small">Nothing matches.</p> : null}
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,15 @@
+{
+  // Cloudflare Workers static assets. Only needed if you deploy with the CLI
+  // (`npm run deploy`); the Pages Git integration reads none of this and just
+  // needs build command `npm run build` and output directory `dist`.
+  "name": "church-directory",
+  "compatibility_date": "2026-01-01",
+  "assets": {
+    "directory": "./dist",
+    // Client-side routing: unknown paths serve index.html rather than 404.
+    "not_found_handling": "single-page-application"
+  },
+  "observability": {
+    "enabled": true
+  }
+}
