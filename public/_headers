@@ -9,9 +9,18 @@
   # A church directory has no business being indexed.
   X-Robots-Tag: noindex, nofollow
 
+# iOS decides browser-vs-standalone from the HTML and manifest at the moment
+# an icon is added to the Home Screen, and that decision sticks. Neither file
+# may be served from a stale cache, so both always revalidate.
+/
+  Cache-Control: public, max-age=0, must-revalidate
+
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+
 /manifest.webmanifest
   Content-Type: application/manifest+json
-  Cache-Control: public, max-age=3600
+  Cache-Control: public, max-age=0, must-revalidate
 
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
