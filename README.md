@@ -124,6 +124,21 @@ is not the same as having access. Photographs live in a **private** bucket and
 are served through short-lived signed URLs. Nothing is readable anonymously, and
 nothing is indexed.
 
+These policies are tested, not just written. `npm run test:rls` applies the
+real migration files to a throwaway PostgreSQL database and then tries to break
+in — as an anonymous visitor, as a stranger who signed themselves up, and as an
+editor trying to promote themselves. CI runs it on every push. If you change a
+policy, run it.
+
+```bash
+# needs a local postgres, or point DATABASE_URL at any throwaway database
+DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/postgres npm run test:rls
+```
+
+The browser side is locked down too: a Content Security Policy in `index.html`
+allows scripts only from the app itself and network calls only to Supabase, and
+`public/_headers` adds the header-only pieces on Cloudflare.
+
 Three roles:
 
 | Role | Can do |
@@ -197,6 +212,7 @@ trusted: if a name wraps on screen, it wraps in print.
 | `npm run dev` | Local dev server |
 | `npm run build` | Typecheck and build into `dist/` |
 | `npm run typecheck` | Types only |
+| `npm run test:rls` | Prove the database policies keep strangers out |
 | `npm run sample:pdf -- out.pdf` | Render a sample directory, no database needed |
 | `npm run seed` | Fill Supabase with demo data |
 | `npm run deploy` | Build and push to Cloudflare with Wrangler |

@@ -123,6 +123,16 @@ export async function getPhotoUrls(paths: string[]): Promise<Map<string, string>
   return result;
 }
 
+/**
+ * Drops every cached signed URL. Called on sign-out: the links stay valid for
+ * up to an hour after they are issued, so they should not outlive the session
+ * that was allowed to hold them - particularly on a shared church office
+ * computer.
+ */
+export function forgetPhotoUrls(): void {
+  signedUrls.clear();
+}
+
 export async function getPhotoUrl(path: string | null | undefined): Promise<string | null> {
   if (!path) return null;
   const urls = await getPhotoUrls([path]);

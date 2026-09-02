@@ -11,7 +11,8 @@
     "typecheck": "tsc -b --force",
     "deploy": "npm run build && npx wrangler deploy",
     "sample:pdf": "node scripts/run.mjs scripts/sample-book.ts",
-    "seed": "node scripts/run.mjs scripts/seed.ts"
+    "seed": "node scripts/run.mjs scripts/seed.ts",
+    "test:rls": "bash scripts/test-rls.sh"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",

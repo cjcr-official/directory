@@ -1,6 +1,7 @@
 import { createContext, use, useCallback, useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { forgetPhotoUrls } from "@/lib/photos";
 import type { AppRole, ProfileRow } from "@/lib/database.types";
 
 interface AuthState {
@@ -98,6 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       async signOut() {
         await supabase.auth.signOut();
+        forgetPhotoUrls();
         setProfile(null);
       },
 

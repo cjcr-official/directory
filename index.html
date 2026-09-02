@@ -5,6 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light" />
     <meta name="robots" content="noindex, nofollow" />
+    <!--
+      Delivered as a meta tag rather than only in public/_headers so it applies
+      wherever the app is served - dev server, local preview, any host - not just
+      Cloudflare. There are no inline scripts, so script-src stays strict;
+      style-src needs 'unsafe-inline' because React sets style attributes.
+      img-src allows blob:/data: for photo previews drawn on a canvas.
+      frame-ancestors is header-only, so it lives in public/_headers instead.
+
+      Self-hosting Supabase? Replace https://*.supabase.co with your own origin.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self';
+               script-src 'self';
+               style-src 'self' 'unsafe-inline';
+               img-src 'self' data: blob: https://*.supabase.co;
+               font-src 'self';
+               connect-src 'self' https://*.supabase.co wss://*.supabase.co;
+               object-src 'none';
+               base-uri 'self';
+               form-action 'self'"
+    />
     <title>Church Directory</title>
     <link
       rel="icon"

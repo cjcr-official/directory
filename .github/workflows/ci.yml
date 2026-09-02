@@ -34,3 +34,29 @@ jobs:
           name: sample-directory-pdf
           path: /tmp/sample-directory.pdf
           if-no-files-found: error
+
+  # The anon key ships in the browser bundle, so row level security is the only
+  # thing keeping the congregation's details private. Prove it every push.
+  rls:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install psql
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Row level security tests
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
+        run: npm run test:rls
