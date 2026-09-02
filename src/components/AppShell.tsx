@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { Logo } from "@/components/Logo";
 import { useAuth } from "@/auth/AuthProvider";
 import { useDirectory } from "@/data/DirectoryContext";
+import { APP_VERSION } from "@/lib/version";
 
 function Item({ to, label, count }: { to: string; label: string; count?: number }) {
   return (
@@ -95,6 +96,11 @@ export function AppShell() {
               {individuals} listed on their own
             </div>
           ) : null}
+          {/* So "which version are you on?" has an answer that does not
+              involve reading a URL bar that is not there. */}
+          <div className="sidebar-version" title={`Build ${APP_VERSION}`}>
+            Version {APP_VERSION.slice(0, 7)}
+          </div>
         </div>
       </nav>
 

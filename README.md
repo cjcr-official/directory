@@ -206,6 +206,7 @@ src/
     photos.ts          resize in the browser, upload, signed URLs
     queries.ts         every database read and write
     demo.ts            the invented congregation used by /sample
+    version.ts         what build this is, and what build is being served
   components/          shared UI, and the preview renderer
   pages/               one file per screen
 scripts/
@@ -218,6 +219,28 @@ yet: `typescript-eslint` still caps at TypeScript 5, and this project is on the
 TypeScript 7 compiler. The strict compiler flags — `strict`, `noUnusedLocals`,
 `noUnusedParameters`, `noFallthroughCasesInSwitch` — cover much of the same
 ground in the meantime.
+
+### Staying up to date
+
+Added to the Home Screen the app is suspended rather than closed, so one page
+load can stay alive for weeks — long enough to be several deploys behind with
+nothing on screen to say so.
+
+Each build stamps the commit it came from into the bundle and into
+`/version.json`. `components/UpdateGate.tsx` re-reads that file when the app
+comes back to the foreground, when the network returns, and every ten minutes
+while it is open. A disagreement means this browser is running an older build:
+it shows the updating screen and reloads.
+
+It will not reload over the top of someone's typing. If anything inside a form
+has been edited since the last navigation, it shows a bar instead and waits —
+for the reload button, or for the navigation that means the record was saved.
+Search boxes are not forms and do not hold it back. If two reloads in a row
+land on the same old version, it stops trying and leaves the bar up, because a
+version behind beats a reload loop.
+
+The running build is printed at the bottom of the sidebar, so "which version
+are you on?" has an answer.
 
 The important idea is in `src/lib/layout/`. `compose.ts` turns records into a
 page model — every box and every line of text placed to the point — and then

@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { LoginPage } from "@/auth/LoginPage";
 import { AccountNotReady } from "@/auth/AccountNotReady";
 import { AppShell } from "@/components/AppShell";
+import { UpdateGate } from "@/components/UpdateGate";
 import { DirectoryProvider } from "@/data/DirectoryContext";
 import { LoadingScreen, Notice } from "@/components/ui";
 import { isConfigured } from "@/lib/supabase";
@@ -86,6 +87,9 @@ function Protected() {
 export function App() {
   return (
     <BrowserRouter>
+      {/* Outside the auth gate: a browser running an old build should be
+          moved onto the new one whether or not anyone is signed in. */}
+      <UpdateGate />
       {isConfigured ? (
         <AuthProvider>
           <Protected />

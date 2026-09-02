@@ -741,6 +741,137 @@ th.num {
   color: var(--ink-3);
 }
 
+.sidebar-version {
+  margin-top: 10px;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  color: var(--ink-3);
+  opacity: 0.72;
+}
+
+/* --- updating -------------------------------------------------------------
+ *
+ * Shown for a beat before the page reloads onto a newer build. It covers
+ * everything, on the same dark ground as sign-in, so the reload that follows
+ * reads as something the app did on purpose rather than a crash.
+ * -------------------------------------------------------------------------- */
+
+.update-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: calc(24px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right))
+    calc(24px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
+  background:
+    radial-gradient(120% 90% at 50% -10%, var(--brand-dark-2) 0%, transparent 60%),
+    var(--brand-dark);
+  animation: update-fade 180ms ease-out;
+}
+
+@keyframes update-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.update-screen-inner {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  width: 100%;
+  max-width: 320px;
+  text-align: center;
+}
+
+.update-screen-logo {
+  width: 100%;
+  max-width: 230px;
+  height: auto;
+  margin-bottom: 10px;
+}
+
+.update-screen-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  color: #fff;
+}
+
+.update-screen-sub {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: rgb(255 255 255 / 62%);
+}
+
+/* The default spinner is drawn for a light card and disappears on this one. */
+.spinner.on-dark {
+  width: 22px;
+  height: 22px;
+  border-color: rgb(255 255 255 / 22%);
+  border-top-color: #fff;
+}
+
+/* --- update bar -----------------------------------------------------------
+ *
+ * The fallback when reloading would throw away half-typed work: say a version
+ * is waiting and let them pick the moment.
+ * -------------------------------------------------------------------------- */
+
+.update-bar {
+  position: fixed;
+  /* Below the mobile drawer (50) and its scrim (45): an open drawer is what
+     the person is doing right now, and the bar can wait behind it. The
+     updating screen sits above everything, because nothing else matters once
+     the reload is committed. */
+  z-index: 35;
+  left: max(14px, env(safe-area-inset-left));
+  right: max(14px, env(safe-area-inset-right));
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  margin-inline: auto;
+  max-width: 560px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 12px 11px 15px;
+  border-radius: var(--radius);
+  /* Lighter than --brand-dark with a hairline edge, so it still reads as a
+     separate surface when it lands on the dark sign-in screen. */
+  background: var(--brand-dark-2);
+  border: 1px solid rgb(255 255 255 / 16%);
+  color: #fff;
+  box-shadow:
+    0 2px 6px rgb(0 0 0 / 24%),
+    0 18px 40px -18px rgb(0 0 0 / 65%);
+  animation: update-rise 220ms ease-out;
+}
+
+@keyframes update-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.update-bar-text {
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.update-bar-actions {
+  flex: none;
+}
+
+.update-bar .btn.ghost {
+  border-color: rgb(255 255 255 / 26%);
+  color: rgb(255 255 255 / 82%);
+  background: none;
+}
+
 /* --- mobile ---------------------------------------------------------------
  *
  * Under 820px the sidebar becomes a drawer behind a dark top bar rather than
@@ -758,6 +889,18 @@ th.num {
 }
 
 @media (max-width: 820px) {
+  /* No room for text and two buttons on one line at phone width. */
+  .update-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 13px 14px;
+  }
+
+  .update-bar-actions {
+    justify-content: flex-end;
+  }
+
   .shell {
     flex-direction: column;
   }
