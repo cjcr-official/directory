@@ -109,10 +109,10 @@ export function PeoplePage() {
                 <th style={{ width: 56 }}></th>
                 <th>Name</th>
                 <th>Family</th>
-                <th>Phone</th>
-                <th>Email</th>
-                <th>Birthday</th>
-                <th>Groups</th>
+                <th className="hide-sm">Phone</th>
+                <th className="hide-sm">Email</th>
+                <th className="hide-sm">Birthday</th>
+                <th className="hide-sm">Groups</th>
               </tr>
             </thead>
             <tbody>

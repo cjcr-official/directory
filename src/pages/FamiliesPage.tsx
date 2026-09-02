@@ -100,9 +100,9 @@ export function FamiliesPage() {
                 <th style={{ width: 56 }}></th>
                 <th>Family</th>
                 <th>Members</th>
-                <th>Address</th>
-                <th>Phone</th>
-                <th>Groups</th>
+                <th className="hide-sm">Address</th>
+                <th className="hide-sm">Phone</th>
+                <th className="hide-sm">Groups</th>
               </tr>
             </thead>
             <tbody>
@@ -129,9 +129,11 @@ export function FamiliesPage() {
                         ? members.map((member) => firstName(member)).join(", ")
                         : "No members yet"}
                     </td>
-                    <td className="small muted">{address[0] ?? "—"}</td>
-                    <td className="small muted nowrap">{formatPhone(household.phone) || "—"}</td>
-                    <td>
+                    <td className="small muted hide-sm">{address[0] ?? "—"}</td>
+                    <td className="small muted nowrap hide-sm">
+                      {formatPhone(household.phone) || "—"}
+                    </td>
+                    <td className="hide-sm">
                       <span className="row tight">
                         {tagsOfHousehold(household.id).map((tagId) => {
                           const tag = tagsById.get(tagId);

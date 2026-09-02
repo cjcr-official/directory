@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { Logo } from "@/components/Logo";
 import { useAuth } from "@/auth/AuthProvider";
 import { useDirectory } from "@/data/DirectoryContext";
@@ -19,12 +20,49 @@ function Item({ to, label, count }: { to: string; label: string; count?: number 
 export function AppShell() {
   const { profile, role, isOwner, signOut } = useAuth();
   const { households, people, tags } = useDirectory();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const location = useLocation();
+
+  // Following a link should put the drawer away.
+  useEffect(() => setMenuOpen(false), [location.pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
 
   const individuals = people.filter((person) => !person.household_id).length;
 
   return (
     <div className="shell">
-      <nav className="sidebar">
+      <header className="topbar">
+        <button
+          type="button"
+          className="menu-btn"
+          aria-label={menuOpen ? "Close menu" : "Open menu"}
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+            {menuOpen ? (
+              <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+            ) : (
+              <path d="M3 6h18M3 12h18M3 18h18" strokeLinecap="round" />
+            )}
+          </svg>
+        </button>
+        <Logo className="topbar-logo" />
+        <span className="spacer" />
+        <span className="pill role">{role ?? "no access"}</span>
+      </header>
+
+      {menuOpen ? <div className="scrim" onClick={() => setMenuOpen(false)} /> : null}
+
+      <nav className={`sidebar${menuOpen ? " open" : ""}`}>
         <div className="brand">
           <Logo />
           <span className="app-name">Church Directory</span>

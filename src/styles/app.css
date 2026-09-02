@@ -740,133 +740,165 @@ th.num {
   color: var(--ink-3);
 }
 
+/* --- mobile ---------------------------------------------------------------
+ *
+ * Under 820px the sidebar becomes a drawer behind a dark top bar rather than
+ * wrapping into rows: seven links and their counts reflowed into three lines of
+ * chrome before any content, and the logo had to be inverted to a black blob to
+ * survive a light background. The bar is dark, so the mark stays as drawn.
+ * -------------------------------------------------------------------------- */
+
+.topbar {
+  display: none;
+}
+
+.scrim {
+  display: none;
+}
+
 @media (max-width: 820px) {
   .shell {
     flex-direction: column;
   }
-  .sidebar {
-    width: auto;
-    flex: none;
-    height: auto;
-    position: static;
-    flex-direction: row;
-    flex-wrap: wrap;
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    display: flex;
     align-items: center;
-    padding: 10px 12px;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--brand-dark);
+    color: #fff;
   }
-  .brand {
-    margin: 0;
-    padding: 6px 12px 6px 4px;
-    background: transparent;
+
+  .topbar-logo {
+    display: block;
+    width: 118px;
+    height: auto;
   }
-  .brand img {
-    max-width: 112px;
-    filter: invert(1) brightness(0.22);
+
+  .topbar .spacer {
+    flex: 1;
   }
-  .brand .app-name {
-    display: none;
+
+  .topbar .pill {
+    background: rgb(255 255 255 / 12%);
+    border-color: rgb(255 255 255 / 18%);
+    color: rgb(255 255 255 / 82%);
   }
-  .nav-section {
-    display: none;
-  }
-  .sidebar-foot {
-    margin: 0 0 0 auto;
-    padding: 0;
+
+  .menu-btn {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    flex: none;
+    margin-left: -6px;
     border: none;
+    border-radius: 9px;
+    background: transparent;
+    color: #fff;
+    cursor: pointer;
+    padding: 0;
   }
+  .menu-btn:active {
+    background: rgb(255 255 255 / 12%);
+  }
+  .menu-btn svg {
+    width: 21px;
+    height: 21px;
+  }
+
+  .scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    background: rgb(10 20 18 / 46%);
+  }
+
+  /* The drawer. Off-canvas until opened, and always a column - never a
+     wrapping row. */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 50;
+    width: 264px;
+    max-width: 84vw;
+    height: 100dvh;
+    flex-direction: column;
+    padding: 0 14px 20px;
+    overflow-y: auto;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    box-shadow: 0 0 40px rgb(0 0 0 / 28%);
+  }
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .brand {
+    margin: 0 -14px 14px;
+    padding: 18px 18px 16px;
+  }
+
+  .nav-link {
+    padding: 10px 11px;
+    font-size: 0.95rem;
+  }
+
   .page {
     padding: 18px 16px 48px;
   }
-}
 
-/* --- print preview ------------------------------------------------------- */
-
-.preview-bar {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 10px 18px;
-  background: var(--paper);
-  border-bottom: 1px solid var(--line);
-}
-
-.preview-canvas {
-  background: #6f7b79;
-  padding: 24px;
-  min-height: calc(100vh - 56px);
-}
-
-.sheet-stack {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 22px;
-}
-
-.sheet-frame {
-  overflow: hidden;
-}
-
-.sheet {
-  position: relative;
-  background: #fff;
-  box-shadow: 0 3px 18px rgb(0 0 0 / 28%);
-  overflow: hidden;
-}
-
-.fold-line {
-  position: absolute;
-  width: 0;
-  border-left: 0.5pt dashed var(--line-strong);
-}
-
-.progress-track {
-  height: 5px;
-  width: 160px;
-  border-radius: 999px;
-  background: var(--line);
-  overflow: hidden;
-}
-.progress-track > div {
-  height: 100%;
-  background: var(--accent);
-  transition: width 0.15s;
-}
-
-@media print {
-  .preview-bar {
-    display: none !important;
+  .page-head h1 {
+    font-size: 1.35rem;
   }
-  /* Anything that explains the preview belongs on screen only; left in, it
-     pushes the first sheet off an exactly-sized page and drifts the fold. */
-  .screen-only {
-    display: none !important;
+
+  /* Cards holding real content need the full width; a stat is a number and a
+     label, and four of them stacked is a lot of scrolling for very little. */
+  .grid.two {
+    grid-template-columns: 1fr;
   }
-  .preview-canvas {
-    background: #fff;
-    padding: 0;
-    min-height: 0;
+  .grid.three {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
   }
-  .sheet-stack {
-    gap: 0;
+
+  .stat {
+    padding: 13px 14px;
   }
-  .sheet-frame {
-    overflow: visible;
+  .stat .value {
+    font-size: 1.5rem;
   }
-  .sheet {
-    box-shadow: none;
-    break-after: page;
-    transform: none !important;
+  .stat .label {
+    font-size: 0.8rem;
   }
-  .sheet:last-child {
-    break-after: auto;
+
+  table {
+    font-size: 0.88rem;
   }
-  .fold-line {
-    border-left-color: #e8eceb;
+
+  /* Six columns cannot fit a phone. The secondary ones are dropped rather
+     than pushed off the edge where nothing hints they exist; the full record
+     is one tap away. */
+  .hide-sm {
+    display: none;
+  }
+
+  td,
+  th {
+    padding: 9px 8px;
+  }
+
+  .letter-bar button {
+    min-width: 22px;
+    padding: 3px 4px;
+    font-size: 0.75rem;
   }
 }
 
