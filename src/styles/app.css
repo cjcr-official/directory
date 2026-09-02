@@ -888,6 +888,68 @@ th.num {
     font-size: 0.88rem;
   }
 
+  /*
+   * Browse tables read as list items on a phone: portrait on the left, the
+   * name above what it belongs to. Even three columns cramp at this width -
+   * every name was breaking across two lines - and a row of headings over
+   * two-line cells is not a table anyone can scan.
+   */
+  .list-table thead {
+    display: none;
+  }
+
+  .list-table,
+  .list-table tbody,
+  .list-table tr,
+  .list-table td {
+    display: block;
+  }
+
+  .list-table tr {
+    display: grid;
+    grid-template-columns: 46px minmax(0, 1fr);
+    grid-template-areas:
+      "avatar primary"
+      "avatar secondary";
+    align-items: center;
+    gap: 1px 12px;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .list-table tbody tr:last-child {
+    border-bottom: none;
+  }
+
+  .list-table td {
+    padding: 0;
+    border: none;
+  }
+
+  /* Must out-rank ".list-table td" above, which would otherwise turn the
+     hidden cells back into blocks and stack them on top of each other. */
+  .list-table td.hide-sm,
+  .hide-sm {
+    display: none;
+  }
+  .list-table td:nth-child(1) {
+    grid-area: avatar;
+  }
+  .list-table td:nth-child(2) {
+    grid-area: primary;
+    font-size: 0.97rem;
+  }
+  .list-table td:nth-child(3) {
+    grid-area: secondary;
+    font-size: 0.85rem;
+    color: var(--ink-3);
+  }
+  /* The family stays tappable but reads as the subtitle it is, rather than
+     competing with the name above it. */
+  .list-table td:nth-child(3) .list-link {
+    color: inherit;
+    font-weight: 500;
+  }
+
   /* Six columns cannot fit a phone. The secondary ones are dropped rather
      than pushed off the edge where nothing hints they exist; the full record
      is one tap away. */

@@ -103,7 +103,7 @@ export function PeoplePage() {
 
       <div className="card">
         {filtered.length ? (
-          <table>
+          <table className="list-table">
             <thead>
               <tr>
                 <th style={{ width: 56 }}></th>
@@ -147,12 +147,14 @@ export function PeoplePage() {
                         <span className="muted">On their own</span>
                       )}
                     </td>
-                    <td className="small muted nowrap">{formatPhone(person.phone) || "—"}</td>
-                    <td className="small muted">{person.email || "—"}</td>
-                    <td className="small muted nowrap">
+                    <td className="small muted nowrap hide-sm">
+                      {formatPhone(person.phone) || "—"}
+                    </td>
+                    <td className="small muted hide-sm">{person.email || "—"}</td>
+                    <td className="small muted nowrap hide-sm">
                       {formatShortDate(person.date_of_birth) || "—"}
                     </td>
-                    <td>
+                    <td className="hide-sm">
                       <span className="row tight">
                         {tagsOfPerson(person.id).map((tagId) => {
                           const tag = tagsById.get(tagId);

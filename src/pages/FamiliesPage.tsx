@@ -94,7 +94,7 @@ export function FamiliesPage() {
 
       <div className="card">
         {filtered.length ? (
-          <table>
+          <table className="list-table">
             <thead>
               <tr>
                 <th style={{ width: 56 }}></th>
