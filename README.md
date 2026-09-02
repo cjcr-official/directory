@@ -22,11 +22,11 @@ optionally a date of birth, an anniversary and an address. People can be grouped
 into a family, which then prints as one card with everyone listed on it. A person
 who is not in a family gets their own card.
 
-**Groups.** Tag a family or a person — *Choir*, *Youth Group*, *Deacons* — and
+**Groups.** Tag a family or a person — _Choir_, _Youth Group_, _Deacons_ — and
 you can print a booklet for just that group later, without picking names again.
 Tagging one chorister pulls their whole family into the choir booklet.
 
-**Directories.** A *directory* is a saved recipe for one printable book: who is
+**Directories.** A _directory_ is a saved recipe for one printable book: who is
 in it, and how it looks. Keep a main directory for the whole congregation and as
 many small ones as you like for events. The data stays live, so reprinting next
 year is one click.
@@ -67,7 +67,7 @@ Open the address it prints. The first account to sign up becomes the **owner**,
 so you can claim a fresh project without touching a secret key.
 
 Every account created after that starts with **no access at all** — it can sign
-in and see nothing until an owner grants it a role under *Administrators*. Sign-up
+in and see nothing until an owner grants it a role under _Administrators_. Sign-up
 is open to anyone who reaches the app, so this is the line that keeps the
 congregation's details private.
 
@@ -75,13 +75,13 @@ congregation's details private.
 
 The build is a folder of static files, so either route works.
 
-**Pages, from GitHub — the easy one.** In the Cloudflare dashboard: *Workers &
-Pages → Create → Pages → Connect to Git*, pick this repository, and set
+**Pages, from GitHub — the easy one.** In the Cloudflare dashboard: _Workers &
+Pages → Create → Pages → Connect to Git_, pick this repository, and set
 
-| Setting | Value |
-| --- | --- |
-| Build command | `npm run build` |
-| Output directory | `dist` |
+| Setting               | Value                                         |
+| --------------------- | --------------------------------------------- |
+| Build command         | `npm run build`                               |
+| Output directory      | `dist`                                        |
 | Environment variables | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
 
 Every push to your branch redeploys. `public/_redirects` already tells Pages to
@@ -118,7 +118,7 @@ to work, and it is not what protects anything.
 
 What protects the congregation's details is **row level security**, defined in
 `supabase/migrations/0001_initial_schema.sql`. Every table refuses to return a
-single row unless the request carries a signed-in account that has an *active*
+single row unless the request carries a signed-in account that has an _active_
 row in `profiles` — and new sign-ups are created inactive, so having an account
 is not the same as having access. Photographs live in a **private** bucket and
 are served through short-lived signed URLs. Nothing is readable anonymously, and
@@ -141,12 +141,12 @@ allows scripts only from the app itself and network calls only to Supabase, and
 
 Three roles:
 
-| Role | Can do |
-| --- | --- |
-| **Owner** | Everything, including adding and removing administrators |
-| **Editor** | Add and edit people, families, groups and directories |
-| **Viewer** | Browse and print; no changes |
-| *(no access)* | A new sign-up, until an owner turns it on |
+| Role          | Can do                                                   |
+| ------------- | -------------------------------------------------------- |
+| **Owner**     | Everything, including adding and removing administrators |
+| **Editor**    | Add and edit people, families, groups and directories    |
+| **Viewer**    | Browse and print; no changes                             |
+| _(no access)_ | A new sign-up, until an owner turns it on                |
 
 ---
 
@@ -198,6 +198,12 @@ scripts/
   seed.ts              fill a Supabase project with demo data
 ```
 
+Formatting is Prettier, checked in CI (`npm run format`). There is no ESLint
+yet: `typescript-eslint` still caps at TypeScript 5, and this project is on the
+TypeScript 7 compiler. The strict compiler flags — `strict`, `noUnusedLocals`,
+`noUnusedParameters`, `noFallthroughCasesInSwitch` — cover much of the same
+ground in the meantime.
+
 The important idea is in `src/lib/layout/`. `compose.ts` turns records into a
 page model — every box and every line of text placed to the point — and then
 **two** renderers consume that same model without changing it: `pdf.ts` writes
@@ -207,15 +213,15 @@ trusted: if a name wraps on screen, it wraps in print.
 
 ### Commands
 
-| Command | What it does |
-| --- | --- |
-| `npm run dev` | Local dev server |
-| `npm run build` | Typecheck and build into `dist/` |
-| `npm run typecheck` | Types only |
-| `npm run test:rls` | Prove the database policies keep strangers out |
-| `npm run sample:pdf -- out.pdf` | Render a sample directory, no database needed |
-| `npm run seed` | Fill Supabase with demo data |
-| `npm run deploy` | Build and push to Cloudflare with Wrangler |
+| Command                         | What it does                                   |
+| ------------------------------- | ---------------------------------------------- |
+| `npm run dev`                   | Local dev server                               |
+| `npm run build`                 | Typecheck and build into `dist/`               |
+| `npm run typecheck`             | Types only                                     |
+| `npm run test:rls`              | Prove the database policies keep strangers out |
+| `npm run sample:pdf -- out.pdf` | Render a sample directory, no database needed  |
+| `npm run seed`                  | Fill Supabase with demo data                   |
+| `npm run deploy`                | Build and push to Cloudflare with Wrangler     |
 
 ---
 

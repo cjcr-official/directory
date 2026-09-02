@@ -32,11 +32,26 @@ async function run() {
   if (clear) {
     console.log("clearing existing records…");
     // Order matters: children before parents.
-    for (const table of ["project_entries", "project_tags", "projects", "person_tags", "household_tags", "people", "households", "tags"]) {
-      const { error } = await supabase.from(table).delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    for (const table of [
+      "project_entries",
+      "project_tags",
+      "projects",
+      "person_tags",
+      "household_tags",
+      "people",
+      "households",
+      "tags",
+    ]) {
+      const { error } = await supabase
+        .from(table)
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000");
       // The join tables have no id column; fall back to deleting everything.
       if (error) {
-        const retry = await supabase.from(table).delete().gte("tag_id", "00000000-0000-0000-0000-000000000000");
+        const retry = await supabase
+          .from(table)
+          .delete()
+          .gte("tag_id", "00000000-0000-0000-0000-000000000000");
         if (retry.error) console.warn(`  ${table}: ${retry.error.message}`);
       }
     }
@@ -103,12 +118,14 @@ async function run() {
       tag_id: tagIds.get(link.tag_id),
     }))
     .filter((row): row is { household_id: string; tag_id: string } =>
-      Boolean(row.household_id && row.tag_id));
+      Boolean(row.household_id && row.tag_id),
+    );
 
   const personTags = demo.personTags
     .map((link) => ({ person_id: personIds.get(link.person_id), tag_id: tagIds.get(link.tag_id) }))
     .filter((row): row is { person_id: string; tag_id: string } =>
-      Boolean(row.person_id && row.tag_id));
+      Boolean(row.person_id && row.tag_id),
+    );
 
   if (householdTags.length) {
     const { error } = await supabase.from("household_tags").insert(householdTags);

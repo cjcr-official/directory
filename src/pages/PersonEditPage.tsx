@@ -62,7 +62,8 @@ export function PersonEditPage() {
   useEffect(() => {
     if (isNew) {
       const household = params.get("household");
-      if (household) setForm((current) => ({ ...current, household_id: household, household_role: "other" }));
+      if (household)
+        setForm((current) => ({ ...current, household_id: household, household_role: "other" }));
       return;
     }
     if (!existing) return;
@@ -75,7 +76,11 @@ export function PersonEditPage() {
     return (
       <div className="page">
         <Notice kind="error">That person no longer exists.</Notice>
-        <p style={{ marginTop: 12 }}><Link className="btn" to="/people">Back to people</Link></p>
+        <p style={{ marginTop: 12 }}>
+          <Link className="btn" to="/people">
+            Back to people
+          </Link>
+        </p>
       </div>
     );
   }
@@ -127,7 +132,9 @@ export function PersonEditPage() {
         photo_path: photoPath,
       };
 
-      const person = existing ? await updatePerson(existing.id, payload) : await createPerson(payload);
+      const person = existing
+        ? await updatePerson(existing.id, payload)
+        : await createPerson(payload);
       await setTags("person", person.id, tagIds);
       await reload();
       navigate(`/people/${person.id}`, { replace: true });
@@ -142,14 +149,23 @@ export function PersonEditPage() {
     <div className="page">
       <div className="page-head">
         <div className="grow">
-          <h1>{isNew ? "Add a person" : `${form.first_name} ${form.last_name}`.trim() || "Person"}</h1>
+          <h1>
+            {isNew ? "Add a person" : `${form.first_name} ${form.last_name}`.trim() || "Person"}
+          </h1>
           <div className="sub">
-            {household
-              ? <>Part of <Link to={`/families/${household.id}`}>{household.display_name}</Link>, so they print on that family's card.</>
-              : "Not in a family, so they get their own record in the book."}
+            {household ? (
+              <>
+                Part of <Link to={`/families/${household.id}`}>{household.display_name}</Link>, so
+                they print on that family's card.
+              </>
+            ) : (
+              "Not in a family, so they get their own record in the book."
+            )}
           </div>
         </div>
-        <Link className="btn ghost" to="/people">Back</Link>
+        <Link className="btn ghost" to="/people">
+          Back
+        </Link>
       </div>
 
       {error ? <Notice kind="error">{error}</Notice> : null}
@@ -157,7 +173,9 @@ export function PersonEditPage() {
       <form onSubmit={save}>
         <div className="grid two" style={{ alignItems: "start" }}>
           <div className="card">
-            <div className="card-head"><h2>Details</h2></div>
+            <div className="card-head">
+              <h2>Details</h2>
+            </div>
             <div className="card-body">
               <div className="field">
                 <PhotoInput
@@ -194,7 +212,11 @@ export function PersonEditPage() {
                 </Field>
               </div>
 
-              <Field label="Goes by" hint="Prints instead of the first name — “Bill” for a William." htmlFor="preferred_name">
+              <Field
+                label="Goes by"
+                hint="Prints instead of the first name — “Bill” for a William."
+                htmlFor="preferred_name"
+              >
                 <input
                   id="preferred_name"
                   type="text"
@@ -250,9 +272,15 @@ export function PersonEditPage() {
           </div>
 
           <div className="card">
-            <div className="card-head"><h2>Family &amp; address</h2></div>
+            <div className="card-head">
+              <h2>Family &amp; address</h2>
+            </div>
             <div className="card-body">
-              <Field label="Family" hint="Choose a family to have this person print on its card." htmlFor="household">
+              <Field
+                label="Family"
+                hint="Choose a family to have this person print on its card."
+                htmlFor="household"
+              >
                 <select
                   id="household"
                   disabled={!canEdit}
@@ -266,7 +294,9 @@ export function PersonEditPage() {
                 >
                   <option value="">Not in a family — prints on their own</option>
                   {households.map((option) => (
-                    <option key={option.id} value={option.id}>{option.display_name}</option>
+                    <option key={option.id} value={option.id}>
+                      {option.display_name}
+                    </option>
                   ))}
                 </select>
               </Field>
@@ -277,10 +307,14 @@ export function PersonEditPage() {
                     id="role"
                     disabled={!canEdit}
                     value={form.household_role ?? "other"}
-                    onChange={(event) => patch({ household_role: event.target.value as HouseholdRole })}
+                    onChange={(event) =>
+                      patch({ household_role: event.target.value as HouseholdRole })
+                    }
                   >
                     {ROLES.map((role) => (
-                      <option key={role.value} value={role.value}>{role.label}</option>
+                      <option key={role.value} value={role.value}>
+                        {role.label}
+                      </option>
                     ))}
                   </select>
                 </Field>
@@ -289,7 +323,11 @@ export function PersonEditPage() {
               {household ? (
                 <Checkbox
                   label="Use the family's address"
-                  hint={inheritedAddress.length ? inheritedAddress.join(", ") : "The family has no address yet."}
+                  hint={
+                    inheritedAddress.length
+                      ? inheritedAddress.join(", ")
+                      : "The family has no address yet."
+                  }
                   checked={form.use_household_address}
                   disabled={!canEdit}
                   onChange={(value) => patch({ use_household_address: value })}
@@ -305,7 +343,11 @@ export function PersonEditPage() {
                 />
               ) : null}
 
-              <Field label="Notes" hint="For your own reference. Never printed." htmlFor="person_notes">
+              <Field
+                label="Notes"
+                hint="For your own reference. Never printed."
+                htmlFor="person_notes"
+              >
                 <textarea
                   id="person_notes"
                   disabled={!canEdit}
@@ -341,7 +383,9 @@ export function PersonEditPage() {
             <button type="submit" className="btn primary" disabled={saving}>
               {saving ? "Saving…" : isNew ? "Add person" : "Save changes"}
             </button>
-            <Link className="btn ghost" to="/people">Cancel</Link>
+            <Link className="btn ghost" to="/people">
+              Cancel
+            </Link>
             <span className="spacer" />
             {existing ? (
               <ConfirmButton

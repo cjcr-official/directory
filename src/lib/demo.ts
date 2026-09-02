@@ -12,31 +12,106 @@ import { suggestHouseholdName } from "./format";
  */
 
 const SURNAMES = [
-  "Abernathy", "Alvarez", "Bennett", "Boateng", "Caldwell", "Chen", "Delgado",
-  "Ellison", "Fitzgerald", "Gallagher", "Haddad", "Ibarra", "Johansson",
-  "Kowalski", "Lindqvist", "Mahoney", "Nakamura", "Okonkwo", "Pemberton",
-  "Quintero", "Ramirez", "Sandoval", "Thibodeaux", "Underwood", "Vasquez",
-  "Whitaker", "Yamamoto", "Zielinski", "Ashford", "Brennan", "Castellanos",
-  "Donnelly", "Eriksson", "Faulkner",
+  "Abernathy",
+  "Alvarez",
+  "Bennett",
+  "Boateng",
+  "Caldwell",
+  "Chen",
+  "Delgado",
+  "Ellison",
+  "Fitzgerald",
+  "Gallagher",
+  "Haddad",
+  "Ibarra",
+  "Johansson",
+  "Kowalski",
+  "Lindqvist",
+  "Mahoney",
+  "Nakamura",
+  "Okonkwo",
+  "Pemberton",
+  "Quintero",
+  "Ramirez",
+  "Sandoval",
+  "Thibodeaux",
+  "Underwood",
+  "Vasquez",
+  "Whitaker",
+  "Yamamoto",
+  "Zielinski",
+  "Ashford",
+  "Brennan",
+  "Castellanos",
+  "Donnelly",
+  "Eriksson",
+  "Faulkner",
 ];
 
 const MEN = [
-  "Samuel", "Marcus", "Theodore", "Elias", "Jonah", "Desmond", "Nathaniel",
-  "Isaac", "Gabriel", "Julian", "Everett", "Simon", "Adrian", "Malachi",
+  "Samuel",
+  "Marcus",
+  "Theodore",
+  "Elias",
+  "Jonah",
+  "Desmond",
+  "Nathaniel",
+  "Isaac",
+  "Gabriel",
+  "Julian",
+  "Everett",
+  "Simon",
+  "Adrian",
+  "Malachi",
 ];
 const WOMEN = [
-  "Miriam", "Delphine", "Rosalind", "Naomi", "Priscilla", "Adaeze", "Genevieve",
-  "Yuki", "Clara", "Imani", "Beatriz", "Susannah", "Lydia", "Antonia",
+  "Miriam",
+  "Delphine",
+  "Rosalind",
+  "Naomi",
+  "Priscilla",
+  "Adaeze",
+  "Genevieve",
+  "Yuki",
+  "Clara",
+  "Imani",
+  "Beatriz",
+  "Susannah",
+  "Lydia",
+  "Antonia",
 ];
 const CHILDREN = [
-  "Ezra", "Ruby", "Silas", "Wren", "Amos", "Juniper", "Levi", "Hazel", "Rosie",
-  "Micah", "Ivy", "Caleb", "Nora", "Tobias", "Freya", "Jonas",
+  "Ezra",
+  "Ruby",
+  "Silas",
+  "Wren",
+  "Amos",
+  "Juniper",
+  "Levi",
+  "Hazel",
+  "Rosie",
+  "Micah",
+  "Ivy",
+  "Caleb",
+  "Nora",
+  "Tobias",
+  "Freya",
+  "Jonas",
 ];
 
 const STREETS = [
-  "Chapel Hill Road", "Sycamore Lane", "Orchard Street", "Meeting House Way",
-  "Birchwood Drive", "Lantern Court", "Wheatfield Road", "Stonebridge Avenue",
-  "Cedar Hollow Lane", "Harvest Ridge Road", "Bellamy Street", "Quarry Lane",
+  "Chapel Hill Road",
+  "Sycamore Lane",
+  "Orchard Street",
+  "Meeting House Way",
+  "Birchwood Drive",
+  "Lantern Court",
+  "Wheatfield Road",
+  "Stonebridge Avenue",
+  "Cedar Hollow Lane",
+  "Harvest Ridge Road",
+  "Bellamy Street",
+  "Quarry Lane",
 ];
 
 const CITIES: [string, string, string][] = [
@@ -73,7 +148,7 @@ export interface DemoData {
 
 export function buildDemoData(householdCount = 34, individualCount = 9, seed = 20260401): DemoData {
   const random = makeRandom(seed);
-  const pick = <T,>(list: T[]): T => list[Math.floor(random() * list.length)];
+  const pick = <T>(list: T[]): T => list[Math.floor(random() * list.length)];
   const chance = (probability: number) => random() < probability;
   const stamp = "2026-01-15T12:00:00.000Z";
 

@@ -47,7 +47,11 @@ export function FamiliesPage() {
             Each family prints as one record, with everyone who lives there listed on the card.
           </div>
         </div>
-        {canEdit ? <Link className="btn primary" to="/families/new">Add a family</Link> : null}
+        {canEdit ? (
+          <Link className="btn primary" to="/families/new">
+            Add a family
+          </Link>
+        ) : null}
       </div>
 
       {error ? <Notice kind="error">{error}</Notice> : null}
@@ -68,7 +72,11 @@ export function FamiliesPage() {
       </div>
 
       <div className="letter-bar">
-        <button type="button" className={letter === null ? "active" : ""} onClick={() => setLetter(null)}>
+        <button
+          type="button"
+          className={letter === null ? "active" : ""}
+          onClick={() => setLetter(null)}
+        >
           All
         </button>
         {LETTERS.map((value) => (
@@ -111,7 +119,9 @@ export function FamiliesPage() {
                         {household.display_name}
                       </Link>
                       {!household.is_active ? (
-                        <span className="pill" style={{ marginLeft: 6 }}>Archived</span>
+                        <span className="pill" style={{ marginLeft: 6 }}>
+                          Archived
+                        </span>
                       ) : null}
                     </td>
                     <td className="small muted">
@@ -125,7 +135,9 @@ export function FamiliesPage() {
                       <span className="row tight">
                         {tagsOfHousehold(household.id).map((tagId) => {
                           const tag = tagsById.get(tagId);
-                          return tag ? <TagPill key={tag.id} name={tag.name} color={tag.color} /> : null;
+                          return tag ? (
+                            <TagPill key={tag.id} name={tag.name} color={tag.color} />
+                          ) : null;
                         })}
                       </span>
                     </td>
@@ -137,7 +149,13 @@ export function FamiliesPage() {
         ) : (
           <EmptyState
             title={households.length ? "Nothing matches" : "No families yet"}
-            action={canEdit && !households.length ? <Link className="btn primary" to="/families/new">Add a family</Link> : null}
+            action={
+              canEdit && !households.length ? (
+                <Link className="btn primary" to="/families/new">
+                  Add a family
+                </Link>
+              ) : null
+            }
           >
             {households.length
               ? "Try a different search, or clear the letter filter."

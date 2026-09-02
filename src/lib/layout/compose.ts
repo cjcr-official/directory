@@ -15,8 +15,10 @@ import {
 import {
   PAGE_SIZES,
   TEXT_SCALES,
+  type CardStyle,
   type PhotoFit,
   type ProjectSettings,
+  type Typeface,
 } from "./settings";
 import { truncate, wrapText, type FontWeight, type Metrics } from "./metrics";
 
@@ -62,9 +64,11 @@ export interface CardModel {
   entryId: string;
   entryType: "household" | "person";
   box: Box;
-  border: boolean;
+  style: CardStyle;
   photo: PhotoSlot | null;
   runs: TextRun[];
+  /** The hairline separating this record from the next, when style is "rule". */
+  rules: RuleModel[];
 }
 
 export interface RuleModel {
@@ -72,6 +76,17 @@ export interface RuleModel {
   y: number;
   w: number;
   color: string;
+}
+
+/** A filled rectangle: the letter tab, and the frame around a photograph. */
+export interface FillModel {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  color: string | null;
+  borderColor?: string;
+  radius?: number;
 }
 
 /** One page of the finished book - a half of a landscape sheet. */
@@ -83,6 +98,7 @@ export interface BookPage {
   cards: CardModel[];
   runs: TextRun[];
   rules: RuleModel[];
+  fills: FillModel[];
 }
 
 /** One sheet of paper. */
@@ -109,6 +125,7 @@ export interface BookModel {
   /** Storage paths of every photo the book needs, deduplicated. */
   photoPaths: string[];
   settings: ProjectSettings;
+  typeface: Typeface;
 }
 
 export const COLORS = {
@@ -120,6 +137,8 @@ export const COLORS = {
   rule: "#d5dedd",
   border: "#c8d4d2",
   placeholder: "#e6ecea",
+  /** The photo hairline: enough to stop a pale portrait floating on the page. */
+  photoEdge: "#cfd9d7",
 };
 
 // ---------------------------------------------------------------------------
@@ -513,14 +532,7 @@ function composeCard(
         if (last && !block.essential) {
           last.text = truncate(`${last.text} ...`, textW, last.size, last.weight, metrics);
         }
-        return {
-          entryId: entry.id,
-          entryType: entry.type,
-          box,
-          border: settings.cardBorders,
-          photo,
-          runs,
-        };
+        return finishCard(entry, box, settings, photo, runs);
       }
       runs.push({
         x: textX,
@@ -536,7 +548,35 @@ function composeCard(
     }
   }
 
-  return { entryId: entry.id, entryType: entry.type, box, border: settings.cardBorders, photo, runs };
+  return finishCard(entry, box, settings, photo, runs);
+}
+
+/**
+ * A record is set off from its neighbour by a hairline beneath it rather than a
+ * box around it - a box reads as a form, a rule reads as a book. The last card
+ * on a page gets no rule, so the page does not end on a dangling line.
+ */
+function finishCard(
+  entry: DirectoryEntry,
+  box: Box,
+  settings: ProjectSettings,
+  photo: PhotoSlot | null,
+  runs: TextRun[],
+): CardModel {
+  const rules: RuleModel[] =
+    settings.cardStyle === "rule"
+      ? [{ x: box.x, y: box.y + box.h + CARD_GAP / 2, w: box.w, color: COLORS.rule }]
+      : [];
+
+  return {
+    entryId: entry.id,
+    entryType: entry.type,
+    box,
+    style: settings.cardStyle,
+    photo,
+    runs,
+    rules,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -550,13 +590,18 @@ function translate(page: BookPage, dx: number, dy: number): BookPage {
     box: { ...page.box, x: page.box.x + dx, y: page.box.y + dy },
     runs: page.runs.map(moveRun),
     rules: page.rules.map((rule) => ({ ...rule, x: rule.x + dx, y: rule.y + dy })),
+    fills: page.fills.map((fill) => ({ ...fill, x: fill.x + dx, y: fill.y + dy })),
     cards: page.cards.map((card) => ({
       ...card,
       box: { ...card.box, x: card.box.x + dx, y: card.box.y + dy },
       photo: card.photo
-        ? { ...card.photo, box: { ...card.photo.box, x: card.photo.box.x + dx, y: card.photo.box.y + dy } }
+        ? {
+            ...card.photo,
+            box: { ...card.photo.box, x: card.photo.box.x + dx, y: card.photo.box.y + dy },
+          }
         : null,
       runs: card.runs.map(moveRun),
+      rules: card.rules.map((rule) => ({ ...rule, x: rule.x + dx, y: rule.y + dy })),
     })),
   };
 }
@@ -590,14 +635,27 @@ function addFurniture(
       }
     }
     if (settings.showLetterTabs && letter) {
-      page.runs.push({
-        x: 0,
-        y: headerY - 2,
-        w: geo.pageWidth,
-        size: 11 * scale,
-        weight: "bold",
+      // A solid tab rather than a lone letter: it gives the eye something to
+      // catch when thumbing through, which is the whole point of a letter tab.
+      const size = 9.5 * scale;
+      const tabHeight = size + 7;
+      const tabWidth = Math.max(tabHeight + 3, size * 0.72 * letter.length + 13);
+      page.fills.push({
+        x: geo.pageWidth - tabWidth,
+        y: headerY - 3,
+        w: tabWidth,
+        h: tabHeight,
         color: COLORS.accent,
-        align: "right",
+        radius: 2,
+      });
+      page.runs.push({
+        x: geo.pageWidth - tabWidth,
+        y: headerY + 1,
+        w: tabWidth,
+        size,
+        weight: "bold",
+        color: "#ffffff",
+        align: "center",
         text: letter,
       });
     }
@@ -646,10 +704,16 @@ function blankPage(geo: Geometry): BookPage {
     cards: [],
     runs: [],
     rules: [],
+    fills: [],
   };
 }
 
-function composeCover(settings: ProjectSettings, geo: Geometry, type: TypeScale, metrics: Metrics): BookPage {
+function composeCover(
+  settings: ProjectSettings,
+  geo: Geometry,
+  type: TypeScale,
+  metrics: Metrics,
+): BookPage {
   const page = blankPage(geo);
   page.kind = "cover";
 
@@ -773,17 +837,41 @@ function composeIndexPages(
     const x = pad + column * (columnWidth + columnGap);
     const pageLabel = String(record.page);
     const numberWidth = metrics.widthOf(pageLabel, size, "regular") + 4;
+    const nameWidth = columnWidth - numberWidth;
+    const name = truncate(record.name, nameWidth, size, "regular", metrics);
 
     page.runs.push({
       x,
       y,
-      w: columnWidth - numberWidth,
+      w: nameWidth,
       size,
       weight: "regular",
       color: COLORS.ink,
       align: "left",
-      text: truncate(record.name, columnWidth - numberWidth, size, "regular", metrics),
+      text: name,
     });
+
+    // Dot leaders, so the eye can run from a name to its page number without
+    // losing the line - the thing that makes an index usable at arm's length.
+    const nameEnd = metrics.widthOf(name, size, "regular");
+    const gap = nameWidth - nameEnd - 6;
+    if (gap > size) {
+      const dotWidth = metrics.widthOf(" .", size, "regular");
+      const dots = " .".repeat(Math.max(0, Math.floor(gap / dotWidth)));
+      if (dots) {
+        page.runs.push({
+          x: x + nameEnd + 3,
+          y,
+          w: gap,
+          size,
+          weight: "regular",
+          color: COLORS.rule,
+          align: "left",
+          text: dots,
+        });
+      }
+    }
+
     page.runs.push({
       x,
       y,
@@ -898,6 +986,9 @@ export function composeBook(
       entryPageIndex.set(entry.id, recordPages.length);
     });
 
+    const lastCard = page.cards[page.cards.length - 1];
+    if (lastCard) lastCard.rules = [];
+
     const from = alphaBucket(slice[0].sortKey);
     const to = alphaBucket(slice[slice.length - 1].sortKey);
     letters.push(from === to ? from : `${from}-${to}`);
@@ -951,6 +1042,7 @@ export function composeBook(
   }
 
   return {
+    typeface: settings.typeface,
     width: geo.width,
     height: geo.height,
     sheets: assembleSheets(pages, settings, geo),

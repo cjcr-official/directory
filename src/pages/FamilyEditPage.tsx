@@ -140,7 +140,11 @@ export function FamilyEditPage() {
     return (
       <div className="page">
         <Notice kind="error">That family no longer exists.</Notice>
-        <p style={{ marginTop: 12 }}><Link className="btn" to="/families">Back to families</Link></p>
+        <p style={{ marginTop: 12 }}>
+          <Link className="btn" to="/families">
+            Back to families
+          </Link>
+        </p>
       </div>
     );
   }
@@ -165,7 +169,9 @@ export function FamilyEditPage() {
   }
 
   function updateMember(index: number, next: Partial<MemberDraft>) {
-    setMembers((current) => current.map((member, i) => (i === index ? { ...member, ...next } : member)));
+    setMembers((current) =>
+      current.map((member, i) => (i === index ? { ...member, ...next } : member)),
+    );
   }
 
   function removeMember(index: number) {
@@ -289,7 +295,9 @@ export function FamilyEditPage() {
             Everything here prints on one card. Only the surname is required — the rest is optional.
           </div>
         </div>
-        <Link className="btn ghost" to="/families">Back</Link>
+        <Link className="btn ghost" to="/families">
+          Back
+        </Link>
       </div>
 
       {error ? <Notice kind="error">{error}</Notice> : null}
@@ -297,7 +305,9 @@ export function FamilyEditPage() {
       <form onSubmit={save}>
         <div className="grid two" style={{ alignItems: "start" }}>
           <div className="card">
-            <div className="card-head"><h2>The family</h2></div>
+            <div className="card-head">
+              <h2>The family</h2>
+            </div>
             <div className="card-body">
               <div className="field">
                 <PhotoInput
@@ -311,7 +321,11 @@ export function FamilyEditPage() {
                 />
               </div>
 
-              <Field label="Surname" hint="Files the family in the book. “Alvarez” sorts under A." htmlFor="surname">
+              <Field
+                label="Surname"
+                hint="Files the family in the book. “Alvarez” sorts under A."
+                htmlFor="surname"
+              >
                 <input
                   id="surname"
                   type="text"
@@ -361,7 +375,11 @@ export function FamilyEditPage() {
                 </Field>
               </div>
 
-              <Field label="Anniversary" hint="Optional. Only printed if you switch it on for a directory." htmlFor="anniversary">
+              <Field
+                label="Anniversary"
+                hint="Optional. Only printed if you switch it on for a directory."
+                htmlFor="anniversary"
+              >
                 <input
                   id="anniversary"
                   type="date"
@@ -374,7 +392,9 @@ export function FamilyEditPage() {
           </div>
 
           <div className="card">
-            <div className="card-head"><h2>Address</h2></div>
+            <div className="card-head">
+              <h2>Address</h2>
+            </div>
             <div className="card-body">
               <AddressFields
                 idPrefix="household"
@@ -431,7 +451,10 @@ export function FamilyEditPage() {
                 <div
                   key={member.key}
                   style={{
-                    borderTop: index === members.indexOf(visibleMembers[0]) ? "none" : "1px solid var(--line)",
+                    borderTop:
+                      index === members.indexOf(visibleMembers[0])
+                        ? "none"
+                        : "1px solid var(--line)",
                     paddingTop: index === members.indexOf(visibleMembers[0]) ? 0 : 16,
                     marginTop: index === members.indexOf(visibleMembers[0]) ? 0 : 16,
                   }}
@@ -444,7 +467,9 @@ export function FamilyEditPage() {
                             type="text"
                             disabled={!canEdit}
                             value={member.first_name}
-                            onChange={(event) => updateMember(index, { first_name: event.target.value })}
+                            onChange={(event) =>
+                              updateMember(index, { first_name: event.target.value })
+                            }
                           />
                         </Field>
                         <Field label="Last name">
@@ -452,7 +477,9 @@ export function FamilyEditPage() {
                             type="text"
                             disabled={!canEdit}
                             value={member.last_name}
-                            onChange={(event) => updateMember(index, { last_name: event.target.value })}
+                            onChange={(event) =>
+                              updateMember(index, { last_name: event.target.value })
+                            }
                           />
                         </Field>
                       </div>
@@ -464,7 +491,9 @@ export function FamilyEditPage() {
                             disabled={!canEdit}
                             placeholder={member.first_name}
                             value={member.preferred_name}
-                            onChange={(event) => updateMember(index, { preferred_name: event.target.value })}
+                            onChange={(event) =>
+                              updateMember(index, { preferred_name: event.target.value })
+                            }
                           />
                         </Field>
                         <Field label="In the family">
@@ -472,11 +501,15 @@ export function FamilyEditPage() {
                             disabled={!canEdit}
                             value={member.household_role}
                             onChange={(event) =>
-                              updateMember(index, { household_role: event.target.value as HouseholdRole })
+                              updateMember(index, {
+                                household_role: event.target.value as HouseholdRole,
+                              })
                             }
                           >
                             {ROLES.map((role) => (
-                              <option key={role.value} value={role.value}>{role.label}</option>
+                              <option key={role.value} value={role.value}>
+                                {role.label}
+                              </option>
                             ))}
                           </select>
                         </Field>
@@ -504,7 +537,9 @@ export function FamilyEditPage() {
                             type="date"
                             disabled={!canEdit}
                             value={member.date_of_birth}
-                            onChange={(event) => updateMember(index, { date_of_birth: event.target.value })}
+                            onChange={(event) =>
+                              updateMember(index, { date_of_birth: event.target.value })
+                            }
                           />
                         </Field>
                       </div>
@@ -516,7 +551,11 @@ export function FamilyEditPage() {
                           </Link>
                         ) : null}
                         {canEdit ? (
-                          <button type="button" className="btn ghost small" onClick={() => removeMember(index)}>
+                          <button
+                            type="button"
+                            className="btn ghost small"
+                            onClick={() => removeMember(index)}
+                          >
                             {member.id ? "Remove from family" : "Discard"}
                           </button>
                         ) : null}
@@ -568,7 +607,9 @@ export function FamilyEditPage() {
             <button type="submit" className="btn primary" disabled={saving}>
               {saving ? "Saving…" : isNew ? "Create family" : "Save changes"}
             </button>
-            <Link className="btn ghost" to="/families">Cancel</Link>
+            <Link className="btn ghost" to="/families">
+              Cancel
+            </Link>
             <span className="spacer" />
             {existing ? (
               <ConfirmButton

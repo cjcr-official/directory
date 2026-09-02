@@ -8,13 +8,33 @@ export interface Metrics {
   lineHeight(size: number): number;
 }
 
-export const STANDARD_FONTS: Record<FontWeight, StandardFonts> = {
-  regular: StandardFonts.Helvetica,
-  bold: StandardFonts.HelveticaBold,
-  italic: StandardFonts.HelveticaOblique,
+export type Typeface = "sans" | "serif";
+
+/**
+ * Both families are among the PDF standard fourteen, so neither embeds a font
+ * file: a serif directory costs nothing in file size and prints identically
+ * everywhere.
+ */
+export const STANDARD_FONTS: Record<Typeface, Record<FontWeight, StandardFonts>> = {
+  sans: {
+    regular: StandardFonts.Helvetica,
+    bold: StandardFonts.HelveticaBold,
+    italic: StandardFonts.HelveticaOblique,
+  },
+  serif: {
+    regular: StandardFonts.TimesRoman,
+    bold: StandardFonts.TimesRomanBold,
+    italic: StandardFonts.TimesRomanItalic,
+  },
 };
 
-let cached: Promise<Metrics> | null = null;
+/** CSS stacks the preview uses, chosen to match the PDF metrics closely. */
+export const CSS_FONT_STACKS: Record<Typeface, string> = {
+  sans: 'Helvetica, "Helvetica Neue", Arial, sans-serif',
+  serif: '"Times New Roman", Times, "Liberation Serif", serif',
+};
+
+const cached = new Map<Typeface, Promise<Metrics>>();
 
 /**
  * Text measurement for the layout composer.
@@ -25,19 +45,22 @@ let cached: Promise<Metrics> | null = null;
  *
  * The throwaway document exists only to embed the fonts; it is never saved.
  */
-export function loadMetrics(): Promise<Metrics> {
-  if (!cached) {
-    cached = (async () => {
+export function loadMetrics(typeface: Typeface = "sans"): Promise<Metrics> {
+  let pending = cached.get(typeface);
+  if (!pending) {
+    pending = (async () => {
       const doc = await PDFDocument.create();
+      const family = STANDARD_FONTS[typeface];
       const fonts: Record<FontWeight, PDFFont> = {
-        regular: await doc.embedFont(STANDARD_FONTS.regular),
-        bold: await doc.embedFont(STANDARD_FONTS.bold),
-        italic: await doc.embedFont(STANDARD_FONTS.italic),
+        regular: await doc.embedFont(family.regular),
+        bold: await doc.embedFont(family.bold),
+        italic: await doc.embedFont(family.italic),
       };
       return makeMetrics(fonts);
     })();
+    cached.set(typeface, pending);
   }
-  return cached;
+  return pending;
 }
 
 export function makeMetrics(fonts: Record<FontWeight, PDFFont>): Metrics {

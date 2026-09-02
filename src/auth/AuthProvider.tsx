@@ -14,7 +14,11 @@ interface AuthState {
   canEdit: boolean;
   isOwner: boolean;
   signIn(email: string, password: string): Promise<void>;
-  signUp(email: string, password: string, fullName: string): Promise<{ needsConfirmation: boolean }>;
+  signUp(
+    email: string,
+    password: string,
+    fullName: string,
+  ): Promise<{ needsConfirmation: boolean }>;
   signOut(): Promise<void>;
   refreshProfile(): Promise<void>;
 }

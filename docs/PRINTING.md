@@ -27,13 +27,13 @@ page on the same sheet, because that is where they land once folded.
 
 **Printer settings that matter**
 
-| Setting | Value |
-| --- | --- |
-| Paper | Letter (or A4), **landscape** |
-| Two-sided | On — **flip on the short edge** |
-| Scale | 100% / "Actual size" — **not** "Fit to page" |
-| Margins | None / default |
-| Booklet mode in the printer driver | **Off** — the PDF is already imposed |
+| Setting                            | Value                                        |
+| ---------------------------------- | -------------------------------------------- |
+| Paper                              | Letter (or A4), **landscape**                |
+| Two-sided                          | On — **flip on the short edge**              |
+| Scale                              | 100% / "Actual size" — **not** "Fit to page" |
+| Margins                            | None / default                               |
+| Booklet mode in the printer driver | **Off** — the PDF is already imposed         |
 
 Flipping on the long edge instead of the short one prints every other page
 upside down. If that happens, that is the setting to change.
@@ -59,11 +59,11 @@ and fine for a handful of copies. Set the same options as above, and turn off
 Six records to a sheet, plus a cover and an index.
 
 | Records | Sheets, double-sided |
-| --- | --- |
-| 30 | 3 |
-| 60 | 6 |
-| 120 | 11 |
-| 250 | 22 |
+| ------- | -------------------- |
+| 30      | 3                    |
+| 60      | 6                    |
+| 120     | 11                   |
+| 250     | 22                   |
 
 The preview bar tells you the real number for your directory.
 
@@ -81,6 +81,14 @@ If a card looks crowded:
 - Turn off details you do not need. Email addresses are the longest thing on a
   card and often the least used on paper.
 - **Member style → One line of first names** is much tighter than a line each.
+
+**Typeface** is a serif by default, which is what most printed directories use
+and what reads best at this size on paper. Switch to sans serif if you prefer a
+plainer look; it also sets a shade more text in the same space.
+
+**How records are separated** defaults to a hairline between them. A box around
+each record makes the page busier but helps when photographs vary a lot in
+brightness. "Space only" is the quietest of the three.
 
 If it looks sparse:
 

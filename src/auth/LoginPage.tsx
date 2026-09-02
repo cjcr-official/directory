@@ -42,7 +42,9 @@ export function LoginPage() {
       <div className="card">
         <div className="card-body">
           <div className="brand" style={{ padding: "0 0 16px" }}>
-            <span className="brand-mark" aria-hidden>✝</span>
+            <span className="brand-mark" aria-hidden>
+              ✝
+            </span>
             <span>Church Directory</span>
           </div>
 
@@ -95,10 +97,23 @@ export function LoginPage() {
               />
             </div>
 
-            {error ? <div className="notice error" style={{ marginBottom: 12 }}>{error}</div> : null}
-            {message ? <div className="notice ok" style={{ marginBottom: 12 }}>{message}</div> : null}
+            {error ? (
+              <div className="notice error" style={{ marginBottom: 12 }}>
+                {error}
+              </div>
+            ) : null}
+            {message ? (
+              <div className="notice ok" style={{ marginBottom: 12 }}>
+                {message}
+              </div>
+            ) : null}
 
-            <button type="submit" className="btn primary" disabled={loading} style={{ width: "100%", justifyContent: "center" }}>
+            <button
+              type="submit"
+              className="btn primary"
+              disabled={loading}
+              style={{ width: "100%", justifyContent: "center" }}
+            >
               {loading ? "Working…" : mode === "signin" ? "Sign in" : "Create account"}
             </button>
           </form>

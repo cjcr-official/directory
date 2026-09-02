@@ -82,9 +82,7 @@ export function addressLines(address: AddressParts | null | undefined): string[]
   const city = address.city?.trim();
   const state = address.state?.trim();
   const postal = address.postal_code?.trim();
-  const locality = [city, [state, postal].filter(Boolean).join(" ")]
-    .filter(Boolean)
-    .join(", ");
+  const locality = [city, [state, postal].filter(Boolean).join(" ")].filter(Boolean).join(", ");
   if (locality) lines.push(locality);
 
   const country = address.country?.trim();
@@ -107,8 +105,18 @@ export function effectiveAddress(
 }
 
 const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
 /** Parses "YYYY-MM-DD" without letting the local timezone shift the day. */
@@ -180,5 +188,8 @@ export function toWinAnsi(text: string): string {
 
 /** Joins non-empty pieces with a separator. */
 export function join(parts: (string | null | undefined)[], separator = " · "): string {
-  return parts.map((p) => p?.trim()).filter(Boolean).join(separator);
+  return parts
+    .map((p) => p?.trim())
+    .filter(Boolean)
+    .join(separator);
 }

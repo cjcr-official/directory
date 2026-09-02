@@ -48,7 +48,11 @@ export function PeoplePage() {
             Everyone in the database. People who belong to a family print on that family's card.
           </div>
         </div>
-        {canEdit ? <Link className="btn primary" to="/people/new">Add a person</Link> : null}
+        {canEdit ? (
+          <Link className="btn primary" to="/people/new">
+            Add a person
+          </Link>
+        ) : null}
       </div>
 
       {error ? <Notice kind="error">{error}</Notice> : null}
@@ -70,12 +74,18 @@ export function PeoplePage() {
           <option value="unattached">Not in a family</option>
         </select>
         <span className="muted small">
-          {filtered.length === people.length ? `${people.length} people` : `${filtered.length} of ${people.length}`}
+          {filtered.length === people.length
+            ? `${people.length} people`
+            : `${filtered.length} of ${people.length}`}
         </span>
       </div>
 
       <div className="letter-bar">
-        <button type="button" className={letter === null ? "active" : ""} onClick={() => setLetter(null)}>
+        <button
+          type="button"
+          className={letter === null ? "active" : ""}
+          onClick={() => setLetter(null)}
+        >
           All
         </button>
         {LETTERS.map((value) => (
@@ -107,7 +117,9 @@ export function PeoplePage() {
             </thead>
             <tbody>
               {filtered.map((person) => {
-                const household = person.household_id ? householdById.get(person.household_id) : null;
+                const household = person.household_id
+                  ? householdById.get(person.household_id)
+                  : null;
                 return (
                   <tr key={person.id}>
                     <td>
@@ -120,7 +132,11 @@ export function PeoplePage() {
                       <Link className="list-link" to={`/people/${person.id}`}>
                         {fileAsName(person)}
                       </Link>
-                      {!person.is_active ? <span className="pill" style={{ marginLeft: 6 }}>Archived</span> : null}
+                      {!person.is_active ? (
+                        <span className="pill" style={{ marginLeft: 6 }}>
+                          Archived
+                        </span>
+                      ) : null}
                     </td>
                     <td className="small">
                       {household ? (
@@ -133,12 +149,16 @@ export function PeoplePage() {
                     </td>
                     <td className="small muted nowrap">{formatPhone(person.phone) || "—"}</td>
                     <td className="small muted">{person.email || "—"}</td>
-                    <td className="small muted nowrap">{formatShortDate(person.date_of_birth) || "—"}</td>
+                    <td className="small muted nowrap">
+                      {formatShortDate(person.date_of_birth) || "—"}
+                    </td>
                     <td>
                       <span className="row tight">
                         {tagsOfPerson(person.id).map((tagId) => {
                           const tag = tagsById.get(tagId);
-                          return tag ? <TagPill key={tag.id} name={tag.name} color={tag.color} /> : null;
+                          return tag ? (
+                            <TagPill key={tag.id} name={tag.name} color={tag.color} />
+                          ) : null;
                         })}
                       </span>
                     </td>
@@ -150,9 +170,17 @@ export function PeoplePage() {
         ) : (
           <EmptyState
             title={people.length ? "Nothing matches" : "No people yet"}
-            action={canEdit && !people.length ? <Link className="btn primary" to="/people/new">Add a person</Link> : null}
+            action={
+              canEdit && !people.length ? (
+                <Link className="btn primary" to="/people/new">
+                  Add a person
+                </Link>
+              ) : null
+            }
           >
-            {people.length ? "Try a different search." : "Add people one at a time, or add a family and fill in its members."}
+            {people.length
+              ? "Try a different search."
+              : "Add people one at a time, or add a family and fill in its members."}
           </EmptyState>
         )}
       </div>

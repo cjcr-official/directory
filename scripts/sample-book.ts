@@ -38,7 +38,7 @@ async function main() {
     showAnniversary: true,
   });
 
-  const metrics = await pdfMetrics();
+  const metrics = await pdfMetrics(settings.typeface);
   const book = composeBook(entries, settings, metrics);
 
   const portraits = new Map<string, Uint8Array>();
@@ -54,8 +54,12 @@ async function main() {
   fs.writeFileSync(outPath, bytes);
 
   const people = demo.people.length;
-  console.log(`records .......... ${book.recordCount} (${demo.households.length} families, ${people} people)`);
-  console.log(`per sheet ........ ${recordsPerSheet(settings)} (${settings.rows} per half x ${settings.columns} halves)`);
+  console.log(
+    `records .......... ${book.recordCount} (${demo.households.length} families, ${people} people)`,
+  );
+  console.log(
+    `per sheet ........ ${recordsPerSheet(settings)} (${settings.rows} per half x ${settings.columns} halves)`,
+  );
   console.log(`book pages ....... ${book.pageCount}`);
   console.log(`sheets of paper .. ${book.sheets.length}`);
   console.log(`index lines ...... ${book.index.length}`);

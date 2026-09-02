@@ -20,9 +20,7 @@ export interface Selection {
  */
 export function resolveEntries(all: DirectoryEntry[], selection: Selection): DirectoryEntry[] {
   if (selection.mode === "manual") {
-    const picked = new Set(
-      selection.entries.map((row) => `${row.entry_type}:${row.ref_id}`),
-    );
+    const picked = new Set(selection.entries.map((row) => `${row.entry_type}:${row.ref_id}`));
     return all.filter((entry) => picked.has(`${entry.type}:${entry.id}`));
   }
 

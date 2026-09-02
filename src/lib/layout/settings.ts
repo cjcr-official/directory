@@ -2,6 +2,9 @@ export type PageSizeName = "letter" | "a4" | "legal";
 export type PhotoFit = "fill" | "fit";
 export type MemberStyle = "compact" | "detailed";
 export type TextScale = "compact" | "normal" | "large";
+export type Typeface = "sans" | "serif";
+/** How one record is set off from the next on the page. */
+export type CardStyle = "rule" | "box" | "none";
 
 /**
  * Everything about how one project prints. Stored as JSON in projects.settings,
@@ -25,8 +28,9 @@ export type ProjectSettings = {
   showEmail: boolean;
   showBirthdays: boolean;
   showAnniversary: boolean;
-  cardBorders: boolean;
+  cardStyle: CardStyle;
   textScale: TextScale;
+  typeface: Typeface;
 
   // --- book furniture ------------------------------------------------------
   churchName: string;
@@ -61,8 +65,11 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   showEmail: true,
   showBirthdays: false,
   showAnniversary: false,
-  cardBorders: true,
+  // A hairline between records reads as a book; a box around each one reads as
+  // a form, so the rule is the default.
+  cardStyle: "rule",
   textScale: "normal",
+  typeface: "serif",
 
   churchName: "",
   coverTitle: "Church Directory",
@@ -89,6 +96,12 @@ export function normalizeSettings(raw: unknown): ProjectSettings {
     }
   }
 
+  // Projects saved before the card style became a three-way choice carry a
+  // boolean instead.
+  if (input.cardStyle === undefined && "cardBorders" in (input as object)) {
+    merged.cardStyle = (input as { cardBorders?: unknown }).cardBorders ? "box" : "none";
+  }
+
   // Guard rails: the layout maths assumes at least one card per half.
   merged.rows = clamp(Math.round(merged.rows), 1, 8);
   merged.columns = clamp(Math.round(merged.columns), 1, 3);
@@ -96,6 +109,8 @@ export function normalizeSettings(raw: unknown): ProjectSettings {
   if (!["fill", "fit"].includes(merged.photoFit)) merged.photoFit = "fill";
   if (!["compact", "detailed"].includes(merged.memberStyle)) merged.memberStyle = "compact";
   if (!["compact", "normal", "large"].includes(merged.textScale)) merged.textScale = "normal";
+  if (!["rule", "box", "none"].includes(merged.cardStyle)) merged.cardStyle = "rule";
+  if (!["sans", "serif"].includes(merged.typeface)) merged.typeface = "serif";
 
   return merged;
 }

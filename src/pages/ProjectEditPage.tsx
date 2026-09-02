@@ -18,9 +18,11 @@ import {
   PAGE_SIZES,
   normalizeSettings,
   recordsPerSheet,
+  type CardStyle,
   type PageSizeName,
   type ProjectSettings,
   type TextScale,
+  type Typeface,
 } from "@/lib/layout/settings";
 import { resolveEntries, type Selection } from "@/lib/projectEntries";
 
@@ -72,7 +74,12 @@ export function ProjectEditPage() {
       tagIds,
       entries: picked.map((key, position) => {
         const [entry_type, ref_id] = key.split(":");
-        return { project_id: id ?? "", entry_type: entry_type as "household" | "person", ref_id, position };
+        return {
+          project_id: id ?? "",
+          entry_type: entry_type as "household" | "person",
+          ref_id,
+          position,
+        };
       }),
     }),
     [mode, tagIds, picked, id],
@@ -139,10 +146,17 @@ export function ProjectEditPage() {
         </div>
         <div className="row tight">
           {!isNew ? (
-            <Link className="btn" to={`/projects/${id}/preview`}>Preview &amp; print</Link>
+            <Link className="btn" to={`/projects/${id}/preview`}>
+              Preview &amp; print
+            </Link>
           ) : null}
           {canEdit ? (
-            <button type="button" className="btn primary" disabled={saving} onClick={() => void save()}>
+            <button
+              type="button"
+              className="btn primary"
+              disabled={saving}
+              onClick={() => void save()}
+            >
               {saving ? "Saving…" : isNew ? "Create" : "Save"}
             </button>
           ) : null}
@@ -156,7 +170,9 @@ export function ProjectEditPage() {
         <div className="grid two" style={{ alignItems: "start", marginTop: 16 }}>
           <div>
             <div className="card">
-              <div className="card-head"><h2>About this directory</h2></div>
+              <div className="card-head">
+                <h2>About this directory</h2>
+              </div>
               <div className="card-body">
                 <Field label="Name" hint="For your own list of directories." htmlFor="project_name">
                   <input
@@ -192,7 +208,9 @@ export function ProjectEditPage() {
             </div>
 
             <div className="card">
-              <div className="card-head"><h2>Who is in it</h2></div>
+              <div className="card-head">
+                <h2>Who is in it</h2>
+              </div>
               <div className="card-body">
                 <Field label="Include" htmlFor="mode">
                   <select
@@ -242,7 +260,9 @@ export function ProjectEditPage() {
 
           <div>
             <div className="card">
-              <div className="card-head"><h2>The page</h2></div>
+              <div className="card-head">
+                <h2>The page</h2>
+              </div>
               <div className="card-body">
                 <Field label="Paper" htmlFor="page_size">
                   <select
@@ -252,7 +272,9 @@ export function ProjectEditPage() {
                     onChange={(event) => set({ pageSize: event.target.value as PageSizeName })}
                   >
                     {(Object.keys(PAGE_SIZES) as PageSizeName[]).map((key) => (
-                      <option key={key} value={key}>{PAGE_SIZES[key].label} landscape</option>
+                      <option key={key} value={key}>
+                        {PAGE_SIZES[key].label} landscape
+                      </option>
                     ))}
                   </select>
                 </Field>
@@ -289,6 +311,18 @@ export function ProjectEditPage() {
                   {safeSettings.pageSize === "a4" ? "A5" : "half-letter"} booklet.
                 </Notice>
 
+                <Field label="Typeface" htmlFor="typeface">
+                  <select
+                    id="typeface"
+                    value={settings.typeface}
+                    disabled={!canEdit}
+                    onChange={(event) => set({ typeface: event.target.value as Typeface })}
+                  >
+                    <option value="serif">Serif — traditional, best for a book</option>
+                    <option value="sans">Sans serif — plainer, a little more compact</option>
+                  </select>
+                </Field>
+
                 <Field label="Text size" htmlFor="text_scale">
                   <select
                     id="text_scale"
@@ -313,10 +347,16 @@ export function ProjectEditPage() {
             </div>
 
             <div className="card">
-              <div className="card-head"><h2>What each card shows</h2></div>
+              <div className="card-head">
+                <h2>What each card shows</h2>
+              </div>
               <div className="card-body">
-                <Checkbox label="Photographs" checked={settings.showPhotos} disabled={!canEdit}
-                  onChange={(value) => set({ showPhotos: value })} />
+                <Checkbox
+                  label="Photographs"
+                  checked={settings.showPhotos}
+                  disabled={!canEdit}
+                  onChange={(value) => set({ showPhotos: value })}
+                />
                 {settings.showPhotos ? (
                   <Field label="Photo shape" htmlFor="photo_fit">
                     <select
@@ -330,40 +370,82 @@ export function ProjectEditPage() {
                     </select>
                   </Field>
                 ) : null}
-                <Checkbox label="Family members' names" checked={settings.showMembers} disabled={!canEdit}
-                  onChange={(value) => set({ showMembers: value })} />
+                <Checkbox
+                  label="Family members' names"
+                  checked={settings.showMembers}
+                  disabled={!canEdit}
+                  onChange={(value) => set({ showMembers: value })}
+                />
                 {settings.showMembers ? (
                   <Field label="Member style" htmlFor="member_style">
                     <select
                       id="member_style"
                       value={settings.memberStyle}
                       disabled={!canEdit}
-                      onChange={(event) => set({ memberStyle: event.target.value as "compact" | "detailed" })}
+                      onChange={(event) =>
+                        set({ memberStyle: event.target.value as "compact" | "detailed" })
+                      }
                     >
                       <option value="compact">One line of first names</option>
                       <option value="detailed">A line each, with their own contact details</option>
                     </select>
                   </Field>
                 ) : null}
-                <Checkbox label="Address" checked={settings.showAddress} disabled={!canEdit}
-                  onChange={(value) => set({ showAddress: value })} />
-                <Checkbox label="Phone numbers" checked={settings.showPhone} disabled={!canEdit}
-                  onChange={(value) => set({ showPhone: value })} />
-                <Checkbox label="Email addresses" checked={settings.showEmail} disabled={!canEdit}
-                  onChange={(value) => set({ showEmail: value })} />
-                <Checkbox label="Birthdays" checked={settings.showBirthdays} disabled={!canEdit}
-                  onChange={(value) => set({ showBirthdays: value })} />
-                <Checkbox label="Anniversaries" checked={settings.showAnniversary} disabled={!canEdit}
-                  onChange={(value) => set({ showAnniversary: value })} />
-                <Checkbox label="A light border around each record" checked={settings.cardBorders} disabled={!canEdit}
-                  onChange={(value) => set({ cardBorders: value })} />
+                <Checkbox
+                  label="Address"
+                  checked={settings.showAddress}
+                  disabled={!canEdit}
+                  onChange={(value) => set({ showAddress: value })}
+                />
+                <Checkbox
+                  label="Phone numbers"
+                  checked={settings.showPhone}
+                  disabled={!canEdit}
+                  onChange={(value) => set({ showPhone: value })}
+                />
+                <Checkbox
+                  label="Email addresses"
+                  checked={settings.showEmail}
+                  disabled={!canEdit}
+                  onChange={(value) => set({ showEmail: value })}
+                />
+                <Checkbox
+                  label="Birthdays"
+                  checked={settings.showBirthdays}
+                  disabled={!canEdit}
+                  onChange={(value) => set({ showBirthdays: value })}
+                />
+                <Checkbox
+                  label="Anniversaries"
+                  checked={settings.showAnniversary}
+                  disabled={!canEdit}
+                  onChange={(value) => set({ showAnniversary: value })}
+                />
+                <Field label="How records are separated" htmlFor="card_style">
+                  <select
+                    id="card_style"
+                    value={settings.cardStyle}
+                    disabled={!canEdit}
+                    onChange={(event) => set({ cardStyle: event.target.value as CardStyle })}
+                  >
+                    <option value="rule">A hairline between records</option>
+                    <option value="box">A light box around each record</option>
+                    <option value="none">Nothing — space only</option>
+                  </select>
+                </Field>
               </div>
             </div>
 
             <div className="card">
-              <div className="card-head"><h2>Cover &amp; furniture</h2></div>
+              <div className="card-head">
+                <h2>Cover &amp; furniture</h2>
+              </div>
               <div className="card-body">
-                <Field label="Church name" hint="Runs along the top of every page." htmlFor="church_name">
+                <Field
+                  label="Church name"
+                  hint="Runs along the top of every page."
+                  htmlFor="church_name"
+                >
                   <input
                     id="church_name"
                     type="text"
@@ -381,7 +463,11 @@ export function ProjectEditPage() {
                     onChange={(event) => set({ coverTitle: event.target.value })}
                   />
                 </Field>
-                <Field label="Cover subtitle" hint="A season or year works well." htmlFor="cover_subtitle">
+                <Field
+                  label="Cover subtitle"
+                  hint="A season or year works well."
+                  htmlFor="cover_subtitle"
+                >
                   <input
                     id="cover_subtitle"
                     type="text"
@@ -402,8 +488,12 @@ export function ProjectEditPage() {
                   />
                 </Field>
 
-                <Checkbox label="Cover page" checked={settings.includeCover} disabled={!canEdit}
-                  onChange={(value) => set({ includeCover: value })} />
+                <Checkbox
+                  label="Cover page"
+                  checked={settings.includeCover}
+                  disabled={!canEdit}
+                  onChange={(value) => set({ includeCover: value })}
+                />
                 <Checkbox
                   label="Alphabetical index at the back"
                   hint="Every person by surname, with the page their family is on."
@@ -411,12 +501,24 @@ export function ProjectEditPage() {
                   disabled={!canEdit}
                   onChange={(value) => set({ includeIndex: value })}
                 />
-                <Checkbox label="Church name in the running header" checked={settings.runningHeader} disabled={!canEdit}
-                  onChange={(value) => set({ runningHeader: value })} />
-                <Checkbox label="Letter tabs (A, B, C…)" checked={settings.showLetterTabs} disabled={!canEdit}
-                  onChange={(value) => set({ showLetterTabs: value })} />
-                <Checkbox label="Page numbers" checked={settings.showPageNumbers} disabled={!canEdit}
-                  onChange={(value) => set({ showPageNumbers: value })} />
+                <Checkbox
+                  label="Church name in the running header"
+                  checked={settings.runningHeader}
+                  disabled={!canEdit}
+                  onChange={(value) => set({ runningHeader: value })}
+                />
+                <Checkbox
+                  label="Letter tabs (A, B, C…)"
+                  checked={settings.showLetterTabs}
+                  disabled={!canEdit}
+                  onChange={(value) => set({ showLetterTabs: value })}
+                />
+                <Checkbox
+                  label="Page numbers"
+                  checked={settings.showPageNumbers}
+                  disabled={!canEdit}
+                  onChange={(value) => set({ showPageNumbers: value })}
+                />
               </div>
             </div>
           </div>
@@ -427,8 +529,14 @@ export function ProjectEditPage() {
             <button type="submit" className="btn primary" disabled={saving}>
               {saving ? "Saving…" : isNew ? "Create directory" : "Save changes"}
             </button>
-            {!isNew ? <Link className="btn" to={`/projects/${id}/preview`}>Preview &amp; print</Link> : null}
-            <Link className="btn ghost" to="/projects">Back</Link>
+            {!isNew ? (
+              <Link className="btn" to={`/projects/${id}/preview`}>
+                Preview &amp; print
+              </Link>
+            ) : null}
+            <Link className="btn ghost" to="/projects">
+              Back
+            </Link>
             <span className="spacer" />
             {!isNew && id ? (
               <ConfirmButton
@@ -481,7 +589,12 @@ function ManualPicker({
         />
         <span className="muted small">{picked.length} chosen</span>
         {picked.length ? (
-          <button type="button" className="btn ghost small" disabled={disabled} onClick={() => onChange([])}>
+          <button
+            type="button"
+            className="btn ghost small"
+            disabled={disabled}
+            onClick={() => onChange([])}
+          >
             Clear
           </button>
         ) : null}

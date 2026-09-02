@@ -29,7 +29,10 @@ async function fetchAll<T>(
   const rows: T[] = [];
 
   for (let from = 0; ; from += PAGE_SIZE) {
-    let query = supabase.from(table).select("*").range(from, from + PAGE_SIZE - 1);
+    let query = supabase
+      .from(table)
+      .select("*")
+      .range(from, from + PAGE_SIZE - 1);
     if (orderBy) query = query.order(orderBy);
 
     const page = unwrap(await query) as T[];
@@ -72,7 +75,10 @@ export async function createHousehold(input: HouseholdInput): Promise<HouseholdR
   return unwrap(await supabase.from("households").insert(input).select().single());
 }
 
-export async function updateHousehold(id: string, patch: Partial<HouseholdInput>): Promise<HouseholdRow> {
+export async function updateHousehold(
+  id: string,
+  patch: Partial<HouseholdInput>,
+): Promise<HouseholdRow> {
   return unwrap(await supabase.from("households").update(patch).eq("id", id).select().single());
 }
 
@@ -118,7 +124,11 @@ export async function setPersonHousehold(
 // Tags
 // ---------------------------------------------------------------------------
 
-export async function createTag(name: string, color: string, description: string | null): Promise<TagRow> {
+export async function createTag(
+  name: string,
+  color: string,
+  description: string | null,
+): Promise<TagRow> {
   return unwrap(await supabase.from("tags").insert({ name, color, description }).select().single());
 }
 
@@ -174,7 +184,9 @@ export interface ProjectWithSelection {
 }
 
 export async function fetchProjects(): Promise<ProjectRow[]> {
-  return unwrap(await supabase.from("projects").select("*").order("created_at", { ascending: false }));
+  return unwrap(
+    await supabase.from("projects").select("*").order("created_at", { ascending: false }),
+  );
 }
 
 export async function fetchProject(id: string): Promise<ProjectWithSelection> {
@@ -228,9 +240,9 @@ export async function setProjectEntries(
   if (remove.error) throw new Error(remove.error.message);
   if (!entries.length) return;
 
-  const insert = await supabase.from("project_entries").insert(
-    entries.map((entry, position) => ({ project_id: projectId, position, ...entry })),
-  );
+  const insert = await supabase
+    .from("project_entries")
+    .insert(entries.map((entry, position) => ({ project_id: projectId, position, ...entry })));
   if (insert.error) throw new Error(insert.error.message);
 }
 

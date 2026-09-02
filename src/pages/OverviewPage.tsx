@@ -62,8 +62,12 @@ export function OverviewPage() {
         </div>
         {canEdit ? (
           <div className="row tight">
-            <Link className="btn" to="/people/new">Add a person</Link>
-            <Link className="btn primary" to="/families/new">Add a family</Link>
+            <Link className="btn" to="/people/new">
+              Add a person
+            </Link>
+            <Link className="btn primary" to="/families/new">
+              Add a family
+            </Link>
           </div>
         ) : null}
       </div>
@@ -77,8 +81,12 @@ export function OverviewPage() {
             action={
               canEdit ? (
                 <div className="row tight" style={{ justifyContent: "center" }}>
-                  <Link className="btn primary" to="/families/new">Add your first family</Link>
-                  <Link className="btn" to="/people/new">Add one person</Link>
+                  <Link className="btn primary" to="/families/new">
+                    Add your first family
+                  </Link>
+                  <Link className="btn" to="/people/new">
+                    Add one person
+                  </Link>
                 </div>
               ) : null
             }
@@ -97,7 +105,9 @@ export function OverviewPage() {
 
           <div className="grid two">
             <div className="card">
-              <div className="card-head"><h2>Next birthdays</h2></div>
+              <div className="card-head">
+                <h2>Next birthdays</h2>
+              </div>
               <div className="card-body tight">
                 {birthdays.length ? (
                   <table>
@@ -109,7 +119,9 @@ export function OverviewPage() {
                               {fullName(person)}
                             </Link>
                           </td>
-                          <td className="num muted nowrap">{formatMonthDay(person.date_of_birth)}</td>
+                          <td className="num muted nowrap">
+                            {formatMonthDay(person.date_of_birth)}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -124,7 +136,9 @@ export function OverviewPage() {
             </div>
 
             <div className="card">
-              <div className="card-head"><h2>Worth a look</h2></div>
+              <div className="card-head">
+                <h2>Worth a look</h2>
+              </div>
               <div className="card-body">
                 {withoutPhoto > 0 ? (
                   <p className="small">
@@ -167,7 +181,9 @@ export function OverviewPage() {
                     </Link>
                   ))}
                   {individuals.length > 24 ? (
-                    <Link className="pill" to="/people">+{individuals.length - 24} more</Link>
+                    <Link className="pill" to="/people">
+                      +{individuals.length - 24} more
+                    </Link>
                   ) : null}
                 </div>
               </div>

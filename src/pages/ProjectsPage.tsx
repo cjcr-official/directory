@@ -37,7 +37,11 @@ export function ProjectsPage() {
             data stays live, so reprinting next year is one click.
           </div>
         </div>
-        {canEdit ? <Link className="btn primary" to="/projects/new">New directory</Link> : null}
+        {canEdit ? (
+          <Link className="btn primary" to="/projects/new">
+            New directory
+          </Link>
+        ) : null}
       </div>
 
       {error ? <Notice kind="error">{error}</Notice> : null}
@@ -63,7 +67,12 @@ export function ProjectsPage() {
                   ) : null}
                   <p className="muted small" style={{ marginTop: 8 }}>
                     {settings.rows} per half-page · {recordsPerSheet(settings)} records to a sheet ·{" "}
-                    {settings.pageSize === "a4" ? "A4" : settings.pageSize === "legal" ? "Legal" : "Letter"} landscape
+                    {settings.pageSize === "a4"
+                      ? "A4"
+                      : settings.pageSize === "legal"
+                        ? "Legal"
+                        : "Letter"}{" "}
+                    landscape
                     {settings.bookletOrder ? " · booklet order" : ""}
                   </p>
                 </div>
@@ -75,7 +84,13 @@ export function ProjectsPage() {
         <div className="card">
           <EmptyState
             title="No directories yet"
-            action={canEdit ? <Link className="btn primary" to="/projects/new">Create the main directory</Link> : null}
+            action={
+              canEdit ? (
+                <Link className="btn primary" to="/projects/new">
+                  Create the main directory
+                </Link>
+              ) : null
+            }
           >
             You have {entries.length} records, which is about {summary.sheets} sheet
             {summary.sheets === 1 ? "" : "s"} of paper at {summary.perSheet} to a sheet.

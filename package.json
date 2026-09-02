@@ -12,7 +12,9 @@
     "deploy": "npm run build && npx wrangler deploy",
     "sample:pdf": "node scripts/run.mjs scripts/sample-book.ts",
     "seed": "node scripts/run.mjs scripts/seed.ts",
-    "test:rls": "bash scripts/test-rls.sh"
+    "test:rls": "bash scripts/test-rls.sh",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",
@@ -27,6 +29,7 @@
     "@types/react-dom": "^19.2.5",
     "@vitejs/plugin-react": "^6.1.1",
     "esbuild": "^0.28.2",
+    "prettier": "^3.9.6",
     "typescript": "^7.0.2",
     "vite": "^8.2.2"
   }

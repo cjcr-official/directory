@@ -28,7 +28,7 @@ members' last names.
 
 **"Goes by".** William prints as Bill without losing the legal first name.
 
-**Groups instead of separate lists.** Tag someone *Choir* once. An event
+**Groups instead of separate lists.** Tag someone _Choir_ once. An event
 directory then says "everyone in the Choir group" and stays correct forever —
 add a new chorister in March and the April booklet includes them. Tagging one
 member pulls in their whole family, which is almost always what you meant.
@@ -72,7 +72,7 @@ family. A read-only link per family — no login, a long random token, expires
 after a month — with an "everything here is right" button and a comment box.
 Email it once before print day and half your corrections arrive on their own.
 
-Keep it a *suggestion*, not a direct edit. An administrator approves it. That
+Keep it a _suggestion_, not a direct edit. An administrator approves it. That
 way a stale link can never quietly change the book.
 
 ### 3. Import from a spreadsheet
@@ -95,8 +95,8 @@ offered as one family.
 ### 5. Small quality-of-life wins
 
 - **Duplicate detection** when adding a person who already exists.
-- **Archive rather than delete** — already in the data model as *include in
-  printed directories*; give it a proper "left the church" reason and a way to
+- **Archive rather than delete** — already in the data model as _include in
+  printed directories_; give it a proper "left the church" reason and a way to
   browse the archive.
 - **Undo after save.** Or at least "changed last Tuesday by Anne", which
   matters when three people share the work.
@@ -112,13 +112,13 @@ offered as one family.
 decision. A book with home addresses and children's birthdays is genuinely
 useful and also the thing people photograph and text around. Some suggestions:
 
-- Ask once, at sign-up: *may we print your address? your photograph?* Store it
+- Ask once, at sign-up: _may we print your address? your photograph?_ Store it
   as a per-family setting and honour it. (Not built yet — worth adding before a
   first full print run.)
 - Consider leaving children's birthdays out of the printed book but keeping them
   in the database for the office birthday list.
-- Print a line on the cover or footer: *for church use only, please do not
-  reproduce*. The footer field is there for exactly this.
+- Print a line on the cover or footer: _for church use only, please do not
+  reproduce_. The footer field is there for exactly this.
 
 **Who can see what.** Editors can see everything. If you want a volunteer to help
 with data entry but not see everyone's address, that needs a fourth role — worth
@@ -140,7 +140,7 @@ being slightly out of date is normal; a rolling "print it again" request is how
 the job becomes a chore.
 
 **Keep a directory called "Main" and never delete it.** Change its cover
-subtitle each time — *Spring 2026*, *Spring 2027* — and you have a consistent
+subtitle each time — _Spring 2026_, _Spring 2027_ — and you have a consistent
 book year to year.
 
 **Small booklets are the real win.** The main directory is printed twice a year.

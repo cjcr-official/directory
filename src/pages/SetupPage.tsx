@@ -10,7 +10,9 @@ export function SetupPage() {
       <div className="card">
         <div className="card-body">
           <div className="brand" style={{ padding: "0 0 14px" }}>
-            <span className="brand-mark" aria-hidden>✝</span>
+            <span className="brand-mark" aria-hidden>
+              ✝
+            </span>
             <span>Church Directory</span>
           </div>
 
@@ -21,19 +23,23 @@ export function SetupPage() {
 
           <ol className="small" style={{ paddingLeft: 20, lineHeight: 1.85, marginTop: 14 }}>
             <li>
-              Create a free project at <a href="https://supabase.com" target="_blank" rel="noreferrer">supabase.com</a>.
+              Create a free project at{" "}
+              <a href="https://supabase.com" target="_blank" rel="noreferrer">
+                supabase.com
+              </a>
+              .
             </li>
             <li>
-              Open <strong>SQL Editor</strong> and run the two files in <span className="mono">supabase/migrations/</span>,
-              in order.
+              Open <strong>SQL Editor</strong> and run the two files in{" "}
+              <span className="mono">supabase/migrations/</span>, in order.
             </li>
             <li>
-              Copy <strong>Project URL</strong> and <strong>anon public</strong> key from
-              {" "}<strong>Project Settings → API</strong>.
+              Copy <strong>Project URL</strong> and <strong>anon public</strong> key from{" "}
+              <strong>Project Settings → API</strong>.
             </li>
             <li>
-              Put them in a file called <span className="mono">.env.local</span> next to
-              {" "}<span className="mono">package.json</span>:
+              Put them in a file called <span className="mono">.env.local</span> next to{" "}
+              <span className="mono">package.json</span>:
             </li>
           </ol>
 
@@ -48,7 +54,7 @@ export function SetupPage() {
               fontSize: "0.8rem",
             }}
           >
-{`VITE_SUPABASE_URL=https://your-project.supabase.co
+            {`VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOi...`}
           </pre>
 
@@ -58,8 +64,12 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOi...`}
           </p>
 
           <div className="row" style={{ marginTop: 16 }}>
-            <Link className="btn primary" to="/sample">See a sample directory</Link>
-            <span className="muted small">No account needed — it runs entirely in this browser.</span>
+            <Link className="btn primary" to="/sample">
+              See a sample directory
+            </Link>
+            <span className="muted small">
+              No account needed — it runs entirely in this browser.
+            </span>
           </div>
 
           <div className="notice" style={{ marginTop: 14 }}>

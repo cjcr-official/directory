@@ -47,7 +47,7 @@ export function ProjectPreviewPage() {
           entries: loaded.entries,
         });
 
-        const metrics = await loadMetrics();
+        const metrics = await loadMetrics(settings.typeface);
         if (!active) return;
 
         const composed = composeBook(included, settings, metrics);
@@ -80,10 +80,7 @@ export function ProjectPreviewPage() {
     return () => window.removeEventListener("resize", fit);
   }, [book]);
 
-  const settings = useMemo(
-    () => (project ? normalizeSettings(project.settings) : null),
-    [project],
-  );
+  const settings = useMemo(() => (project ? normalizeSettings(project.settings) : null), [project]);
 
   /**
    * The preview caps how many sheets it draws to stay responsive, but the
@@ -136,7 +133,11 @@ export function ProjectPreviewPage() {
     return (
       <div className="page">
         <Notice kind="error">{error}</Notice>
-        <p style={{ marginTop: 12 }}><Link className="btn" to="/projects">Back to directories</Link></p>
+        <p style={{ marginTop: 12 }}>
+          <Link className="btn" to="/projects">
+            Back to directories
+          </Link>
+        </p>
       </div>
     );
   }
@@ -152,7 +153,9 @@ export function ProjectPreviewPage() {
       <style>{`@page { size: ${book.width}pt ${book.height}pt; margin: 0; }`}</style>
 
       <div className="preview-bar">
-        <Link className="btn ghost" to={`/projects/${project.id}`}>← {project.name}</Link>
+        <Link className="btn ghost" to={`/projects/${project.id}`}>
+          ← {project.name}
+        </Link>
 
         <span className="muted small nowrap">
           {book.recordCount} records · {book.pageCount} pages · {book.sheets.length} sheets ·{" "}
@@ -186,7 +189,11 @@ export function ProjectPreviewPage() {
         {progress ? (
           <span className="row tight">
             <span className="progress-track">
-              <div style={{ width: `${Math.round((progress.done / Math.max(progress.total, 1)) * 100)}%` }} />
+              <div
+                style={{
+                  width: `${Math.round((progress.done / Math.max(progress.total, 1)) * 100)}%`,
+                }}
+              />
             </span>
           </span>
         ) : null}
@@ -194,7 +201,12 @@ export function ProjectPreviewPage() {
         <button type="button" className="btn" onClick={() => setPrintingAll(true)}>
           {printingAll ? "Preparing…" : "Print"}
         </button>
-        <button type="button" className="btn primary" disabled={building} onClick={() => void generatePdf()}>
+        <button
+          type="button"
+          className="btn primary"
+          disabled={building}
+          onClick={() => void generatePdf()}
+        >
           {building ? "Building PDF…" : "Download PDF"}
         </button>
       </div>

@@ -180,7 +180,11 @@ export function ConfirmButton({
         >
           {label}
         </button>
-        {error ? <span className="small" style={{ color: "var(--danger)" }}>{error}</span> : null}
+        {error ? (
+          <span className="small" style={{ color: "var(--danger)" }}>
+            {error}
+          </span>
+        ) : null}
       </span>
     );
   }

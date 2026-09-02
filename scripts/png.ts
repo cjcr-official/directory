@@ -89,15 +89,17 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   const hp = (h % 360) / 60;
   const x = c * (1 - Math.abs((hp % 2) - 1));
   const [r, g, b] =
-    hp < 1 ? [c, x, 0] :
-    hp < 2 ? [x, c, 0] :
-    hp < 3 ? [0, c, x] :
-    hp < 4 ? [0, x, c] :
-    hp < 5 ? [x, 0, c] : [c, 0, x];
+    hp < 1
+      ? [c, x, 0]
+      : hp < 2
+        ? [x, c, 0]
+        : hp < 3
+          ? [0, c, x]
+          : hp < 4
+            ? [0, x, c]
+            : hp < 5
+              ? [x, 0, c]
+              : [c, 0, x];
   const m = l - c / 2;
-  return [
-    Math.round((r + m) * 255),
-    Math.round((g + m) * 255),
-    Math.round((b + m) * 255),
-  ];
+  return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
 }

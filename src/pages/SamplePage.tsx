@@ -48,7 +48,7 @@ export function SamplePage() {
           showAnniversary: true,
         });
 
-        const metrics = await loadMetrics();
+        const metrics = await loadMetrics(settings.typeface);
         if (!active) return;
 
         const composed = composeBook(entries, settings, metrics);
@@ -93,10 +93,14 @@ export function SamplePage() {
     setBuilding(true);
     try {
       const { renderPdf } = await import("@/lib/layout/pdf");
-      const bytes = await renderPdf(book, async (path) => {
-        const blob = photoBlobs.get(path);
-        return blob ? new Uint8Array(await blob.arrayBuffer()) : null;
-      }, { showFoldGuides: true, title: "Sample church directory" });
+      const bytes = await renderPdf(
+        book,
+        async (path) => {
+          const blob = photoBlobs.get(path);
+          return blob ? new Uint8Array(await blob.arrayBuffer()) : null;
+        },
+        { showFoldGuides: true, title: "Sample church directory" },
+      );
 
       const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" }));
       const link = document.createElement("a");
@@ -111,7 +115,12 @@ export function SamplePage() {
     }
   }
 
-  if (error) return <div className="page"><Notice kind="error">{error}</Notice></div>;
+  if (error)
+    return (
+      <div className="page">
+        <Notice kind="error">{error}</Notice>
+      </div>
+    );
   if (!book) return <LoadingScreen label="Building a sample directory…" />;
 
   return (
@@ -119,7 +128,9 @@ export function SamplePage() {
       <style>{`@page { size: ${book.width}pt ${book.height}pt; margin: 0; }`}</style>
 
       <div className="preview-bar">
-        <Link className="btn ghost" to="/">← Back</Link>
+        <Link className="btn ghost" to="/">
+          ← Back
+        </Link>
         <strong className="small">Sample directory</strong>
         <span className="muted small nowrap">
           {book.recordCount} records · {recordsPerSheet(book.settings)} to a sheet ·{" "}
@@ -138,7 +149,12 @@ export function SamplePage() {
             onChange={(event) => setZoom(Number(event.target.value))}
           />
         </label>
-        <button type="button" className="btn primary" disabled={building} onClick={() => void download()}>
+        <button
+          type="button"
+          className="btn primary"
+          disabled={building}
+          onClick={() => void download()}
+        >
           {building ? "Building…" : "Download sample PDF"}
         </button>
       </div>

@@ -38,7 +38,12 @@ function Protected() {
               Your account exists but has not been given access to this directory yet. Ask an owner
               to grant it — they will find you listed under Administrators.
             </Notice>
-            <button type="button" className="btn" style={{ marginTop: 14 }} onClick={() => void signOut()}>
+            <button
+              type="button"
+              className="btn"
+              style={{ marginTop: 14 }}
+              onClick={() => void signOut()}
+            >
               Sign out
             </button>
           </div>

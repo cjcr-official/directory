@@ -35,9 +35,11 @@ export function PhotoInput({ path, initials, disabled, onChange }: Props) {
       setSavedUrl(null);
       return;
     }
-    getPhotoUrl(path).then((url) => {
-      if (active) setSavedUrl(url);
-    }).catch(() => undefined);
+    getPhotoUrl(path)
+      .then((url) => {
+        if (active) setSavedUrl(url);
+      })
+      .catch(() => undefined);
     return () => {
       active = false;
     };
@@ -117,9 +119,16 @@ export function PhotoInput({ path, initials, disabled, onChange }: Props) {
         </div>
         <p className="hint" style={{ marginTop: 7 }}>
           Portrait orientation prints best. Large photos are shrunk automatically
-          {pending ? ` — ${pending.width}×${pending.height}, ${Math.round(pending.blob.size / 1024)} KB` : ""}.
+          {pending
+            ? ` — ${pending.width}×${pending.height}, ${Math.round(pending.blob.size / 1024)} KB`
+            : ""}
+          .
         </p>
-        {error ? <p className="hint" style={{ color: "var(--danger)" }}>{error}</p> : null}
+        {error ? (
+          <p className="hint" style={{ color: "var(--danger)" }}>
+            {error}
+          </p>
+        ) : null}
       </div>
     </div>
   );

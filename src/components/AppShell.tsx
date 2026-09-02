@@ -4,7 +4,11 @@ import { useDirectory } from "@/data/DirectoryContext";
 
 function Item({ to, label, count }: { to: string; label: string; count?: number }) {
   return (
-    <NavLink to={to} className={({ isActive }) => `nav-link${isActive ? " active" : ""}`} end={to === "/"}>
+    <NavLink
+      to={to}
+      className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}
+      end={to === "/"}
+    >
       <span>{label}</span>
       {count === undefined ? null : <span className="count">{count}</span>}
     </NavLink>
@@ -21,7 +25,9 @@ export function AppShell() {
     <div className="shell">
       <nav className="sidebar">
         <div className="brand">
-          <span className="brand-mark" aria-hidden>✝</span>
+          <span className="brand-mark" aria-hidden>
+            ✝
+          </span>
           <span>Directory</span>
         </div>
 

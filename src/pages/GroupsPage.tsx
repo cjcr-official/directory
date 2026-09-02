@@ -6,8 +6,15 @@ import { ConfirmButton, EmptyState, Field, LoadingScreen, Notice } from "@/compo
 import { createTag, deleteTag, updateTag } from "@/lib/queries";
 
 const PALETTE = [
-  "#2f6d63", "#7c5cbf", "#c2643a", "#3f7cac", "#a34f6f",
-  "#5c7a2f", "#b0813a", "#4b5c8a", "#8a4b4b",
+  "#2f6d63",
+  "#7c5cbf",
+  "#c2643a",
+  "#3f7cac",
+  "#a34f6f",
+  "#5c7a2f",
+  "#b0813a",
+  "#4b5c8a",
+  "#8a4b4b",
 ];
 
 /**
@@ -68,7 +75,9 @@ export function GroupsPage() {
 
       <div className="grid two" style={{ alignItems: "start" }}>
         <div className="card">
-          <div className="card-head"><h2>Your groups</h2></div>
+          <div className="card-head">
+            <h2>Your groups</h2>
+          </div>
           {formError ? (
             <div style={{ padding: "12px 18px 0" }}>
               <Notice kind="error">{formError}</Notice>
@@ -90,13 +99,22 @@ export function GroupsPage() {
                       <span className="row tight">
                         <span
                           className="dot"
-                          style={{ width: 10, height: 10, borderRadius: "50%", background: tag.color }}
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: "50%",
+                            background: tag.color,
+                          }}
                         />
                         {canEdit ? (
                           <input
                             type="text"
                             defaultValue={tag.name}
-                            style={{ maxWidth: 220, border: "1px solid transparent", background: "transparent" }}
+                            style={{
+                              maxWidth: 220,
+                              border: "1px solid transparent",
+                              background: "transparent",
+                            }}
                             onBlur={async (event) => {
                               const field = event.target;
                               const next = field.value.trim();
@@ -151,7 +169,9 @@ export function GroupsPage() {
 
         {canEdit ? (
           <div className="card">
-            <div className="card-head"><h2>Add a group</h2></div>
+            <div className="card-head">
+              <h2>Add a group</h2>
+            </div>
             <div className="card-body">
               <form onSubmit={add}>
                 <Field label="Name" htmlFor="group_name">
@@ -177,7 +197,8 @@ export function GroupsPage() {
                           height: 26,
                           borderRadius: 7,
                           background: option,
-                          border: color === option ? "2px solid var(--ink)" : "2px solid transparent",
+                          border:
+                            color === option ? "2px solid var(--ink)" : "2px solid transparent",
                           cursor: "pointer",
                         }}
                       />
@@ -185,7 +206,12 @@ export function GroupsPage() {
                   </div>
                 </Field>
 
-                <button type="submit" className="btn primary" disabled={busy || !name.trim()} style={{ marginTop: 10 }}>
+                <button
+                  type="submit"
+                  className="btn primary"
+                  disabled={busy || !name.trim()}
+                  style={{ marginTop: 10 }}
+                >
                   {busy ? "Adding…" : "Add group"}
                 </button>
               </form>

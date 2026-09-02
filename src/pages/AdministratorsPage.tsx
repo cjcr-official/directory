@@ -51,8 +51,7 @@ export function AdministratorsPage() {
         <div className="grow">
           <h1>Administrators</h1>
           <div className="sub">
-            People who can sign in. A new account can see nothing at all until you turn it on
-            here.
+            People who can sign in. A new account can see nothing at all until you turn it on here.
           </div>
         </div>
       </div>
@@ -85,7 +84,11 @@ export function AdministratorsPage() {
                 <tr key={row.id}>
                   <td>
                     {row.full_name || <span className="muted">—</span>}
-                    {isMe ? <span className="pill" style={{ marginLeft: 6 }}>You</span> : null}
+                    {isMe ? (
+                      <span className="pill" style={{ marginLeft: 6 }}>
+                        You
+                      </span>
+                    ) : null}
                   </td>
                   <td className="small muted">{row.email}</td>
                   <td>
@@ -94,10 +97,14 @@ export function AdministratorsPage() {
                         value={row.role}
                         disabled={busy === row.id}
                         style={{ width: "auto" }}
-                        onChange={(event) => void change(row.id, { role: event.target.value as AppRole })}
+                        onChange={(event) =>
+                          void change(row.id, { role: event.target.value as AppRole })
+                        }
                       >
                         {ROLES.map((role) => (
-                          <option key={role.value} value={role.value}>{role.label}</option>
+                          <option key={role.value} value={role.value}>
+                            {role.label}
+                          </option>
                         ))}
                       </select>
                     ) : (

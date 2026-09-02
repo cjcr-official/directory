@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import { COLORS, type BookModel, type BookPage, type TextRun } from "@/lib/layout/compose";
+import { CSS_FONT_STACKS, type Typeface } from "@/lib/layout/metrics";
 
 interface Props {
   book: BookModel;
@@ -11,9 +12,7 @@ interface Props {
   limit?: number;
 }
 
-const FONT_STACK = 'Helvetica, "Helvetica Neue", Arial, sans-serif';
-
-function runStyle(run: TextRun): React.CSSProperties {
+function runStyle(run: TextRun, fontStack: string): React.CSSProperties {
   return {
     position: "absolute",
     left: `${run.x}pt`,
@@ -21,7 +20,7 @@ function runStyle(run: TextRun): React.CSSProperties {
     width: `${run.w}pt`,
     fontSize: `${run.size}pt`,
     lineHeight: 1,
-    fontFamily: FONT_STACK,
+    fontFamily: fontStack,
     fontWeight: run.weight === "bold" ? 700 : 400,
     fontStyle: run.weight === "italic" ? "italic" : "normal",
     color: run.color,
@@ -33,12 +32,37 @@ function runStyle(run: TextRun): React.CSSProperties {
   };
 }
 
-function Page({ page, photoUrls }: { page: BookPage; photoUrls: Map<string, string> }) {
+function Page({
+  page,
+  photoUrls,
+  fontStack,
+}: {
+  page: BookPage;
+  photoUrls: Map<string, string>;
+  fontStack: string;
+}) {
   return (
     <Fragment>
+      {page.fills.map((fill, i) => (
+        <div
+          key={`fill-${i}`}
+          style={{
+            position: "absolute",
+            left: `${fill.x}pt`,
+            top: `${fill.y}pt`,
+            width: `${fill.w}pt`,
+            height: `${fill.h}pt`,
+            background: fill.color ?? "transparent",
+            border: fill.borderColor ? `0.5pt solid ${fill.borderColor}` : undefined,
+            borderRadius: fill.radius ? `${fill.radius}pt` : undefined,
+            boxSizing: "border-box",
+          }}
+        />
+      ))}
+
       {page.cards.map((card) => (
         <Fragment key={`${card.entryType}-${card.entryId}`}>
-          {card.border ? (
+          {card.style === "box" ? (
             <div
               style={{
                 position: "absolute",
@@ -52,44 +76,67 @@ function Page({ page, photoUrls }: { page: BookPage; photoUrls: Map<string, stri
             />
           ) : null}
 
-          {card.photo ? (
-            (() => {
-              const url = card.photo.path ? photoUrls.get(card.photo.path) : undefined;
-              const box = card.photo.box;
-              const common: React.CSSProperties = {
+          {card.rules.map((rule, i) => (
+            <div
+              key={`card-rule-${i}`}
+              style={{
                 position: "absolute",
-                left: `${box.x}pt`,
-                top: `${box.y}pt`,
-                width: `${box.w}pt`,
-                height: `${box.h}pt`,
-              };
-              return url ? (
-                <img
-                  src={url}
-                  alt=""
-                  style={{ ...common, objectFit: card.photo.fit === "fill" ? "cover" : "contain" }}
-                />
-              ) : (
-                <div
-                  style={{
-                    ...common,
-                    background: COLORS.placeholder,
-                    color: COLORS.soft,
-                    display: "grid",
-                    placeItems: "center",
-                    fontFamily: FONT_STACK,
-                    fontWeight: 700,
-                    fontSize: `${Math.min(box.w, box.h) * 0.32}pt`,
-                  }}
-                >
-                  {card.photo.initials}
-                </div>
-              );
-            })()
-          ) : null}
+                left: `${rule.x}pt`,
+                top: `${rule.y}pt`,
+                width: `${rule.w}pt`,
+                height: 0,
+                borderTop: `0.5pt solid ${rule.color}`,
+              }}
+            />
+          ))}
+
+          {card.photo
+            ? (() => {
+                const url = card.photo.path ? photoUrls.get(card.photo.path) : undefined;
+                const box = card.photo.box;
+                const common: React.CSSProperties = {
+                  position: "absolute",
+                  left: `${box.x}pt`,
+                  top: `${box.y}pt`,
+                  width: `${box.w}pt`,
+                  height: `${box.h}pt`,
+                };
+                return url ? (
+                  <img
+                    src={url}
+                    alt=""
+                    style={{
+                      ...common,
+                      objectFit: card.photo.fit === "fill" ? "cover" : "contain",
+                      border: `0.4pt solid ${COLORS.photoEdge}`,
+                      boxSizing: "border-box",
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      ...common,
+                      background: COLORS.placeholder,
+                      color: COLORS.soft,
+                      border: `0.4pt solid ${COLORS.photoEdge}`,
+                      boxSizing: "border-box",
+                      display: "grid",
+                      placeItems: "center",
+                      fontFamily: fontStack,
+                      fontWeight: 700,
+                      fontSize: `${Math.min(box.w, box.h) * 0.32}pt`,
+                    }}
+                  >
+                    {card.photo.initials}
+                  </div>
+                );
+              })()
+            : null}
 
           {card.runs.map((run, i) => (
-            <div key={i} style={runStyle(run)}>{run.text}</div>
+            <div key={i} style={runStyle(run, fontStack)}>
+              {run.text}
+            </div>
           ))}
         </Fragment>
       ))}
@@ -109,7 +156,9 @@ function Page({ page, photoUrls }: { page: BookPage; photoUrls: Map<string, stri
       ))}
 
       {page.runs.map((run, i) => (
-        <div key={`run-${i}`} style={runStyle(run)}>{run.text}</div>
+        <div key={`run-${i}`} style={runStyle(run, fontStack)}>
+          {run.text}
+        </div>
       ))}
     </Fragment>
   );
@@ -123,6 +172,7 @@ function Page({ page, photoUrls }: { page: BookPage; photoUrls: Map<string, stri
  */
 export function BookPreview({ book, photoUrls, zoom, limit }: Props) {
   const sheets = limit ? book.sheets.slice(0, limit) : book.sheets;
+  const fontStack = CSS_FONT_STACKS[book.typeface as Typeface] ?? CSS_FONT_STACKS.sans;
 
   return (
     <div className="sheet-stack">
@@ -149,7 +199,12 @@ export function BookPreview({ book, photoUrls, zoom, limit }: Props) {
               />
             ))}
             {sheet.pages.map((page, i) => (
-              <Page key={`${sheet.index}-${i}`} page={page} photoUrls={photoUrls} />
+              <Page
+                key={`${sheet.index}-${i}`}
+                page={page}
+                photoUrls={photoUrls}
+                fontStack={fontStack}
+              />
             ))}
           </div>
         </div>

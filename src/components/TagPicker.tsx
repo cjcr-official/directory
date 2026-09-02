@@ -13,7 +13,13 @@ interface Props {
 }
 
 const NEW_TAG_COLORS = [
-  "#2f6d63", "#7c5cbf", "#c2643a", "#3f7cac", "#a34f6f", "#5c7a2f", "#b0813a",
+  "#2f6d63",
+  "#7c5cbf",
+  "#c2643a",
+  "#3f7cac",
+  "#a34f6f",
+  "#5c7a2f",
+  "#b0813a",
 ];
 
 export function TagPicker({ tags, selected, onChange, allowCreate, onCreated, disabled }: Props) {
@@ -64,7 +70,10 @@ export function TagPicker({ tags, selected, onChange, allowCreate, onCreated, di
                 color: on ? "#fff" : "var(--ink-2)",
               }}
             >
-              <span className="dot" style={{ background: on ? "rgba(255,255,255,.75)" : tag.color }} />
+              <span
+                className="dot"
+                style={{ background: on ? "rgba(255,255,255,.75)" : tag.color }}
+              />
               {tag.name}
             </button>
           );
@@ -99,7 +108,12 @@ export function TagPicker({ tags, selected, onChange, allowCreate, onCreated, di
               if (event.key === "Escape") setAdding(false);
             }}
           />
-          <button type="button" className="btn small primary" disabled={busy} onClick={() => void create()}>
+          <button
+            type="button"
+            className="btn small primary"
+            disabled={busy}
+            onClick={() => void create()}
+          >
             Add
           </button>
           <button type="button" className="btn ghost small" onClick={() => setAdding(false)}>
@@ -108,7 +122,11 @@ export function TagPicker({ tags, selected, onChange, allowCreate, onCreated, di
         </div>
       ) : null}
 
-      {error ? <p className="hint" style={{ color: "var(--danger)" }}>{error}</p> : null}
+      {error ? (
+        <p className="hint" style={{ color: "var(--danger)" }}>
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

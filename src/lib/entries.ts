@@ -48,7 +48,8 @@ export function sortMembers(members: PersonRow[]): PersonRow[] {
   const rank: Record<string, number> = { head: 0, spouse: 1, child: 2, other: 3 };
   return [...members].sort((a, b) => {
     if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
-    const roleDelta = (rank[a.household_role ?? "other"] ?? 3) - (rank[b.household_role ?? "other"] ?? 3);
+    const roleDelta =
+      (rank[a.household_role ?? "other"] ?? 3) - (rank[b.household_role ?? "other"] ?? 3);
     if (roleDelta !== 0) return roleDelta;
     // Children last, oldest first, so a family reads the way it is introduced.
     if (a.household_role === "child" && b.household_role === "child") {

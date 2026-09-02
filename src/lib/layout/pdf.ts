@@ -14,7 +14,13 @@ import {
 } from "pdf-lib";
 import { toWinAnsi } from "../format";
 import { COLORS, type BookModel, type Box, type PhotoSlot, type TextRun } from "./compose";
-import { STANDARD_FONTS, makeMetrics, type FontWeight, type Metrics } from "./metrics";
+import {
+  STANDARD_FONTS,
+  makeMetrics,
+  type FontWeight,
+  type Metrics,
+  type Typeface,
+} from "./metrics";
 
 /** Loads the bytes for one photo, or null when it cannot be fetched. */
 export type PhotoLoader = (path: string) => Promise<Uint8Array | null>;
@@ -39,7 +45,12 @@ function hexToRgb(hex: string) {
  * here and nowhere else. `y` names the top of the line box, so the baseline
  * sits one ascender below it.
  */
-function drawRun(page: PDFPage, run: TextRun, fonts: Record<FontWeight, PDFFont>, pageHeight: number) {
+function drawRun(
+  page: PDFPage,
+  run: TextRun,
+  fonts: Record<FontWeight, PDFFont>,
+  pageHeight: number,
+) {
   const font = fonts[run.weight];
   const text = toWinAnsi(run.text);
   if (!text) return;
@@ -62,7 +73,12 @@ function drawRun(page: PDFPage, run: TextRun, fonts: Record<FontWeight, PDFFont>
   });
 }
 
-function drawBox(page: PDFPage, box: Box, pageHeight: number, options: Parameters<PDFPage["drawRectangle"]>[0]) {
+function drawBox(
+  page: PDFPage,
+  box: Box,
+  pageHeight: number,
+  options: Parameters<PDFPage["drawRectangle"]>[0],
+) {
   page.drawRectangle({
     ...options,
     x: box.x,
@@ -84,12 +100,7 @@ function drawBox(page: PDFPage, box: Box, pageHeight: number, options: Parameter
  * painting over the spill, because a wide landscape photo can overflow far
  * enough to cover the text beside it.
  */
-function drawPhoto(
-  page: PDFPage,
-  slot: PhotoSlot,
-  image: PDFImage,
-  pageHeight: number,
-): void {
+function drawPhoto(page: PDFPage, slot: PhotoSlot, image: PDFImage, pageHeight: number): void {
   const { box, fit } = slot;
   const scale =
     fit === "fill"
@@ -158,10 +169,11 @@ export async function renderPdf(
   doc.setProducer("Church Directory");
   doc.setCreator("Church Directory");
 
+  const family = STANDARD_FONTS[book.typeface];
   const fonts: Record<FontWeight, PDFFont> = {
-    regular: await doc.embedFont(STANDARD_FONTS.regular),
-    bold: await doc.embedFont(STANDARD_FONTS.bold),
-    italic: await doc.embedFont(STANDARD_FONTS.italic),
+    regular: await doc.embedFont(family.regular),
+    bold: await doc.embedFont(family.bold),
+    italic: await doc.embedFont(family.italic),
   };
 
   const images = new Map<string, PDFImage | null>();
@@ -212,17 +224,42 @@ export async function renderPdf(
         });
       }
 
+      for (const fill of bookPage.fills) {
+        page.drawRectangle({
+          x: fill.x,
+          y: h - fill.y - fill.h,
+          width: fill.w,
+          height: fill.h,
+          color: fill.color ? hexToRgb(fill.color) : undefined,
+          borderColor: fill.borderColor ? hexToRgb(fill.borderColor) : undefined,
+          borderWidth: fill.borderColor ? 0.5 : undefined,
+        });
+      }
+
       for (const card of bookPage.cards) {
-        if (card.border) {
+        if (card.style === "box") {
           drawBox(page, card.box, h, {
             borderColor: hexToRgb(COLORS.border),
             borderWidth: 0.5,
+          });
+        }
+        for (const rule of card.rules) {
+          page.drawLine({
+            start: { x: rule.x, y: h - rule.y },
+            end: { x: rule.x + rule.w, y: h - rule.y },
+            thickness: 0.5,
+            color: hexToRgb(rule.color),
           });
         }
         if (card.photo) {
           const image = card.photo.path ? images.get(card.photo.path) : null;
           if (image) drawPhoto(page, card.photo, image, h);
           else drawPlaceholder(page, card.photo, fonts, h);
+          // A hairline so a pale portrait does not float on white paper.
+          drawBox(page, card.photo.box, h, {
+            borderColor: hexToRgb(COLORS.photoEdge),
+            borderWidth: 0.4,
+          });
         }
         for (const run of card.runs) drawRun(page, run, fonts, h);
       }
@@ -248,11 +285,12 @@ function isPng(bytes: Uint8Array): boolean {
 }
 
 /** Metrics backed by a fresh document - used by tests and scripts. */
-export async function pdfMetrics(): Promise<Metrics> {
+export async function pdfMetrics(typeface: Typeface = "sans"): Promise<Metrics> {
   const doc = await PDFDocument.create();
+  const family = STANDARD_FONTS[typeface];
   return makeMetrics({
-    regular: await doc.embedFont(STANDARD_FONTS.regular),
-    bold: await doc.embedFont(STANDARD_FONTS.bold),
-    italic: await doc.embedFont(STANDARD_FONTS.italic),
+    regular: await doc.embedFont(family.regular),
+    bold: await doc.embedFont(family.bold),
+    italic: await doc.embedFont(family.italic),
   });
 }
