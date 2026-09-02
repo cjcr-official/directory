@@ -70,4 +70,9 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # The action still defaults to Wrangler 3, which predates deploying a
+          # Worker whose only content is static assets - it looks for a `main`
+          # script, finds none, and fails with "Missing entry-point". The
+          # `assets` block in wrangler.jsonc needs Wrangler 4.
+          wranglerVersion: "4"
           command: deploy
