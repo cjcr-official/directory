@@ -49,6 +49,10 @@ built from invented families, with no account and no database.
 
 ## Setting it up
 
+**[docs/DEPLOY.md](docs/DEPLOY.md) is the step-by-step version** — Supabase,
+Cloudflare, and the check that proves a stranger cannot read your congregation's
+addresses. What follows is the short form.
+
 ### 1. The database (Supabase)
 
 1. Create a free project at [supabase.com](https://supabase.com).
@@ -68,6 +72,10 @@ npm install
 cp .env.example .env.local     # then paste in your two values
 npm run dev
 ```
+
+Before deploying, run `npm run verify`. It connects with the anon key — the same
+key the browser gets — and reports whether the schema is in place and whether a
+stranger can read anything. Do not go live until it passes.
 
 Open the address it prints. The first account to sign up becomes the **owner**,
 so you can claim a fresh project without touching a secret key.

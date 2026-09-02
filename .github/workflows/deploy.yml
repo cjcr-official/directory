@@ -1,0 +1,73 @@
+name: Deploy
+
+# Deploys to Cloudflare on every push to main, but only once the build,
+# formatting, type and security checks in ci.yml have passed.
+#
+# Needs four repository secrets (Settings -> Secrets and variables -> Actions):
+#
+#   VITE_SUPABASE_URL        Project URL, from Supabase Settings -> API
+#   VITE_SUPABASE_ANON_KEY   The "anon public" key from the same page
+#   CLOUDFLARE_API_TOKEN     A token with the "Edit Cloudflare Workers" template
+#   CLOUDFLARE_ACCOUNT_ID    From the Cloudflare dashboard sidebar
+#
+# Never add the Supabase service_role key here. It bypasses every security
+# policy, and nothing in the browser bundle should be able to.
+#
+# Prefer clicking? Connect the repository under Workers & Pages instead and
+# skip this file entirely - see docs/DEPLOY.md.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Formatting, types and layout engine
+        run: |
+          npm run format:check
+          npm run typecheck
+          npm run sample:pdf -- /tmp/sample.pdf
+
+      - name: Check the deploy secrets are set
+        id: secrets
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Deploy skipped - set the four secrets listed in .github/workflows/deploy.yml"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: npm run build
+
+      - name: Deploy to Cloudflare
+        if: steps.secrets.outputs.ready == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy

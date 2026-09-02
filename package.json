@@ -14,7 +14,8 @@
     "seed": "node scripts/run.mjs scripts/seed.ts",
     "test:rls": "bash scripts/test-rls.sh",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "verify": "node scripts/run.mjs scripts/verify-setup.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",
