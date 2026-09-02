@@ -111,6 +111,7 @@ export function GroupsPage() {
                     <td style={{ textAlign: "right" }}>
                       {canEdit ? (
                         <ConfirmButton
+                          subtle
                           label="Delete"
                           confirmLabel="Delete group"
                           onConfirm={async () => {

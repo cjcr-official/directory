@@ -147,11 +147,14 @@ export function ConfirmButton({
   confirmLabel = "Really delete",
   onConfirm,
   disabled,
+  /** Quiet until hovered - for a delete that sits in every row of a table. */
+  subtle,
 }: {
   label: string;
   confirmLabel?: string;
   onConfirm: () => void | Promise<void>;
   disabled?: boolean;
+  subtle?: boolean;
 }) {
   const [armed, setArmed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -164,7 +167,12 @@ export function ConfirmButton({
 
   if (!armed) {
     return (
-      <button type="button" className="btn danger" disabled={disabled} onClick={() => setArmed(true)}>
+      <button
+        type="button"
+        className={subtle ? "btn ghost small danger-hover" : "btn danger"}
+        disabled={disabled}
+        onClick={() => setArmed(true)}
+      >
         {label}
       </button>
     );
@@ -174,7 +182,7 @@ export function ConfirmButton({
     <span className="row tight">
       <button
         type="button"
-        className="btn danger"
+        className={subtle ? "btn danger small" : "btn danger"}
         disabled={busy}
         onClick={async () => {
           setBusy(true);

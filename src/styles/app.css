@@ -145,6 +145,9 @@ p:last-child { margin-bottom: 0; }
   box-shadow: var(--shadow);
 }
 .card + .card { margin-top: 16px; }
+/* Inside a grid the gap already does the spacing, and the stacking margin
+   would push every card after the first out of alignment with its row. */
+.grid > .card + .card { margin-top: 0; }
 .card-head {
   padding: 14px 18px;
   border-bottom: 1px solid var(--line);
@@ -231,6 +234,8 @@ legend {
 .btn.ghost { border-color: transparent; background: transparent; }
 .btn.ghost:hover:not(:disabled) { background: var(--canvas); }
 .btn.small { padding: 4px 9px; font-size: 0.8rem; }
+.btn.danger-hover { color: var(--ink-3); }
+.btn.danger-hover:hover:not(:disabled) { background: var(--danger-soft); color: var(--danger); }
 
 /* --- tables & lists ------------------------------------------------------ */
 
