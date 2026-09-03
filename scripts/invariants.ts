@@ -511,6 +511,114 @@ async function main() {
     );
   }
 
+  // ---- 12. the cover carries what the office put on it --------------------
+  {
+    // Every part of the cover is optional and none of it is placed at a fixed
+    // height, so the failure to guard against is a blank field still taking up
+    // room - a plain cover drifting down the page because the statement and
+    // the contact block reserved space they never used.
+    const settings = (over: Partial<typeof DEFAULT_SETTINGS>) =>
+      normalizeSettings({ ...DEFAULT_SETTINGS, includeCover: true, ...over });
+    const coverOf = (over: Partial<typeof DEFAULT_SETTINGS>) => {
+      const book = composeBook([], settings(over), metrics);
+      for (const sheet of book.sheets)
+        for (const page of sheet.pages) if (page.kind === "cover") return { page, book };
+      throw new Error("the book composed no cover");
+    };
+
+    const full = coverOf({
+      churchName: "Plains Alliance Church",
+      coverTitle: "2026 Spring Directory",
+      coverStatement: "OUR VISION…\nTo be a God-glorifying, Spirit-filled community.",
+      coverContact: "505 West 5th Street\nP.O. Box 368\nPlains, MT 59859",
+      coverPhotoPath: "covers/photo.jpg",
+      coverLogoPath: "covers/logo.jpg",
+    });
+    const text = drawn(full.page).join("\n");
+    ok(text.includes("PLAINS ALLIANCE CHURCH"), "the church name is not on the cover");
+    ok(text.includes("2026 Spring Directory"), "the title is not on the cover");
+    ok(text.includes("OUR VISION…"), "the statement is not on the cover");
+    ok(text.includes("P.O. Box 368"), "the contact block is not on the cover");
+    ok(
+      full.page.photos.length === 2,
+      `the cover carries ${full.page.photos.length} pictures, not 2`,
+    );
+
+    // The pictures have to be fetched by the same pass that fetches portraits,
+    // or the PDF prints a cover the preview showed.
+    ok(
+      full.book.photoPaths.includes("covers/photo.jpg") &&
+        full.book.photoPaths.includes("covers/logo.jpg"),
+      "the cover's pictures are not in the list the PDF fetches",
+    );
+
+    // The pictures have to be moved onto the sheet with the text. A page is
+    // composed in its own coordinates and then translated into its column, and
+    // artwork left behind by that step lands on top of the lines above it -
+    // not a crash, just a ruined cover.
+    const box = full.page.box;
+    for (const photo of full.page.photos) {
+      const inside =
+        photo.box.x >= box.x - 0.5 &&
+        photo.box.y >= box.y - 0.5 &&
+        photo.box.x + photo.box.w <= box.x + box.w + 0.5 &&
+        photo.box.y + photo.box.h <= box.y + box.h + 0.5;
+      ok(inside, `a cover picture sits outside the page it belongs to (${photo.path})`);
+    }
+
+    // And in the order the stack was built in, top to bottom.
+    const at = (text: string) => full.page.runs.find((r) => r.text.startsWith(text))?.y ?? NaN;
+    const logo = full.page.photos.find((p) => p.path === "covers/logo.jpg");
+    const shot = full.page.photos.find((p) => p.path === "covers/photo.jpg");
+    ok(!!logo && logo.box.y < at("PLAINS"), "the logo is not above the church name");
+    ok(!!shot && at("2026 Spring Directory") < shot.box.y, "the title is not above the photograph");
+    ok(
+      !!shot && shot.box.y + shot.box.h <= at("OUR VISION") + 0.5,
+      "the photograph overlaps the statement",
+    );
+    ok(at("OUR VISION") < at("505 West"), "the statement is not above the contact block");
+    // The sharpest of these: the rule under the title is a page rule and the
+    // photograph is a page picture, so if only one of the two is moved onto the
+    // sheet the picture climbs over it. Nothing else here notices a shift of
+    // exactly one margin.
+    const rule = full.page.rules[0];
+    ok(!!rule && !!shot && rule.y < shot.box.y, "the photograph rides up over the title's rule");
+
+    // A cover with only a title is only a title: an empty field must take no
+    // room at all, not a blank line. Measured as the ink's own span, so padding
+    // cannot hide behind the whole stack being centred.
+    const plain = coverOf({ coverTitle: "2026 Spring Directory" });
+    ok(plain.page.photos.length === 0, "a cover with no artwork still reserved picture slots");
+    const span = (page: (typeof plain)["page"]) => {
+      const ys = [
+        ...page.runs.map((r) => r.y),
+        ...page.rules.map((r) => r.y),
+        ...page.photos.flatMap((p) => [p.box.y, p.box.y + p.box.h]),
+      ];
+      return Math.max(...ys) - Math.min(...ys);
+    };
+    const plainSpan = span(plain.page);
+    ok(
+      plainSpan < 80,
+      `a title-only cover spans ${Math.round(plainSpan)}pt of page, not a title's`,
+    );
+
+    // Nothing drawn off the paper.
+    const lowest = Math.max(
+      ...full.page.runs.map((r) => r.y),
+      ...full.page.photos.map((p) => p.box.y + p.box.h),
+    );
+    ok(
+      lowest <= box.y + box.h,
+      `the cover draws ${Math.round(lowest - box.y - box.h)}pt past the bottom of the page`,
+    );
+
+    console.log(
+      `cover: a full one spans ${Math.round(span(full.page))}pt of page, ` +
+        `a title-only one ${Math.round(plainSpan)}pt`,
+    );
+  }
+
   // -------------------------------------------------------------------------
   // Measuring text is cached, and a cache that returns a wrong width would not
   // throw - it would set a line slightly off and print it that way. So compose

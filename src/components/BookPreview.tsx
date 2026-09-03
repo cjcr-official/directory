@@ -77,6 +77,28 @@ const Page = memo(function Page({
         />
       ))}
 
+      {/* The cover's own pictures, drawn under everything else - the same
+          slots the PDF draws, so the screen and the paper agree. */}
+      {page.photos.map((slot, i) => {
+        const url = slot.path ? photoUrls.get(slot.path) : undefined;
+        if (!url) return null;
+        return (
+          <img
+            key={`page-photo-${i}`}
+            src={url}
+            alt=""
+            style={{
+              position: "absolute",
+              left: `${slot.box.x}pt`,
+              top: `${slot.box.y}pt`,
+              width: `${slot.box.w}pt`,
+              height: `${slot.box.h}pt`,
+              objectFit: slot.fit === "fill" ? "cover" : "contain",
+            }}
+          />
+        );
+      })}
+
       {page.cards.map((card) => (
         <Fragment key={`${card.entryType}-${card.entryId}`}>
           {card.style === "box" ? (

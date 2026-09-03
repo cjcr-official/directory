@@ -27,6 +27,8 @@ import {
 } from "@/lib/layout/settings";
 import { resolveEntries, type Selection } from "@/lib/projectEntries";
 import { labelledHouseholdName } from "@/lib/format";
+import { removePhoto, uploadPhoto } from "@/lib/photos";
+import { PhotoInput } from "@/components/PhotoInput";
 
 export function ProjectEditPage() {
   const { id } = useParams();
@@ -42,6 +44,15 @@ export function ProjectEditPage() {
   const [tagIds, setTagIds] = useState<string[]>([]);
   const [picked, setPicked] = useState<string[]>([]);
   const [settings, setSettings] = useState<ProjectSettings>(DEFAULT_SETTINGS);
+  /**
+   * Cover artwork chosen but not yet uploaded.
+   *
+   * Nothing reaches storage until the directory is saved, so backing out of a
+   * half-made change leaves no orphan file behind - the same bargain the family
+   * and person forms make with their portraits.
+   */
+  const [coverBlobs, setCoverBlobs] = useState<{ photo?: Blob | null; logo?: Blob | null }>({});
+  const [coverRemoved, setCoverRemoved] = useState<{ photo?: boolean; logo?: boolean }>({});
 
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -168,12 +179,39 @@ export function ProjectEditPage() {
     setSaving(true);
     setError(null);
     try {
+      // Upload before deleting, never the other way round: this runs on a
+      // phone on church wifi, and removing first would mean a failed upload
+      // took the existing artwork with it.
+      const settle = async (current: string, blob: Blob | null | undefined, gone?: boolean) => {
+        if (blob) {
+          const replaced = gone ? "" : current;
+          const path = await uploadPhoto("covers", blob);
+          if (replaced) await removePhoto(replaced);
+          return path;
+        }
+        if (gone && current) {
+          await removePhoto(current);
+          return "";
+        }
+        return current;
+      };
+
+      const cover = {
+        coverPhotoPath: await settle(
+          safeSettings.coverPhotoPath,
+          coverBlobs.photo,
+          coverRemoved.photo,
+        ),
+        coverLogoPath: await settle(safeSettings.coverLogoPath, coverBlobs.logo, coverRemoved.logo),
+      };
+      const saved = { ...safeSettings, ...cover };
+
       const payload = {
         name: name.trim() || "Untitled directory",
         kind,
         description: description.trim() || null,
         selection_mode: mode,
-        settings: safeSettings as unknown as Record<string, unknown>,
+        settings: saved as unknown as Record<string, unknown>,
       };
 
       const project = id
@@ -190,6 +228,9 @@ export function ProjectEditPage() {
           : [],
       );
 
+      setSettings((current) => ({ ...current, ...cover }));
+      setCoverBlobs({});
+      setCoverRemoved({});
       setOpenedAt(project.updated_at);
       setStale(false);
       setSavedAt(Date.now());
@@ -584,6 +625,65 @@ export function ProjectEditPage() {
                     onChange={(event) => set({ coverSubtitle: event.target.value })}
                   />
                 </Field>
+                <Field
+                  label="In your own words"
+                  hint="A vision, a welcome, a verse. Prints as its own paragraph under the title."
+                  htmlFor="cover_statement"
+                >
+                  <textarea
+                    id="cover_statement"
+                    rows={4}
+                    value={settings.coverStatement}
+                    placeholder={
+                      "OUR VISION…\nTo be a God-glorifying, Spirit-filled community of believers."
+                    }
+                    disabled={!canEdit}
+                    onChange={(event) => set({ coverStatement: event.target.value })}
+                  />
+                </Field>
+
+                <Field
+                  label="How to reach the church"
+                  hint="One line per line, exactly as it should print at the foot of the cover."
+                  htmlFor="cover_contact"
+                >
+                  <textarea
+                    id="cover_contact"
+                    rows={5}
+                    value={settings.coverContact}
+                    placeholder={
+                      "505 West 5th Street\nP.O. Box 368\nPlains, MT 59859\n406.826.3916\noffice@example.org"
+                    }
+                    disabled={!canEdit}
+                    onChange={(event) => set({ coverContact: event.target.value })}
+                  />
+                </Field>
+
+                <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <Field label="Cover photograph" hint="The building, or the sign.">
+                    <PhotoInput
+                      path={coverRemoved.photo ? null : settings.coverPhotoPath || null}
+                      initials=""
+                      disabled={!canEdit}
+                      onChange={(blob, removed) => {
+                        setCoverBlobs((current) => ({ ...current, photo: blob }));
+                        setCoverRemoved((current) => ({ ...current, photo: removed }));
+                      }}
+                    />
+                  </Field>
+                  <Field label="Logo" hint="Shown whole, at the top.">
+                    <PhotoInput
+                      path={coverRemoved.logo ? null : settings.coverLogoPath || null}
+                      initials=""
+                      disabled={!canEdit}
+                      onChange={(blob, removed) => {
+                        setCoverBlobs((current) => ({ ...current, logo: blob }));
+                        setCoverRemoved((current) => ({ ...current, logo: removed }));
+                      }}
+                    />
+                  </Field>
+                </div>
+
                 <Field label="Footer note" htmlFor="footer_text">
                   <input
                     id="footer_text"

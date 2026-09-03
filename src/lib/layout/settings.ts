@@ -36,6 +36,19 @@ export type ProjectSettings = {
   churchName: string;
   coverTitle: string;
   coverSubtitle: string;
+  /** The congregation's own words - a vision or welcome, in its own paragraph. */
+  coverStatement: string;
+  /** Where to find the church. One line per line, exactly as it should print. */
+  coverContact: string;
+  /**
+   * Storage paths, or "" for none.
+   *
+   * Empty string rather than null so normalizeSettings can keep its one rule -
+   * a stored value is taken when it is the same type as the default - instead
+   * of growing a special case for a field whose default is typeof "object".
+   */
+  coverPhotoPath: string;
+  coverLogoPath: string;
   includeCover: boolean;
   includeIndex: boolean;
   runningHeader: boolean;
@@ -74,6 +87,10 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   churchName: "",
   coverTitle: "Church Directory",
   coverSubtitle: "",
+  coverStatement: "",
+  coverContact: "",
+  coverPhotoPath: "",
+  coverLogoPath: "",
   includeCover: true,
   includeIndex: true,
   runningHeader: true,
