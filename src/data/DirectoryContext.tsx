@@ -2,7 +2,7 @@ import { createContext, use, useCallback, useEffect, useMemo, useState } from "r
 import { fetchDirectory } from "@/lib/queries";
 import { buildEntries, sortMembers, type DirectoryData, type DirectoryEntry } from "@/lib/entries";
 import type { HouseholdRow, PersonRow, TagRow } from "@/lib/database.types";
-import { sortKey } from "@/lib/format";
+import { sortByKey, sortKey } from "@/lib/format";
 
 interface DirectoryState {
   loading: boolean;
@@ -61,53 +61,66 @@ export function DirectoryProvider({ children }: { children: React.ReactNode }) {
     void reload();
   }, [reload]);
 
-  const value = useMemo<DirectoryState>(() => {
+  /**
+   * Everything derived from the rows.
+   *
+   * Keyed on `data` alone, deliberately. Loading is flipped on at the start of
+   * every reload and off at the end, and when this was one memo over
+   * [data, loading, error] each flip re-sorted the congregation, rebuilt every
+   * map and re-ran buildEntries - once over rows that had not changed yet, and
+   * again over the new ones. That is twice the work per save, half of it for
+   * nothing, on a phone.
+   *
+   * Splitting it also keeps `entries` referentially stable while a reload is
+   * in flight, so the preview screen stops recomposing an entire book because
+   * a spinner started.
+   */
+  const derived = useMemo(() => {
     const householdById = new Map(data.households.map((row) => [row.id, row]));
     const personById = new Map(data.people.map((row) => [row.id, row]));
 
     const members = new Map<string, PersonRow[]>();
     for (const person of data.people) {
       if (!person.household_id) continue;
-      const list = members.get(person.household_id) ?? [];
-      list.push(person);
-      members.set(person.household_id, list);
+      const list = members.get(person.household_id);
+      if (list) list.push(person);
+      else members.set(person.household_id, [person]);
     }
     for (const [id, list] of members) members.set(id, sortMembers(list));
 
     const householdTagIds = new Map<string, string[]>();
     for (const link of data.householdTags) {
-      householdTagIds.set(link.household_id, [
-        ...(householdTagIds.get(link.household_id) ?? []),
-        link.tag_id,
-      ]);
+      const list = householdTagIds.get(link.household_id);
+      if (list) list.push(link.tag_id);
+      else householdTagIds.set(link.household_id, [link.tag_id]);
     }
 
     const personTagIds = new Map<string, string[]>();
     for (const link of data.personTags) {
-      personTagIds.set(link.person_id, [...(personTagIds.get(link.person_id) ?? []), link.tag_id]);
+      const list = personTagIds.get(link.person_id);
+      if (list) list.push(link.tag_id);
+      else personTagIds.set(link.person_id, [link.tag_id]);
     }
 
     return {
-      loading,
-      error,
-      households: [...data.households].sort((a, b) =>
-        sortKey(a.sort_name).localeCompare(sortKey(b.sort_name)),
-      ),
-      people: [...data.people].sort((a, b) =>
-        sortKey(a.last_name, a.first_name).localeCompare(sortKey(b.last_name, b.first_name)),
-      ),
+      households: sortByKey(data.households, (row) => sortKey(row.sort_name)),
+      people: sortByKey(data.people, (row) => sortKey(row.last_name, row.first_name)),
       tags: data.tags,
       householdTags: data.householdTags,
       personTags: data.personTags,
       entries: buildEntries(data),
       householdById,
       personById,
-      membersOf: (householdId) => members.get(householdId) ?? [],
-      tagsOfHousehold: (householdId) => householdTagIds.get(householdId) ?? [],
-      tagsOfPerson: (personId) => personTagIds.get(personId) ?? [],
-      reload,
+      membersOf: (householdId: string) => members.get(householdId) ?? [],
+      tagsOfHousehold: (householdId: string) => householdTagIds.get(householdId) ?? [],
+      tagsOfPerson: (personId: string) => personTagIds.get(personId) ?? [],
     };
-  }, [data, loading, error, reload]);
+  }, [data]);
+
+  const value = useMemo<DirectoryState>(
+    () => ({ ...derived, loading, error, reload }),
+    [derived, loading, error, reload],
+  );
 
   return <DirectoryContext value={value}>{children}</DirectoryContext>;
 }

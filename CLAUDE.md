@@ -38,7 +38,8 @@ again. There is no separate rollback.
 ## Before pushing
 
 CI runs formatting, types, the build, a real render of the sample book, the
-layout and restore checks, and the row level security suite. Run the same
+layout, restore, batching and bundle-size checks, and the row level security
+suite. Run the same
 things locally first:
 
 ```
@@ -48,6 +49,8 @@ npm run build
 npm run sample:pdf -- /tmp/sample.pdf
 npm run invariants
 npm run restore:check
+npm run batch:check
+npm run bundle:check
 ```
 
 Prettier is not advisory - `format:check` fails the build, and it also fails

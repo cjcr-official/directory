@@ -45,6 +45,7 @@ jobs:
           npm run sample:pdf -- /tmp/sample.pdf
           npm run invariants
           npm run restore:check
+          npm run batch:check
 
       - name: Check the deploy secrets are set
         id: secrets
@@ -65,6 +66,12 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: npm run build
+
+      # Reads what index.html actually pulls in, so it has to follow the build
+      # and use the same one that is about to be deployed.
+      - name: What a first visit downloads
+        if: steps.secrets.outputs.ready == 'true'
+        run: npm run bundle:check
 
       - name: Deploy to Cloudflare
         if: steps.secrets.outputs.ready == 'true'
