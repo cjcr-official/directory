@@ -118,7 +118,7 @@ export function isStaleWrite(error: unknown): boolean {
  * different words, so ask which it was rather than guessing.
  */
 async function explainMiss(
-  table: "households" | "people",
+  table: "households" | "people" | "projects",
   what: string,
   id: string,
 ): Promise<never> {
@@ -355,8 +355,24 @@ export async function createProject(input: ProjectInput): Promise<ProjectRow> {
   return unwrap(await supabase.from("projects").insert(input).select().single());
 }
 
-export async function updateProject(id: string, patch: Partial<ProjectInput>): Promise<ProjectRow> {
-  return unwrap(await supabase.from("projects").update(patch).eq("id", id).select().single());
+/**
+ * As updateHousehold, guarded the same way and for the same reason.
+ *
+ * A directory is one row that decides how a whole booklet prints, and two
+ * people tidying it before a print run is exactly when it gets edited at all.
+ * Whoever saved second used to win, quietly, and the settings the first one
+ * chose were gone with nothing on screen about it.
+ */
+export async function updateProject(
+  id: string,
+  patch: Partial<ProjectInput>,
+  expectedUpdatedAt?: string | null,
+): Promise<ProjectRow> {
+  let query = supabase.from("projects").update(patch).eq("id", id);
+  if (expectedUpdatedAt) query = query.eq("updated_at", expectedUpdatedAt);
+
+  const rows = unwrap(await query.select()) as ProjectRow[];
+  return rows[0] ?? (await explainMiss("projects", "directory", id));
 }
 
 export async function deleteProject(id: string): Promise<void> {

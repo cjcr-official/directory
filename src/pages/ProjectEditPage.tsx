@@ -8,6 +8,7 @@ import {
   createProject,
   deleteProject,
   fetchProject,
+  isStaleWrite,
   setProjectEntries,
   setProjectTags,
   updateProject,
@@ -45,6 +46,15 @@ export function ProjectEditPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  /**
+   * The version this form was opened on, as a fingerprint for the save.
+   *
+   * Held separately from the loaded row on purpose: a reload refreshes that,
+   * and what is wanted here is the version that was on screen when the editing
+   * started.
+   */
+  const [openedAt, setOpenedAt] = useState<string | null>(null);
+  const [stale, setStale] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -60,6 +70,8 @@ export function ProjectEditPage() {
         setTagIds(loaded.tagIds);
         setPicked(loaded.entries.map((row) => `${row.entry_type}:${row.ref_id}`));
         setSettings(normalizeSettings(loaded.project.settings));
+        setOpenedAt(loaded.project.updated_at);
+        setStale(false);
       })
       .catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)))
       .finally(() => active && setLoading(false));
@@ -100,6 +112,42 @@ export function ProjectEditPage() {
 
   async function save(event?: React.FormEvent) {
     event?.preventDefault();
+    await store(false);
+  }
+
+  /**
+   * Throws this browser's changes away and shows the directory as somebody
+   * else left it. Reading it again is what makes the form honest - the values
+   * on screen were worked out from a version that is no longer current.
+   */
+  async function discardMine() {
+    if (!id) return;
+    setSaving(true);
+    try {
+      const loaded = await fetchProject(id);
+      setName(loaded.project.name);
+      setKind(loaded.project.kind);
+      setDescription(loaded.project.description ?? "");
+      setMode(loaded.project.selection_mode);
+      setTagIds(loaded.tagIds);
+      setPicked(loaded.entries.map((row) => `${row.entry_type}:${row.ref_id}`));
+      setSettings(normalizeSettings(loaded.project.settings));
+      setOpenedAt(loaded.project.updated_at);
+      setStale(false);
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /**
+   * Writes the directory. `force` drops the check that it has not moved since
+   * it was opened - only reached from the button offered when it has, so
+   * overwriting somebody is a decision rather than an accident.
+   */
+  async function store(force: boolean) {
     if (!canEdit) return;
     setSaving(true);
     setError(null);
@@ -112,7 +160,9 @@ export function ProjectEditPage() {
         settings: safeSettings as unknown as Record<string, unknown>,
       };
 
-      const project = id ? await updateProject(id, payload) : await createProject(payload);
+      const project = id
+        ? await updateProject(id, payload, force ? null : openedAt)
+        : await createProject(payload);
       await setProjectTags(project.id, mode === "tags" ? tagIds : []);
       await setProjectEntries(
         project.id,
@@ -124,9 +174,12 @@ export function ProjectEditPage() {
           : [],
       );
 
+      setOpenedAt(project.updated_at);
+      setStale(false);
       setSavedAt(Date.now());
       if (!id) navigate(`/projects/${project.id}`, { replace: true });
     } catch (cause) {
+      setStale(isStaleWrite(cause));
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setSaving(false);
@@ -163,7 +216,31 @@ export function ProjectEditPage() {
         </div>
       </div>
 
-      {error ? <Notice kind="error">{error}</Notice> : null}
+      {error ? (
+        <Notice kind="error">
+          {error}
+          {stale ? (
+            <div className="row tight" style={{ marginTop: 10 }}>
+              <button
+                type="button"
+                className="btn small"
+                disabled={saving}
+                onClick={() => void discardMine()}
+              >
+                Reload and lose my changes
+              </button>
+              <button
+                type="button"
+                className="btn small danger"
+                disabled={saving}
+                onClick={() => void store(true)}
+              >
+                Save mine over theirs
+              </button>
+            </div>
+          ) : null}
+        </Notice>
+      ) : null}
       {savedAt ? <Notice kind="ok">Saved. Open the preview to see it laid out.</Notice> : null}
 
       <form onSubmit={save}>

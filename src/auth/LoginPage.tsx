@@ -39,7 +39,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="auth-screen">
+    <main className="auth-screen">
       <div className="auth-inner">
         <Logo className="auth-logo" />
 
@@ -132,6 +132,6 @@ export function LoginPage() {
           Directory information is private to this church and is not published.
         </p>
       </div>
-    </div>
+    </main>
   );
 }

@@ -146,7 +146,7 @@ export function ProjectPreviewPage() {
             <span aria-hidden>←</span>
           </Link>
           <div className="preview-titles">
-            <div className="preview-title">{project.name}</div>
+            <h1 className="preview-title">{project.name}</h1>
             <div className="preview-stats">
               <span>
                 <strong>{book.recordCount}</strong> {book.recordCount === 1 ? "record" : "records"}
@@ -201,27 +201,27 @@ export function ProjectPreviewPage() {
         ) : null}
       </header>
 
-      {settings.bookletOrder ? (
-        <div className="preview-notice screen-only">
-          <Notice>
-            <strong>Booklet order is on.</strong> The pages below are arranged for printing
-            double-sided, folding the whole stack down the middle and stapling the spine — so they
-            will look shuffled here and read correctly once folded. Print double-sided, flipping on
-            the <em>short</em> edge.
-          </Notice>
-        </div>
-      ) : null}
+      <main className="preview-canvas" ref={canvasRef}>
+        {settings.bookletOrder ? (
+          <div className="preview-notice screen-only">
+            <Notice>
+              <strong>Booklet order is on.</strong> The pages below are arranged for printing
+              double-sided, folding the whole stack down the middle and stapling the spine — so they
+              will look shuffled here and read correctly once folded. Print double-sided, flipping
+              on the <em>short</em> edge.
+            </Notice>
+          </div>
+        ) : null}
 
-      {truncated ? (
-        <div className="preview-notice screen-only">
-          <Notice kind="warn">
-            Showing the first {PREVIEW_SHEET_LIMIT} of {book.sheets.length} sheets to keep this
-            screen quick. Printing and the downloaded PDF both use all of them.
-          </Notice>
-        </div>
-      ) : null}
+        {truncated ? (
+          <div className="preview-notice screen-only">
+            <Notice kind="warn">
+              Showing the first {PREVIEW_SHEET_LIMIT} of {book.sheets.length} sheets to keep this
+              screen quick. Printing and the downloaded PDF both use all of them.
+            </Notice>
+          </div>
+        ) : null}
 
-      <div className="preview-canvas" ref={canvasRef}>
         <BookPreview
           book={book}
           photoUrls={photoUrls}
@@ -230,7 +230,7 @@ export function ProjectPreviewPage() {
           guides={showGuides}
           limit={printingAll ? undefined : PREVIEW_SHEET_LIMIT}
         />
-      </div>
+      </main>
     </div>
   );
 }

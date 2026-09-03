@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useDirectory } from "@/data/DirectoryContext";
 import { useAuth } from "@/auth/AuthProvider";
@@ -9,7 +9,7 @@ import { Avatar, Checkbox, ConfirmButton, Field, LoadingScreen, Notice } from "@
 import type { HouseholdRole, PersonRow } from "@/lib/database.types";
 import { removePhoto, uploadPhoto } from "@/lib/photos";
 import { createPerson, deletePerson, isStaleWrite, setTags, updatePerson } from "@/lib/queries";
-import { addressLines } from "@/lib/format";
+import { addressLines, fullName, samePersonName } from "@/lib/format";
 
 const ROLES: { value: HouseholdRole; label: string }[] = [
   { value: "head", label: "Head of household" },
@@ -46,8 +46,17 @@ export function PersonEditPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { canEdit } = useAuth();
-  const { personById, householdById, households, membersOf, tags, tagsOfPerson, reload, loading } =
-    useDirectory();
+  const {
+    personById,
+    householdById,
+    households,
+    people,
+    membersOf,
+    tags,
+    tagsOfPerson,
+    reload,
+    loading,
+  } = useDirectory();
 
   const existing = id ? personById.get(id) : undefined;
   const isNew = !id;
@@ -109,6 +118,21 @@ export function PersonEditPage() {
 
   const household = form.household_id ? householdById.get(form.household_id) : null;
   const inheritedAddress = household ? addressLines(household) : [];
+
+  /**
+   * People already here who would be hard to tell apart from this one.
+   *
+   * Archived ones count. Somebody typing in a name that was archived last year
+   * is usually re-adding a person who came back, and bringing the old record
+   * out of the archive keeps their history rather than starting a second one.
+   */
+  const nameClashes = useMemo(
+    () =>
+      people
+        .filter((other) => other.id !== existing?.id && samePersonName(form, other))
+        .slice(0, 4),
+    [people, existing?.id, form.first_name, form.last_name, form.preferred_name],
+  );
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
@@ -318,6 +342,37 @@ export function PersonEditPage() {
                   />
                 </Field>
               </div>
+
+              {nameClashes.length ? (
+                <div style={{ marginTop: -4, marginBottom: 14 }}>
+                  <Notice kind="warn">
+                    {nameClashes.length === 1
+                      ? "Somebody with this name is"
+                      : "People with this name are"}{" "}
+                    already in the directory. Two people really can share a name — but if this is
+                    the same person, open them instead of adding them twice.
+                    <ul className="clash-list">
+                      {nameClashes.map((other) => {
+                        const theirs = other.household_id
+                          ? householdById.get(other.household_id)
+                          : null;
+                        return (
+                          <li key={other.id}>
+                            <Link className="list-link" to={`/people/${other.id}`}>
+                              {fullName(other)}
+                            </Link>
+                            <span className="muted">
+                              {" — "}
+                              {theirs ? theirs.display_name : "on their own"}
+                              {other.is_active ? "" : ", archived"}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </Notice>
+                </div>
+              ) : null}
 
               <Field
                 label="Goes by"
