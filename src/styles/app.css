@@ -1441,16 +1441,20 @@ th.num {
     flex-direction: column;
   }
 
-  /* The pull rubber-bands as it always did - what changed is what it opens on.
-     Setting the colour on html alone was not enough: WebKit went on painting
-     the overscroll with body's pale --canvas, which is why the gap stayed
-     white. Both carry the dark now, and the page background moves onto #root,
-     so nothing pale is left at document level for the bounce to pick up.
+  /* The page does not rubber-band. It was turned off, briefly put back, and
+     turned off again on the strength of using it: on a phone the app should
+     stop at its ends the way a screen does, not slide about revealing what is
+     behind it. Nothing here needs the bounce.
 
-     The bar staying put through a pull upward is not this rule's doing and
-     does not depend on it: that was #root and .shell disagreeing about their
-     height, leaving dead space below the shell for the sticky bar to scroll
-     away into. They are sized in the same units now. */
+     The colour stays regardless, for any overscroll a browser insists on.
+     Setting it on html alone was not enough - WebKit went on painting the
+     overscroll with body's pale --canvas, which is why the gap stayed white -
+     so both carry the dark and the page background lives on #root, leaving
+     nothing pale at document level to be picked up. */
+  html {
+    overscroll-behavior: none;
+  }
+
   html,
   body {
     background: var(--brand-dark);
