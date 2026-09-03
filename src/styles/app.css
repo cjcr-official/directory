@@ -1292,6 +1292,27 @@ th.num {
     flex-direction: column;
   }
 
+  /* Pulled past the top, the page rubber-bands and what shows behind it is the
+     canvas - which was the pale page background, so a band of near-white opened
+     above a bar that is nearly black. The bar's colour now carries on beyond the
+     top of the viewport, and the gap reads as the bar rather than as a flash of
+     empty paper. Fixed rather than absolute: an overscroll takes fixed elements
+     down with it, which is the one moment this has to be seen. On the shell
+     rather than the body, so it caps the screens that actually carry the bar -
+     sign-in and setup render outside it and keep their own backgrounds. */
+  .shell::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 100vh;
+    transform: translateY(-100%);
+    background: var(--brand-dark);
+    pointer-events: none;
+    z-index: -1;
+  }
+
   .topbar {
     position: sticky;
     top: 0;
