@@ -41,11 +41,23 @@
 html,
 body,
 #root {
-  height: 100%;
   /* Panning and scrolling, but no pinch to zoom and no double-tap to zoom.
      The gesture handlers in lib/zoom.ts cover iOS Safari, which decides page
      zoom for itself regardless of this. */
   touch-action: pan-x pan-y;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+/* Grows with the content instead of stopping at the viewport, so a background
+   on it covers the whole document rather than ending at the fold. Only
+   .shell's min-height reads this as a percentage, and nothing paints on the
+   shell; every full-height screen sizes itself in viewport units. */
+#root {
+  min-height: 100%;
 }
 
 html {
@@ -1353,25 +1365,21 @@ th.num {
     flex-direction: column;
   }
 
-  /* Pulled past the top, the page rubber-bands and what shows behind it is the
-     canvas - which was the pale page background, so a band of near-white opened
-     above a bar that is nearly black. The bar's colour now carries on beyond the
-     top of the viewport, and the gap reads as the bar rather than as a flash of
-     empty paper. Fixed rather than absolute: an overscroll takes fixed elements
-     down with it, which is the one moment this has to be seen. On the shell
-     rather than the body, so it caps the screens that actually carry the bar -
-     sign-in and setup render outside it and keep their own backgrounds. */
-  .shell::before {
-    content: "";
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 100vh;
-    transform: translateY(-100%);
+  /* Pulled past the top, iOS rubber-bands and paints the gap it opens with the
+     canvas - the root element's background. Nothing inside the page can reach
+     that area: the overscroll is composited outside the page's own layer, so a
+     fixed element parked above the viewport never shows there, which is what an
+     earlier attempt at this got wrong. The canvas itself has to carry the
+     colour. The pale page background moves onto #root, which grows with the
+     content, so the page still reads light all the way down.
+
+     This colours the bounce at both ends, since a canvas has one colour. */
+  html {
     background: var(--brand-dark);
-    pointer-events: none;
-    z-index: -1;
+  }
+
+  #root {
+    background: var(--canvas);
   }
 
   .topbar {
