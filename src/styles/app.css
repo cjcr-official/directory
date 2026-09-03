@@ -5,7 +5,11 @@
 :root {
   --ink: #14201f;
   --ink-2: #3d4d4b;
-  --ink-3: #6c7c7a;
+  /* Hints, muted figures and secondary lines. Was #6c7c7a, which came to
+     4.37:1 on white and 4.06:1 on the canvas - under the 4.5:1 that small text
+     needs, on every screen in the app at once. This clears it on both
+     (4.97:1 and 4.62:1) and is a shade darker, not a different colour. */
+  --ink-3: #637371;
   --line: #dde5e3;
   --line-strong: #c4d1cf;
   --paper: #ffffff;
@@ -630,7 +634,9 @@ th.num {
   background: var(--accent-soft);
   display: grid;
   place-items: center;
-  color: var(--ink-3);
+  /* Initials stand in for a face, so they have to be readable. --ink-3 on the
+     soft accent came to 4.28:1 at this size, just under what small text needs. */
+  color: var(--ink-2);
   font-size: 0.78rem;
   font-weight: 620;
   overflow: hidden;
@@ -1059,7 +1065,10 @@ th.num {
   min-width: 0;
 }
 
+/* An h1, so the screen has one - sized as the bar needs rather than as a
+   heading, which is what it looked like all along. */
 .preview-title {
+  margin: 0;
   font-family: var(--serif);
   font-size: 1.05rem;
   font-weight: 600;
@@ -1796,6 +1805,20 @@ th.num {
     padding: 3px 4px;
     font-size: 0.75rem;
   }
+}
+
+/* People already here who share the name being typed. Inside a notice, so it
+   inherits its colour and only needs the list reset. */
+.clash-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.clash-list li + li {
+  margin-top: 4px;
+}
+.clash-list .muted {
+  font-size: 0.85em;
 }
 
 /* --- restoring a backup --------------------------------------------------- */

@@ -24,14 +24,21 @@ export function fileAsName(
  * which is what someone flipping through the book expects.
  */
 export function sortKey(...parts: (string | null | undefined)[]): string {
-  return parts
-    .filter(Boolean)
-    .join(" ")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9 ]/g, "")
-    .trim();
+  return (
+    parts
+      .filter(Boolean)
+      .join(" ")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9 ]/g, "")
+      // Runs of spaces collapse to one. Without this a name typed with a stray
+      // space - or one whose punctuation was just stripped from between two
+      // words - keys differently from the same name typed cleanly, and so files
+      // somewhere else in the book entirely.
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 }
 
 /**
@@ -96,6 +103,60 @@ export function suggestHouseholdName(surname: string, headFirstName?: string): s
 export function sameDisplayName(a: string, b: string): boolean {
   const left = sortKey(a);
   return left.length > 0 && left === sortKey(b);
+}
+
+/**
+ * Every name one person answers to, as sort keys.
+ *
+ * Usually one. Someone with a preferred name answers to two - William Smith is
+ * also Bill Smith - and either is what a person typing them in might reach for,
+ * so both count when looking for somebody already in the directory.
+ */
+/**
+ * A hyphen is a word break; an apostrophe is not.
+ *
+ * "Anne-Jones" and "Anne Jones" are one surname typed two ways, so the hyphen
+ * becomes a space before the key is taken. An apostrophe is the opposite case -
+ * "O'Neil" and "ONeil" are also one surname, and sortKey already joins them by
+ * dropping it. Spacing all punctuation alike would fix the first and break the
+ * second.
+ *
+ * Kept here rather than in sortKey on purpose: sortKey decides the order of the
+ * printed index, and moving hyphenated surnames around in it is not something
+ * a warning on a form should quietly do.
+ */
+function nameKey(...parts: (string | null | undefined)[]): string {
+  return sortKey(...parts.map((part) => part?.replace(/[-\u2010-\u2015]/g, " ")));
+}
+
+function knownAs(person: Pick<PersonRow, "first_name" | "last_name" | "preferred_name">): string[] {
+  const names = [nameKey(person.first_name, person.last_name)];
+  const preferred = person.preferred_name?.trim();
+  if (preferred) names.push(nameKey(preferred, person.last_name));
+  return names.filter((name) => name.length > 0);
+}
+
+/**
+ * Whether two records look like the same person.
+ *
+ * Deliberately a question about names and nothing else. A congregation really
+ * does contain two John Smiths, so this can only ever say "these would be hard
+ * to tell apart" - never "this is a duplicate". What it is for is the case
+ * where somebody is being typed in who is already there, which is the one that
+ * quietly produces two half-filled records and a directory that prints both.
+ *
+ * "Ávila" matches "Avila" and "O'Neil" matches "ONeil", because sortKey strips
+ * accents and punctuation - a duplicate typed slightly differently is still a
+ * duplicate.
+ */
+export function samePersonName(
+  a: Pick<PersonRow, "first_name" | "last_name" | "preferred_name">,
+  b: Pick<PersonRow, "first_name" | "last_name" | "preferred_name">,
+): boolean {
+  const mine = knownAs(a);
+  if (!mine.length) return false;
+  const theirs = new Set(knownAs(b));
+  return mine.some((name) => theirs.has(name));
 }
 
 /** Formats 10- and 11-digit North American numbers; leaves anything else alone. */

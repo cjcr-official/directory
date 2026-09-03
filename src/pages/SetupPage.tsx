@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 
 export function SetupPage() {
   return (
-    <div className="centered wide">
+    <main className="centered wide">
       <div className="card">
         <div className="card-body">
           <div className="brand" style={{ padding: "0 0 14px" }}>
@@ -79,6 +79,6 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOi...`}
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

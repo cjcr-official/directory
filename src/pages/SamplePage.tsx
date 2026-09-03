@@ -123,7 +123,7 @@ export function SamplePage() {
             <span aria-hidden>←</span>
           </Link>
           <div className="preview-titles">
-            <div className="preview-title">Sample directory</div>
+            <h1 className="preview-title">Sample directory</h1>
             <div className="preview-stats">
               <span>
                 <strong>{book.recordCount}</strong> records
@@ -155,17 +155,17 @@ export function SamplePage() {
         </div>
       </header>
 
-      <div className="preview-notice screen-only">
-        <Notice>
-          Every name, address, photograph and phone number below is invented. This is the exact
-          layout your own directory will print in: landscape paper, folded down the middle, three
-          records on each half — <strong>six families to a sheet</strong>.
-        </Notice>
-      </div>
+      <main className="preview-canvas" ref={canvasRef}>
+        <div className="preview-notice screen-only">
+          <Notice>
+            Every name, address, photograph and phone number below is invented. This is the exact
+            layout your own directory will print in: landscape paper, folded down the middle, three
+            records on each half — <strong>six families to a sheet</strong>.
+          </Notice>
+        </div>
 
-      <div className="preview-canvas" ref={canvasRef}>
         <BookPreview book={book} photoUrls={photoUrls} zoom={scale} level={level} limit={12} />
-      </div>
+      </main>
     </div>
   );
 }

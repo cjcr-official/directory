@@ -37,18 +37,18 @@ export function AccountNotReady() {
 
   if (!retried) {
     return (
-      <div className="auth-screen">
+      <main className="auth-screen">
         <div className="auth-inner" style={{ textAlign: "center" }}>
           <Logo className="auth-logo" />
           <span className="spinner" style={{ margin: "0 auto" }} aria-hidden />
           <p className="auth-foot">Signing you in…</p>
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="auth-screen">
+    <main className="auth-screen">
       <div className="auth-inner">
         <Logo className="auth-logo" />
 
@@ -107,6 +107,6 @@ export function AccountNotReady() {
           Nothing is lost — your sign-in is fine, only the profile is missing.
         </p>
       </div>
-    </div>
+    </main>
   );
 }

@@ -32,18 +32,13 @@ jobs:
       - name: Render the sample directory
         run: npm run sample:pdf -- /tmp/sample-directory.pdf
 
-      # Both of these are pure: they need no database and no browser, and they
-      # cover the two things nobody would notice going wrong until it mattered
-      # - a record dropped from a printed book, and a restore writing the wrong
-      # rows.
-      - name: Layout invariants
-        run: npm run invariants
-
-      - name: Restore decisions
-        run: npm run restore:check
-
-      - name: Request batching
-        run: npm run batch:check
+      # Every one of these is pure - no database, no browser, milliseconds each
+      # - and every one covers something that goes wrong without throwing: a
+      # record dropped from a printed book, a restore writing the wrong rows,
+      # four hundred requests where one was promised, a duplicate warning that
+      # stopped warning, text quietly too pale to read.
+      - name: Checks
+        run: npm run checks
 
       # Needs the build above: it reads what index.html actually pulls in.
       - name: What a first visit downloads
