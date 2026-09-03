@@ -36,6 +36,13 @@ export type HouseholdRow = {
   anniversary: string | null;
   photo_path: string | null;
   notes: string | null;
+  /**
+   * A short label the office writes to tell two same-named families apart -
+   * "2", "Tim & Sue", "Elm St". Shown only where a family appears by name
+   * alone; never printed. Added by migration 0004, so it is absent rather
+   * than null on a database that has not run it yet.
+   */
+  office_label?: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

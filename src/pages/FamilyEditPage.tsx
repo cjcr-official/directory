@@ -14,6 +14,7 @@ import {
   deleteHousehold,
   setPersonHousehold,
   setTags,
+  officeLabelUnavailable,
   updateHousehold,
   updatePerson,
 } from "@/lib/queries";
@@ -25,6 +26,7 @@ import {
   sameDisplayName,
   sortKey,
   suggestHouseholdName,
+  suggestOfficeLabel,
 } from "@/lib/format";
 
 const ROLES: { value: HouseholdRole; label: string }[] = [
@@ -65,6 +67,7 @@ const BLANK: Omit<HouseholdRow, "id" | "created_at" | "updated_at"> = {
   anniversary: null,
   photo_path: null,
   notes: null,
+  office_label: null,
   is_active: true,
 };
 
@@ -176,6 +179,18 @@ export function FamilyEditPage() {
           sameDisplayName(other.display_name, form.display_name),
       ),
     [households, existing?.id, form.display_name],
+  );
+
+  /**
+   * The smallest number none of the same-named families is using.
+   *
+   * Only the ones that clash count. Numbers are per-name, not per-directory -
+   * there is no reason a second Johnston should be told to call itself 14
+   * because thirteen unrelated families happen to carry a label.
+   */
+  const suggestedLabel = useMemo(
+    () => suggestOfficeLabel(nameClashes.map((other) => other.office_label)),
+    [nameClashes],
   );
 
   /** "The John Smith Family" - available once the family has a head. */
@@ -467,7 +482,8 @@ export function FamilyEditPage() {
                     {nameClashes.length === 1 ? "Another family is" : "Other families are"} already
                     called <strong>{form.display_name}</strong>. Both cards will be headed the same
                     way, so a reader cannot tell them apart. Naming the head of each is the usual
-                    fix.
+                    fix; if the two should stay identically named on the card, tell them apart for
+                    yourself below instead.
                     <div className="row tight" style={{ marginTop: 8 }}>
                       {/* Only once a head is in the family is there a name to
                           offer - which is usually after the family was created,
@@ -492,6 +508,48 @@ export function FamilyEditPage() {
                     </div>
                   </Notice>
                 </div>
+              ) : null}
+
+              {/* Only worth asking about when there is something to tell apart.
+                  A family that already carries a label keeps the field on
+                  screen even once the clash is gone, so the label can be seen
+                  and cleared rather than living on invisibly. */}
+              {nameClashes.length || form.office_label ? (
+                <Field
+                  label="Which one? (office only)"
+                  hint={
+                    // A label typed into a database that has not run 0004 is
+                    // dropped so the rest of the save can go through. Saying so
+                    // is the difference between a known wait and a field that
+                    // mysteriously forgets what was typed into it.
+                    officeLabelUnavailable()
+                      ? "Waiting on migration 0004 — until that is run, this will not save. See docs/DEPLOY.md, step 7."
+                      : "Shown beside the name in your lists so you can tell the two apart. Never printed, and not in the book or its index."
+                  }
+                  htmlFor="office_label"
+                >
+                  <div className="row tight">
+                    <input
+                      id="office_label"
+                      className="grow"
+                      type="text"
+                      maxLength={24}
+                      disabled={!canEdit}
+                      placeholder={`e.g. ${suggestedLabel}, Tim & Sue, Elm St`}
+                      value={form.office_label ?? ""}
+                      onChange={(event) => patch({ office_label: event.target.value || null })}
+                    />
+                    {canEdit && !form.office_label?.trim() ? (
+                      <button
+                        type="button"
+                        className="btn small"
+                        onClick={() => patch({ office_label: suggestedLabel })}
+                      >
+                        Use “{suggestedLabel}”
+                      </button>
+                    ) : null}
+                  </div>
+                </Field>
               ) : null}
 
               <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>

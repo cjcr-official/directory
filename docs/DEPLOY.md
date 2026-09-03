@@ -19,16 +19,27 @@ database exists.
    and run it. It should report success with no rows.
 5. New query again. Paste `supabase/migrations/0002_storage.sql` and run it.
 6. Once more for `supabase/migrations/0003_atomic_link_writes.sql`.
+7. And once more for `supabase/migrations/0004_office_label.sql`.
 
-All three files are safe to run twice, so if you are unsure whether one took,
+All four files are safe to run twice, so if you are unsure whether one took,
 run it again.
 
-An existing directory needs step 6 too. Setting a record's groups used to be a
-delete and an insert sent separately, with a moment in between where the record
-had none — and a connection that dropped there left it that way. 0003 adds the
-functions that do both halves at once. The app asks for them and quietly falls
-back to the old pair when they are not there, so nothing breaks while the file
-is still waiting to be run; it simply keeps the old risk until it is.
+An existing directory needs steps 6 and 7 too.
+
+**6.** Setting a record's groups used to be a delete and an insert sent
+separately, with a moment in between where the record had none — and a
+connection that dropped there left it that way. 0003 adds the functions that do
+both halves at once. The app asks for them and quietly falls back to the old
+pair when they are not there, so nothing breaks while the file is still waiting
+to be run; it simply keeps the old risk until it is.
+
+**7.** Two families can share a name. The printed card carries a photograph, the
+members and an address, so a reader can tell them apart — but three screens show
+a family by its name alone, and there "The Johnston Family" appears twice with
+nothing to choose between them. 0004 adds a short label the office writes for
+itself — `2`, `Tim & Sue`, `Elm St` — shown in those three places and nowhere
+else. It is never printed and never in the index. Until the file is run, the
+field simply does not appear and every other save carries on as normal.
 
 > **What these do.** The first creates the tables and — more importantly — the
 > row level security policies that stop anyone reading the directory without an
