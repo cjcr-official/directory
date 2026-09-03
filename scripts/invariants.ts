@@ -78,6 +78,28 @@ function blankPerson(over: Partial<PersonRow>): PersonRow {
   } as PersonRow;
 }
 
+/**
+ * Only the strings the book will actually draw.
+ *
+ * Searching the whole composed object would also search the settings that come
+ * back with it, and a key like showAnniversary contains "Anniversary" - which
+ * once made a whole invariant pass no matter what was on the page.
+ */
+function drawn(book: unknown): string[] {
+  const out: string[] = [];
+  const walk = (node: unknown): void => {
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (node && typeof node === "object") {
+      for (const [key, value] of Object.entries(node)) {
+        if (key === "text" && typeof value === "string") out.push(value);
+        else walk(value);
+      }
+    }
+  };
+  walk(book);
+  return out;
+}
+
 async function main() {
   const metrics = await pdfMetrics();
 
@@ -383,25 +405,6 @@ async function main() {
     };
     const entries = buildEntries(data);
 
-    // Only the strings the book will draw. Searching the whole composed object
-    // would also search the settings that come back with it, and the key
-    // showAnniversary contains "Anniversary" - which made every check here
-    // pass no matter what was on the page.
-    const drawn = (book: unknown): string[] => {
-      const out: string[] = [];
-      const walk = (node: unknown): void => {
-        if (Array.isArray(node)) return node.forEach(walk);
-        if (node && typeof node === "object") {
-          for (const [key, value] of Object.entries(node)) {
-            if (key === "text" && typeof value === "string") out.push(value);
-            else walk(value);
-          }
-        }
-      };
-      walk(book);
-      return out;
-    };
-
     for (const memberStyle of ["compact", "detailed"] as const) {
       const settings = normalizeSettings({
         ...DEFAULT_SETTINGS,
@@ -424,6 +427,88 @@ async function main() {
     const off = normalizeSettings({ ...DEFAULT_SETTINGS, showAnniversary: false });
     const quiet = drawn(composeBook(entries, off, metrics)).join("\n");
     ok(!quiet.includes("Anniversary"), "an anniversary printed with the setting switched off");
+  }
+
+  // ---- 11. a family reachable through its people, not its own record ------
+  {
+    // "Phone numbers" and "Email addresses" are one switch each, and they read
+    // as being about the card, not about which row the value happens to sit on.
+    // Most congregations now keep a mobile against each person rather than one
+    // line against the house, and for them the switch did nothing at all.
+    const reach = (over: Partial<PersonRow>) => blankPerson({ household_id: "h1", ...over });
+    const data = {
+      households: [blankHousehold({ id: "h1" })],
+      people: [
+        reach({ id: "p1", first_name: "Tim", phone: "4065550101", email: "tim@example.org" }),
+        reach({ id: "p2", first_name: "Delane", phone: "4065550199" }),
+        reach({ id: "p3", first_name: "Quiet" }),
+      ],
+      tags: [],
+      householdTags: [],
+      personTags: [],
+    };
+    const entries = buildEntries(data);
+    const book = (over: Partial<typeof DEFAULT_SETTINGS>) =>
+      drawn(
+        composeBook(
+          entries,
+          normalizeSettings({
+            ...DEFAULT_SETTINGS,
+            showPhone: true,
+            showEmail: true,
+            showMembers: true,
+            memberStyle: "compact",
+            ...over,
+          }),
+          metrics,
+        ),
+      ).join("\n");
+
+    const compact = book({});
+    ok(compact.includes("(406) 555-0101"), "a member's phone did not print with compact members");
+    ok(compact.includes("tim@example.org"), "a member's email did not print with compact members");
+    ok(compact.includes("Delane"), "a member with only a phone did not print");
+    // Somebody with neither must not get an empty line of their own.
+    ok(!/Quiet —/.test(compact), "a member with no contact details got a line anyway");
+
+    // The switches still mean something.
+    ok(!book({ showPhone: false }).includes("555-0101"), "a phone printed with the switch off");
+    ok(!book({ showEmail: false }).includes("tim@example.org"), "an email printed with it off");
+
+    // Not listing members must not be a way to leak them back onto the card.
+    // The bare name is no test: the index lists everybody by design, which is
+    // how a reader finds their page, so "Tim" is in the book either way. What
+    // must not appear is a contact line of his on the family's card.
+    const hidden = book({ showMembers: false });
+    ok(!/Tim —/.test(hidden), "a member got a contact line when members were switched off");
+    ok(!hidden.includes("555-0101"), "a member's phone printed when members were switched off");
+    ok(!hidden.includes("tim@example.org"), "a member's email printed when members were off");
+
+    // Detailed members already carry these, so the fallback must not double up.
+    const detailed = book({ memberStyle: "detailed" });
+    const timLines = detailed.split("\n").filter((line) => line.includes("555-0101"));
+    ok(timLines.length === 1, `a member's phone printed ${timLines.length} times in detailed mode`);
+
+    // And a family with its own line still speaks for itself.
+    const own = drawn(
+      composeBook(
+        buildEntries({ ...data, households: [blankHousehold({ id: "h1", phone: "4065550000" })] }),
+        normalizeSettings({
+          ...DEFAULT_SETTINGS,
+          showPhone: true,
+          showEmail: true,
+          showMembers: true,
+          memberStyle: "compact",
+        }),
+        metrics,
+      ),
+    ).join("\n");
+    ok(own.includes("(406) 555-0000"), "the family's own phone stopped printing");
+    ok(!own.includes("555-0101"), "members' phones printed alongside the family's own");
+
+    console.log(
+      `reachable family: compact prints ${compact.split("\n").filter((l) => l.includes("—")).length} member contact lines`,
+    );
   }
 
   // -------------------------------------------------------------------------
