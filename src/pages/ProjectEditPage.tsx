@@ -586,48 +586,84 @@ export function ProjectEditPage() {
 
             <div className="card">
               <div className="card-head">
-                <h2>Cover &amp; furniture</h2>
+                <h2>The cover</h2>
               </div>
+              {/* In the order it prints, top of the cover to the bottom, so
+                  filling the form in reads down the page it makes. */}
               <div className="card-body">
+                <div className="grid two">
+                  {/* One hint apiece: PhotoInput carries its own, so a hint on
+                      the Field as well just stacks two paragraphs under every
+                      picture. */}
+                  <Field label="Logo">
+                    <PhotoInput
+                      path={coverRemoved.logo ? null : settings.coverLogoPath || null}
+                      initials=""
+                      shape="square"
+                      hint="Sits at the very top, any shape - fitted whole, never cropped"
+                      disabled={!canEdit}
+                      onChange={(blob, removed) => {
+                        setCoverBlobs((current) => ({ ...current, logo: blob }));
+                        setCoverRemoved((current) => ({ ...current, logo: removed }));
+                      }}
+                    />
+                  </Field>
+                  <Field label="Photograph">
+                    <PhotoInput
+                      path={coverRemoved.photo ? null : settings.coverPhotoPath || null}
+                      initials=""
+                      shape="wide"
+                      hint="Under the title - the building, or the sign. Landscape prints best, and large photos are shrunk automatically"
+                      disabled={!canEdit}
+                      onChange={(blob, removed) => {
+                        setCoverBlobs((current) => ({ ...current, photo: blob }));
+                        setCoverRemoved((current) => ({ ...current, photo: removed }));
+                      }}
+                    />
+                  </Field>
+                </div>
+
                 <Field
                   label="Church name"
-                  hint="Runs along the top of every page."
+                  hint="Small, above the title - and along the top of every page inside."
                   htmlFor="church_name"
                 >
                   <input
                     id="church_name"
                     type="text"
                     value={settings.churchName}
+                    placeholder="Plains Alliance Church"
                     disabled={!canEdit}
                     onChange={(event) => set({ churchName: event.target.value })}
                   />
                 </Field>
-                <Field label="Cover title" htmlFor="cover_title">
-                  <input
-                    id="cover_title"
-                    type="text"
-                    value={settings.coverTitle}
-                    disabled={!canEdit}
-                    onChange={(event) => set({ coverTitle: event.target.value })}
-                  />
-                </Field>
-                <Field
-                  label="Cover subtitle"
-                  hint="A season or year works well."
-                  htmlFor="cover_subtitle"
-                >
-                  <input
-                    id="cover_subtitle"
-                    type="text"
-                    value={settings.coverSubtitle}
-                    placeholder="Spring 2026"
-                    disabled={!canEdit}
-                    onChange={(event) => set({ coverSubtitle: event.target.value })}
-                  />
-                </Field>
+
+                <div className="grid two">
+                  <Field label="Title" hint="The big line." htmlFor="cover_title">
+                    <input
+                      id="cover_title"
+                      type="text"
+                      value={settings.coverTitle}
+                      placeholder="Church Directory"
+                      disabled={!canEdit}
+                      onChange={(event) => set({ coverTitle: event.target.value })}
+                    />
+                  </Field>
+                  <Field label="Subtitle" hint="A season or a year." htmlFor="cover_subtitle">
+                    <input
+                      id="cover_subtitle"
+                      type="text"
+                      value={settings.coverSubtitle}
+                      placeholder="Spring 2026"
+                      disabled={!canEdit}
+                      onChange={(event) => set({ coverSubtitle: event.target.value })}
+                    />
+                  </Field>
+                </div>
+
                 <Field
                   label="In your own words"
-                  hint="A vision, a welcome, a verse. Prints as its own paragraph under the title."
+                  hint="A vision, a welcome, a verse. Its own paragraph, under the photograph."
                   htmlFor="cover_statement"
                 >
                   <textarea
@@ -644,7 +680,7 @@ export function ProjectEditPage() {
 
                 <Field
                   label="How to reach the church"
-                  hint="One line per line, exactly as it should print at the foot of the cover."
+                  hint="The foot of the cover. One line here is one line there."
                   htmlFor="cover_contact"
                 >
                   <textarea
@@ -659,32 +695,26 @@ export function ProjectEditPage() {
                   />
                 </Field>
 
-                <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <Field label="Cover photograph" hint="The building, or the sign.">
-                    <PhotoInput
-                      path={coverRemoved.photo ? null : settings.coverPhotoPath || null}
-                      initials=""
-                      disabled={!canEdit}
-                      onChange={(blob, removed) => {
-                        setCoverBlobs((current) => ({ ...current, photo: blob }));
-                        setCoverRemoved((current) => ({ ...current, photo: removed }));
-                      }}
-                    />
-                  </Field>
-                  <Field label="Logo" hint="Shown whole, at the top.">
-                    <PhotoInput
-                      path={coverRemoved.logo ? null : settings.coverLogoPath || null}
-                      initials=""
-                      disabled={!canEdit}
-                      onChange={(blob, removed) => {
-                        setCoverBlobs((current) => ({ ...current, logo: blob }));
-                        setCoverRemoved((current) => ({ ...current, logo: removed }));
-                      }}
-                    />
-                  </Field>
-                </div>
+                <Checkbox
+                  label="Print a cover page"
+                  hint="Off prints the records straight away, with no cover."
+                  checked={settings.includeCover}
+                  disabled={!canEdit}
+                  onChange={(value) => set({ includeCover: value })}
+                />
+              </div>
+            </div>
 
-                <Field label="Footer note" htmlFor="footer_text">
+            <div className="card">
+              <div className="card-head">
+                <h2>Inside the book</h2>
+              </div>
+              <div className="card-body">
+                <Field
+                  label="Footer note"
+                  hint="Along the bottom of every page."
+                  htmlFor="footer_text"
+                >
                   <input
                     id="footer_text"
                     type="text"
@@ -695,12 +725,6 @@ export function ProjectEditPage() {
                   />
                 </Field>
 
-                <Checkbox
-                  label="Cover page"
-                  checked={settings.includeCover}
-                  disabled={!canEdit}
-                  onChange={(value) => set({ includeCover: value })}
-                />
                 <Checkbox
                   label="Alphabetical index at the back"
                   hint="Every person by surname, with the page their family is on."
