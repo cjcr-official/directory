@@ -521,7 +521,7 @@ export function ProjectEditPage() {
                   onChange={(value) => set({ showBirthdays: value })}
                 />
                 <Checkbox
-                  label="Anniversaries"
+                  label="Family anniversaries"
                   checked={settings.showAnniversary}
                   disabled={!canEdit}
                   onChange={(value) => set({ showAnniversary: value })}

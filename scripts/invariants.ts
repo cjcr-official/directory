@@ -355,6 +355,77 @@ async function main() {
     );
   }
 
+  // ---- 10. an anniversary is the family's, and prints either way ----------
+  {
+    // Two rules that only show up on paper. A person no longer has an
+    // anniversary field, so any value still on a person row is stale and must
+    // not print - it cannot be corrected or cleared from any screen. And the
+    // family's own anniversary used to be collected in a block gated on
+    // compact members, which is where a person's anniversary was doing the
+    // work in detailed mode; with that gone, gating it would mean a family
+    // that set an anniversary and chose detailed members printed none at all.
+    const data = {
+      households: [blankHousehold({ id: "h1", anniversary: "1994-06-11" })],
+      people: [
+        blankPerson({ id: "p1", household_id: "h1", household_role: "head" }),
+        // Stale, from before the field was taken off the person form.
+        blankPerson({
+          id: "p2",
+          household_id: "h1",
+          household_role: "spouse",
+          first_name: "Sue",
+          anniversary: "1994-06-11",
+        } as Partial<PersonRow>),
+      ],
+      tags: [],
+      householdTags: [],
+      personTags: [],
+    };
+    const entries = buildEntries(data);
+
+    // Only the strings the book will draw. Searching the whole composed object
+    // would also search the settings that come back with it, and the key
+    // showAnniversary contains "Anniversary" - which made every check here
+    // pass no matter what was on the page.
+    const drawn = (book: unknown): string[] => {
+      const out: string[] = [];
+      const walk = (node: unknown): void => {
+        if (Array.isArray(node)) return node.forEach(walk);
+        if (node && typeof node === "object") {
+          for (const [key, value] of Object.entries(node)) {
+            if (key === "text" && typeof value === "string") out.push(value);
+            else walk(value);
+          }
+        }
+      };
+      walk(book);
+      return out;
+    };
+
+    for (const memberStyle of ["compact", "detailed"] as const) {
+      const settings = normalizeSettings({
+        ...DEFAULT_SETTINGS,
+        showAnniversary: true,
+        showBirthdays: true,
+        memberStyle,
+      });
+      const printed = drawn(composeBook(entries, settings, metrics)).join("\n");
+      const familyPrints = printed.includes("Anniversary");
+      const personLeaks = printed.includes("anniv.");
+      console.log(
+        `anniversaries (${memberStyle} members): family ${familyPrints ? "prints" : "MISSING"}, ` +
+          `stale person value ${personLeaks ? "LEAKED" : "not printed"}`,
+      );
+      ok(familyPrints, `the family's anniversary does not print with ${memberStyle} members`);
+      ok(!personLeaks, `a stale person anniversary printed with ${memberStyle} members`);
+    }
+
+    // And with the setting off, neither prints.
+    const off = normalizeSettings({ ...DEFAULT_SETTINGS, showAnniversary: false });
+    const quiet = drawn(composeBook(entries, off, metrics)).join("\n");
+    ok(!quiet.includes("Anniversary"), "an anniversary printed with the setting switched off");
+  }
+
   // -------------------------------------------------------------------------
   // Measuring text is cached, and a cache that returns a wrong width would not
   // throw - it would set a line slightly off and print it that way. So compose

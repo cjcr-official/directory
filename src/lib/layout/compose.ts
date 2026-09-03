@@ -254,9 +254,6 @@ function personDates(person: PersonRow, settings: ProjectSettings): string[] {
   if (settings.showBirthdays && person.date_of_birth) {
     parts.push(`b. ${formatShortDate(person.date_of_birth)}`);
   }
-  if (settings.showAnniversary && person.anniversary) {
-    parts.push(`anniv. ${formatShortDate(person.anniversary)}`);
-  }
   return parts;
 }
 
@@ -341,14 +338,18 @@ function householdBlocks(
     });
   }
 
-  // In compact mode the dates for the whole family collapse onto one line;
-  // in detailed mode they already sit beside each member's name.
-  if (settings.memberStyle === "compact") {
+  // Birthdays belong to people, so in detailed mode they are already beside
+  // each member's name and only compact mode has to collect them. The
+  // anniversary is the family's own and was never on a member's line - it was
+  // only ever reached through this block, so gating the whole thing on compact
+  // meant a family that set an anniversary and chose detailed members printed
+  // no anniversary at all.
+  {
     const dateParts: string[] = [];
     if (settings.showAnniversary && household.anniversary) {
       dateParts.push(`Anniversary ${formatMonthDay(household.anniversary)}`);
     }
-    if (settings.showBirthdays) {
+    if (settings.showBirthdays && settings.memberStyle === "compact") {
       const birthdays = members
         .filter((m) => m.date_of_birth)
         .map((m) => `${firstName(m)} ${formatShortDate(m.date_of_birth)}`);
@@ -421,9 +422,6 @@ function personBlocks(
   const dateParts: string[] = [];
   if (settings.showBirthdays && person.date_of_birth) {
     dateParts.push(`Birthday ${formatMonthDay(person.date_of_birth)}`);
-  }
-  if (settings.showAnniversary && person.anniversary) {
-    dateParts.push(`Anniversary ${formatMonthDay(person.anniversary)}`);
   }
   if (dateParts.length) {
     blocks.push({

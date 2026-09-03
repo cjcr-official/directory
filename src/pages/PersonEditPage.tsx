@@ -410,26 +410,17 @@ export function PersonEditPage() {
                 </Field>
               </div>
 
-              <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <Field label="Date of birth" hint="Optional." htmlFor="dob">
-                  <input
-                    id="dob"
-                    type="date"
-                    disabled={!canEdit}
-                    value={form.date_of_birth ?? ""}
-                    onChange={(event) => patch({ date_of_birth: event.target.value || null })}
-                  />
-                </Field>
-                <Field label="Anniversary" hint="Optional." htmlFor="person_anniversary">
-                  <input
-                    id="person_anniversary"
-                    type="date"
-                    disabled={!canEdit}
-                    value={form.anniversary ?? ""}
-                    onChange={(event) => patch({ anniversary: event.target.value || null })}
-                  />
-                </Field>
-              </div>
+              {/* An anniversary belongs to a couple, which is what a family
+                  record is - so it is asked for there and only there. */}
+              <Field label="Date of birth" hint="Optional." htmlFor="dob">
+                <input
+                  id="dob"
+                  type="date"
+                  disabled={!canEdit}
+                  value={form.date_of_birth ?? ""}
+                  onChange={(event) => patch({ date_of_birth: event.target.value || null })}
+                />
+              </Field>
             </div>
           </div>
 
