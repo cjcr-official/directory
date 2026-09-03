@@ -6,7 +6,7 @@ import { AddressFields } from "@/components/AddressFields";
 import { PhotoInput } from "@/components/PhotoInput";
 import { TagPicker } from "@/components/TagPicker";
 import { Avatar, Checkbox, ConfirmButton, Field, LoadingScreen, Notice } from "@/components/ui";
-import type { HouseholdRole, HouseholdRow } from "@/lib/database.types";
+import type { HouseholdRole, HouseholdRow, PersonRow } from "@/lib/database.types";
 import { removePhoto, uploadPhoto } from "@/lib/photos";
 import {
   isStaleWrite,
@@ -133,17 +133,27 @@ export function FamilyEditPage() {
     [members, personById],
   );
 
-  /** People who could be added: anyone not already listed here. */
+  /**
+   * People who could be added: anyone not already listed here.
+   *
+   * No sort. `people` arrives from the directory already ordered by exactly
+   * this key, and filtering keeps that order - re-sorting it was doing the
+   * congregation over again on every keystroke, which measured at 10ms per
+   * letter typed on a desktop and several times that on a phone.
+   */
   const candidates = useMemo(() => {
     const taken = new Set(members.map((m) => m.id));
     const needle = sortKey(memberQuery);
-    return people
-      .filter((person) => !taken.has(person.id))
-      .filter((person) => !needle || sortKey(fullName(person), person.email).includes(needle))
-      .sort((a, b) =>
-        sortKey(a.last_name, a.first_name).localeCompare(sortKey(b.last_name, b.first_name)),
-      )
-      .slice(0, 8);
+    const found: PersonRow[] = [];
+    for (const person of people) {
+      if (taken.has(person.id)) continue;
+      if (needle && !sortKey(fullName(person), person.email).includes(needle)) continue;
+      found.push(person);
+      // Only eight are shown, and on a directory of any size most of the work
+      // was scanning past them.
+      if (found.length === 8) break;
+    }
+    return found;
   }, [people, members, memberQuery]);
 
   // Until someone edits the family name by hand it tracks the surname and the

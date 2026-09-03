@@ -1,4 +1,5 @@
 import { PHOTO_BUCKET, supabase } from "./supabase";
+import { createBatcher } from "./batch";
 
 /**
  * Photographs, end to end.
@@ -127,6 +128,17 @@ export async function getPhotoUrls(paths: string[]): Promise<Map<string, string>
 }
 
 /**
+ * The queue behind getPhotoUrl.
+ *
+ * getPhotoUrls above batches whatever it is handed, which is right for the
+ * book preview - it knows every photograph it wants. A list of faces does not
+ * work that way: each Avatar knows only its own, so each asked on its own and
+ * the batching never got a chance. A page of four hundred people meant four
+ * hundred signing requests, which is what this exists to stop.
+ */
+const photoUrlQueue = createBatcher((paths: string[]) => getPhotoUrls(paths), SIGN_BATCH);
+
+/**
  * Drops every cached signed URL. Called on sign-out: the links stay valid for
  * up to an hour after they are issued, so they should not outlive the session
  * that was allowed to hold them - particularly on a shared church office
@@ -134,12 +146,22 @@ export async function getPhotoUrls(paths: string[]): Promise<Map<string, string>
  */
 export function forgetPhotoUrls(): void {
   signedUrls.clear();
+  photoUrlQueue.reset();
 }
 
+/**
+ * A URL for one photograph.
+ *
+ * Asks that land in the same tick go out as one request, so a list of faces
+ * costs a round trip rather than one per face.
+ */
 export async function getPhotoUrl(path: string | null | undefined): Promise<string | null> {
   if (!path) return null;
-  const urls = await getPhotoUrls([path]);
-  return urls.get(path) ?? null;
+
+  const cached = signedUrls.get(path);
+  if (cached && cached.expires > Date.now()) return cached.url;
+
+  return (await photoUrlQueue.get(path)) ?? null;
 }
 
 /**

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDirectory } from "@/data/DirectoryContext";
 import { useAuth } from "@/auth/AuthProvider";
@@ -576,6 +576,37 @@ export function ProjectEditPage() {
   );
 }
 
+/**
+ * One line of the checklist.
+ *
+ * Memoised, with a toggle that never changes identity, so ticking one box
+ * re-renders that box rather than the whole congregation. Without both halves
+ * a directory of a thousand records re-created a thousand checkboxes on every
+ * tick, and picking a booklet by hand is nothing but ticks.
+ */
+const PickerRow = memo(function PickerRow({
+  entryKey,
+  label,
+  checked,
+  disabled,
+  onToggle,
+}: {
+  entryKey: string;
+  label: string;
+  checked: boolean;
+  disabled?: boolean;
+  onToggle: (entryKey: string, on: boolean) => void;
+}) {
+  return (
+    <Checkbox
+      label={label}
+      checked={checked}
+      disabled={disabled}
+      onChange={(on) => onToggle(entryKey, on)}
+    />
+  );
+});
+
 /** Checklist of every record, for the hand-picked mode. */
 function ManualPicker({
   entries,
@@ -589,10 +620,27 @@ function ManualPicker({
   disabled?: boolean;
 }) {
   const [query, setQuery] = useState("");
-  const chosen = new Set(picked);
 
-  const visible = entries.filter((entry) =>
-    entry.title.toLowerCase().includes(query.trim().toLowerCase()),
+  const chosen = useMemo(() => new Set(picked), [picked]);
+
+  const visible = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return entries;
+    return entries.filter((entry) => entry.title.toLowerCase().includes(needle));
+  }, [entries, query]);
+
+  // Held in a ref so the callback below can read the current selection without
+  // being rebuilt when it changes - a new callback every render would be a new
+  // prop on every row, and the memo above would never once hold.
+  const pickedRef = useRef(picked);
+  pickedRef.current = picked;
+
+  const onToggle = useCallback(
+    (entryKey: string, on: boolean) => {
+      const next = pickedRef.current.filter((key) => key !== entryKey);
+      onChange(on ? [...next, entryKey] : next);
+    },
+    [onChange],
   );
 
   return (
@@ -630,12 +678,13 @@ function ManualPicker({
         {visible.map((entry) => {
           const key = `${entry.type}:${entry.id}`;
           return (
-            <Checkbox
+            <PickerRow
               key={key}
+              entryKey={key}
               label={entry.title}
               checked={chosen.has(key)}
               disabled={disabled}
-              onChange={(on) => onChange(on ? [...picked, key] : picked.filter((k) => k !== key))}
+              onToggle={onToggle}
             />
           );
         })}

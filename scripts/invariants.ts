@@ -11,9 +11,12 @@
  * print. None of them raise an error on their own - they just come out wrong
  * on paper, which is the expensive place to find them.
  */
+import { PDFDocument } from "pdf-lib";
 import { buildEntries } from "../src/lib/entries";
 import { composeBook } from "../src/lib/layout/compose";
 import { pdfMetrics } from "../src/lib/layout/pdf";
+import { STANDARD_FONTS, type Metrics } from "../src/lib/layout/metrics";
+import { toWinAnsi } from "../src/lib/format";
 import { DEFAULT_SETTINGS, normalizeSettings, recordsPerSheet } from "../src/lib/layout/settings";
 import { buildDemoData } from "../src/lib/demo";
 import type { HouseholdRow, PersonRow } from "../src/lib/database.types";
@@ -291,6 +294,60 @@ async function main() {
       oldFamilies + oldIndividuals !== entries.length,
       "the old counting would not have been wrong here - weak test",
     );
+  }
+
+  // -------------------------------------------------------------------------
+  // Measuring text is cached, and a cache that returns a wrong width would not
+  // throw - it would set a line slightly off and print it that way. So compose
+  // the same books through an uncached measurer and insist on the same model,
+  // over every shape of book the settings can make.
+  // -------------------------------------------------------------------------
+  {
+    const data = buildDemoData(60, 8);
+    const entries = buildEntries(data);
+
+    const shapes: Partial<typeof DEFAULT_SETTINGS>[] = [
+      {},
+      { typeface: "sans" },
+      { columns: 1, rows: 1 },
+      { columns: 3, rows: 8, textScale: "compact" },
+      { bookletOrder: true, includeCover: false },
+      { includeIndex: false, showPhotos: false, cardStyle: "box" },
+      { memberStyle: "detailed", showBirthdays: true, showAnniversary: true, textScale: "large" },
+      { pageSize: "a4", showLetterTabs: false, runningHeader: false, showPageNumbers: false },
+      { pageSize: "legal", footerText: "For the congregation", photoFit: "fit" },
+      {
+        coverTitle: "A Cover Title Long Enough That It Has To Shrink To Fit",
+        churchName: "St Mary",
+      },
+    ];
+
+    /** What makeMetrics did before it cached anything: measure every time. */
+    async function uncachedMetrics(typeface: "sans" | "serif"): Promise<Metrics> {
+      const doc = await PDFDocument.create();
+      const family = STANDARD_FONTS[typeface];
+      const fonts = {
+        regular: await doc.embedFont(family.regular),
+        bold: await doc.embedFont(family.bold),
+        italic: await doc.embedFont(family.italic),
+      };
+      return {
+        widthOf: (text, size, weight) =>
+          text ? fonts[weight].widthOfTextAtSize(toWinAnsi(text), size) : 0,
+        lineHeight: (size) => size * 1.22,
+      };
+    }
+
+    let matched = 0;
+    for (const shape of shapes) {
+      const settings = normalizeSettings(shape);
+      const a = composeBook(entries, settings, await pdfMetrics(settings.typeface));
+      const b = composeBook(entries, settings, await uncachedMetrics(settings.typeface));
+      if (JSON.stringify(a) === JSON.stringify(b)) matched += 1;
+    }
+
+    console.log(`measured widths: ${matched} of ${shapes.length} book shapes compose identically`);
+    ok(matched === shapes.length, "caching text measurement changed the composed book");
   }
 
   console.log(

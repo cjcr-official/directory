@@ -42,6 +42,13 @@ jobs:
       - name: Restore decisions
         run: npm run restore:check
 
+      - name: Request batching
+        run: npm run batch:check
+
+      # Needs the build above: it reads what index.html actually pulls in.
+      - name: What a first visit downloads
+        run: npm run bundle:check
+
       - uses: actions/upload-artifact@v4
         with:
           name: sample-directory-pdf

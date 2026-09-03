@@ -45,11 +45,17 @@ export function PhotoInput({ path, initials, disabled, onChange }: Props) {
     };
   }, [path]);
 
-  // Object URLs are cheap but not free; release the previous one.
+  // Object URLs are cheap but not free, and this is the only place that lets
+  // one go: the cleanup runs both when `pending` is replaced and on unmount,
+  // which covers replacing a photo, removing it, and leaving the page.
+  //
+  // Deliberately not done inside the setPending updaters. React may call an
+  // updater more than once for a single update - StrictMode does exactly that
+  // in development - and revoking a URL is a side effect on the world, not a
+  // calculation of the next state.
   useEffect(() => {
-    return () => {
-      if (pending) URL.revokeObjectURL(pending.previewUrl);
-    };
+    if (!pending) return;
+    return () => URL.revokeObjectURL(pending.previewUrl);
   }, [pending]);
 
   const shown = pending?.previewUrl ?? (removed ? null : savedUrl);
@@ -60,10 +66,7 @@ export function PhotoInput({ path, initials, disabled, onChange }: Props) {
     setError(null);
     try {
       const prepared = await preparePhoto(file);
-      setPending((previous) => {
-        if (previous) URL.revokeObjectURL(previous.previewUrl);
-        return prepared;
-      });
+      setPending(prepared);
       setRemoved(false);
       onChange(prepared.blob, false);
     } catch (cause) {
@@ -74,10 +77,7 @@ export function PhotoInput({ path, initials, disabled, onChange }: Props) {
   }
 
   function clear() {
-    setPending((previous) => {
-      if (previous) URL.revokeObjectURL(previous.previewUrl);
-      return null;
-    });
+    setPending(null);
     setRemoved(true);
     onChange(null, true);
     if (input.current) input.current.value = "";

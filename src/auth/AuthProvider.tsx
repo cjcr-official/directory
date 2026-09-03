@@ -1,4 +1,4 @@
-import { createContext, use, useCallback, useEffect, useMemo, useState } from "react";
+import { createContext, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { forgetPhotoUrls } from "@/lib/photos";
@@ -37,8 +37,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  /**
+   * Which profile lookup is the current one.
+   *
+   * Two of these can be in the air at once - the first read on load, and the
+   * one onAuthStateChange starts the moment it subscribes - and a sign-out
+   * followed by a sign-in starts more. They are separate requests over a
+   * network, so they can come back in any order, and the last answer to arrive
+   * would win regardless of which question it answered. On a shared church
+   * office computer that means the previous person's role deciding what the
+   * next one is allowed to edit. Each call takes a ticket and only the newest
+   * one is allowed to write.
+   */
+  const latestLoad = useRef(0);
+
   const loadProfile = useCallback(async (userId: string | undefined) => {
+    const ticket = (latestLoad.current += 1);
+    const current = () => latestLoad.current === ticket;
+
     if (!userId) {
+      if (!current()) return;
       setProfile(null);
       setProfileError(null);
       setProfileLoaded(true);
@@ -50,6 +68,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .select("*")
       .eq("id", userId)
       .maybeSingle();
+
+    if (!current()) return;
 
     // Swallowing this is what turned a missing table into a spinner that never
     // stopped; the message names the problem, so it gets kept and shown.

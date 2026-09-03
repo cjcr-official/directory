@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, memo } from "react";
 import { COLORS, type BookModel, type BookPage, type TextRun } from "@/lib/layout/compose";
 import { CSS_FONT_STACKS, type Typeface } from "@/lib/layout/metrics";
 
@@ -40,7 +40,16 @@ function runStyle(run: TextRun, fontStack: string): React.CSSProperties {
   };
 }
 
-function Page({
+/**
+ * One half-sheet.
+ *
+ * Memoised, and worth it: a page is a few hundred absolutely positioned
+ * elements and the screen draws up to eighty of them at once. None of them
+ * depend on the zoom - that is a transform on the sheet above - or on the fold
+ * guides, so without this every touch of either control would reconcile the
+ * whole book to arrive back at the same DOM.
+ */
+const Page = memo(function Page({
   page,
   photoUrls,
   fontStack,
@@ -170,7 +179,7 @@ function Page({
       ))}
     </Fragment>
   );
-}
+});
 
 /**
  * Draws the composed book as HTML, from the very same page model the PDF
