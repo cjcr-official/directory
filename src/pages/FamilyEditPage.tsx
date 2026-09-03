@@ -213,8 +213,13 @@ export function FamilyEditPage() {
       photoPath = null;
     }
     if (photoBlob) {
-      if (form.photo_path && !photoRemoved) await removePhoto(form.photo_path);
+      // Upload before deleting, never the other way round: this runs on a
+      // phone on church wifi, and removing first meant a failed upload took
+      // the existing photograph with it while the record still pointed at the
+      // file that no longer existed.
+      const replaced = !photoRemoved ? form.photo_path : null;
       photoPath = await uploadPhoto("households", photoBlob);
+      if (replaced) await removePhoto(replaced);
     }
 
     const surname = form.sort_name.trim();

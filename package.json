@@ -11,6 +11,7 @@
     "typecheck": "tsc -b --force",
     "deploy": "npm run build && npx wrangler deploy",
     "sample:pdf": "node scripts/run.mjs scripts/sample-book.ts",
+    "invariants": "node scripts/run.mjs scripts/invariants.ts",
     "seed": "node scripts/run.mjs scripts/seed.ts",
     "test:rls": "bash scripts/test-rls.sh",
     "format": "prettier --write .",
