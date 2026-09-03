@@ -7,6 +7,19 @@ interface Props {
   initials: string;
   disabled?: boolean;
   /**
+   * The shape this picture prints in, so the slot on screen is the slot on
+   * paper. A portrait is right for a face and wrong for everything else - the
+   * cover's photograph prints wider than it is tall, and a logo prints
+   * whole, in a band.
+   */
+  shape?: "portrait" | "wide" | "square";
+  /**
+   * What to tell someone about this particular picture. Left out, it says what
+   * is true of a portrait; a logo is not a portrait, and being told that
+   * portrait orientation prints best is worse than being told nothing.
+   */
+  hint?: string;
+  /**
    * Called with the resized JPEG when a new photo is chosen, or null when the
    * existing one is removed. The parent uploads on save, so nothing is written
    * to storage until the form is submitted.
@@ -21,7 +34,14 @@ interface Props {
  * preview is exactly what gets stored - no surprise between the screen and the
  * printed page.
  */
-export function PhotoInput({ path, initials, disabled, onChange }: Props) {
+export function PhotoInput({
+  path,
+  initials,
+  disabled,
+  onChange,
+  shape = "portrait",
+  hint = "Portrait orientation prints best. Large photos are shrunk automatically",
+}: Props) {
   const input = useRef<HTMLInputElement>(null);
   const [savedUrl, setSavedUrl] = useState<string | null>(null);
   const [pending, setPending] = useState<PreparedPhoto | null>(null);
@@ -86,9 +106,9 @@ export function PhotoInput({ path, initials, disabled, onChange }: Props) {
   return (
     <div className="row" style={{ alignItems: "flex-start", gap: 14 }}>
       {shown ? (
-        <img className="avatar lg" src={shown} alt="" />
+        <img className={`avatar lg ${shape}`} src={shown} alt="" />
       ) : (
-        <span className="avatar lg" aria-hidden>
+        <span className={`avatar lg ${shape}`} aria-hidden>
           {initials.slice(0, 2).toUpperCase()}
         </span>
       )}
@@ -118,7 +138,7 @@ export function PhotoInput({ path, initials, disabled, onChange }: Props) {
           ) : null}
         </div>
         <p className="hint" style={{ marginTop: 7 }}>
-          Portrait orientation prints best. Large photos are shrunk automatically
+          {hint}
           {pending
             ? ` — ${pending.width}×${pending.height}, ${Math.round(pending.blob.size / 1024)} KB`
             : ""}

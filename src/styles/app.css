@@ -682,6 +682,19 @@ th.num {
   border-radius: 8px;
   font-size: 1.5rem;
 }
+/* A slot the shape of the thing it holds. A face is a portrait; the cover's
+   photograph prints wider than it is tall; a logo prints whole, so it is shown
+   square and left to sit inside that however it likes. */
+.avatar.lg.wide {
+  width: 150px;
+  height: 99px;
+}
+.avatar.lg.square {
+  width: 108px;
+  height: 108px;
+  object-fit: contain;
+  padding: 6px;
+}
 
 .pill {
   display: inline-flex;
