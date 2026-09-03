@@ -193,6 +193,14 @@ export function FamilyEditPage() {
     [nameClashes],
   );
 
+  /**
+   * Whether the office has actually said which one this is.
+   *
+   * A field that has been typed into and cleared holds "", and one that was
+   * never touched holds null - neither is an answer, so both keep the warning.
+   */
+  const labelled = Boolean(form.office_label?.trim());
+
   /** "The John Smith Family" - available once the family has a head. */
   const qualifiedName = useMemo(() => {
     const head = members.find((m) => m.role === "head") ?? members[0];
@@ -476,14 +484,34 @@ export function FamilyEditPage() {
                 />
               </Field>
 
+              {/* Two states, because a label answers half of this and not the
+                  other half. Unlabelled, nobody has said whether this is a
+                  second Johnston family or the same one typed in twice, and
+                  that is worth stopping for. Labelled, the office has said so
+                  plainly - so the warning stands down to a note, which still
+                  has to say the printed card did not change, or clearing the
+                  yellow would read as having fixed the book. */}
               {nameClashes.length ? (
                 <div style={{ marginTop: -4, marginBottom: 14 }}>
-                  <Notice kind="warn">
-                    {nameClashes.length === 1 ? "Another family is" : "Other families are"} already
-                    called <strong>{form.display_name}</strong>. Both cards will be headed the same
-                    way, so a reader cannot tell them apart. Naming the head of each is the usual
-                    fix; if the two should stay identically named on the card, tell them apart for
-                    yourself below instead.
+                  <Notice kind={labelled ? "info" : "warn"}>
+                    {labelled ? (
+                      <>
+                        Also called <strong>{form.display_name}</strong> by{" "}
+                        {nameClashes.length === 1
+                          ? "one other family"
+                          : `${nameClashes.length} other families`}
+                        , told apart here as <strong>{form.office_label?.trim()}</strong>. That is
+                        for your lists only - both cards still print under the same heading.
+                      </>
+                    ) : (
+                      <>
+                        {nameClashes.length === 1 ? "Another family is" : "Other families are"}{" "}
+                        already called <strong>{form.display_name}</strong>. Both cards will be
+                        headed the same way, so a reader cannot tell them apart. Naming the head of
+                        each is the usual fix; if the two should stay identically named on the card,
+                        tell them apart for yourself below instead.
+                      </>
+                    )}
                     <div className="row tight" style={{ marginTop: 8 }}>
                       {/* Only once a head is in the family is there a name to
                           offer - which is usually after the family was created,
@@ -500,9 +528,11 @@ export function FamilyEditPage() {
                           Use “{qualifiedName}”
                         </button>
                       ) : null}
+                      {/* Labelling this one leaves the other still plain, and
+                          going there is the next thing worth doing. */}
                       {nameClashes.map((other) => (
                         <Link key={other.id} className="btn small" to={`/families/${other.id}`}>
-                          Open the other one
+                          {labelled ? "Label the other one" : "Open the other one"}
                         </Link>
                       ))}
                     </div>
