@@ -44,6 +44,14 @@ export function OverviewPage() {
   if (loading && !people.length) return <LoadingScreen label="Loading the directory…" />;
 
   const individuals = people.filter((person) => !person.household_id);
+
+  // Counted off the entries the book is actually built from, not off the raw
+  // tables. households and people here are every row, archived and inactive
+  // included, so the old sentence promised families that will not print and
+  // missed a member of an archived family who now prints on their own - three
+  // numbers that did not add up to each other.
+  const printedFamilies = entries.filter((entry) => entry.type === "household").length;
+  const printedIndividuals = entries.length - printedFamilies;
   const withoutPhoto = entries.filter((entry) =>
     entry.type === "household" ? !entry.household.photo_path : !entry.person.photo_path,
   ).length;
@@ -56,8 +64,8 @@ export function OverviewPage() {
         <div className="grow">
           <h1>Good to see you, {profile?.full_name?.split(" ")[0] || "friend"}</h1>
           <div className="sub">
-            {entries.length} records will print in the directory — {households.length} families and{" "}
-            {individuals.length} individuals.
+            {entries.length} records will print in the directory — {printedFamilies} families and{" "}
+            {printedIndividuals} individuals.
           </div>
         </div>
         {canEdit ? (

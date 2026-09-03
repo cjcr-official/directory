@@ -20,7 +20,7 @@ function Item({ to, label, count }: { to: string; label: string; count?: number 
 
 export function AppShell() {
   const { profile, role, isOwner, signOut } = useAuth();
-  const { households, people, tags } = useDirectory();
+  const { households, people, tags, entries } = useDirectory();
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
 
@@ -36,7 +36,9 @@ export function AppShell() {
     return () => window.removeEventListener("keydown", onKey);
   }, [menuOpen]);
 
-  const individuals = people.filter((person) => !person.household_id).length;
+  // From the entries the book is built from, for the same reason the overview
+  // counts that way: people here is every row, inactive included.
+  const individuals = entries.filter((entry) => entry.type === "person").length;
 
   return (
     <div className="shell">

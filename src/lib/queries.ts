@@ -22,10 +22,26 @@ function unwrap<T>(result: { data: T | null; error: { message: string } | null }
  */
 const PAGE_SIZE = 1000;
 
-async function fetchAll<T>(
-  table: "households" | "people" | "tags" | "household_tags" | "person_tags",
-  orderBy?: string,
-): Promise<T[]> {
+/**
+ * A total order for every paged read.
+ *
+ * Paging with range() and no tiebreak is the same bug in a second costume:
+ * PostgreSQL is free to return rows tied on the sort column in a different
+ * order for each page, so a row can arrive twice or not at all at a page
+ * boundary. Surnames are not unique and the join tables had no order at all,
+ * which for a congregation over a thousand could drop somebody from a group
+ * booklet with nothing on screen to say so. Each list below ends in something
+ * unique - a primary key, or the pair that makes one.
+ */
+const PAGED_ORDER = {
+  households: ["sort_name", "id"],
+  people: ["last_name", "id"],
+  tags: ["name", "id"],
+  household_tags: ["household_id", "tag_id"],
+  person_tags: ["person_id", "tag_id"],
+} as const;
+
+async function fetchAll<T>(table: keyof typeof PAGED_ORDER): Promise<T[]> {
   const rows: T[] = [];
 
   for (let from = 0; ; from += PAGE_SIZE) {
@@ -33,7 +49,7 @@ async function fetchAll<T>(
       .from(table)
       .select("*")
       .range(from, from + PAGE_SIZE - 1);
-    if (orderBy) query = query.order(orderBy);
+    for (const column of PAGED_ORDER[table]) query = query.order(column);
 
     const page = unwrap(await query) as T[];
     rows.push(...page);
@@ -55,9 +71,9 @@ async function fetchAll<T>(
  */
 export async function fetchDirectory(): Promise<DirectoryData> {
   const [households, people, tags, householdTags, personTags] = await Promise.all([
-    fetchAll<HouseholdRow>("households", "sort_name"),
-    fetchAll<PersonRow>("people", "last_name"),
-    fetchAll<TagRow>("tags", "name"),
+    fetchAll<HouseholdRow>("households"),
+    fetchAll<PersonRow>("people"),
+    fetchAll<TagRow>("tags"),
     fetchAll<{ household_id: string; tag_id: string }>("household_tags"),
     fetchAll<{ person_id: string; tag_id: string }>("person_tags"),
   ]);
@@ -189,17 +205,40 @@ export async function fetchProjects(): Promise<ProjectRow[]> {
   );
 }
 
+/**
+ * A hand-picked directory names one row per record, so this is the one project
+ * read that can pass a thousand rows - and an unpaged select would have taken
+ * the first thousand and printed a book quietly missing the rest. Position is
+ * unique within a project, so it orders the pages on its own.
+ */
+async function fetchProjectEntries(projectId: string): Promise<ProjectEntryRow[]> {
+  const rows: ProjectEntryRow[] = [];
+
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const page = unwrap(
+      await supabase
+        .from("project_entries")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("position")
+        .range(from, from + PAGE_SIZE - 1),
+    ) as ProjectEntryRow[];
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) return rows;
+  }
+}
+
 export async function fetchProject(id: string): Promise<ProjectWithSelection> {
   const [project, tags, entries] = await Promise.all([
     supabase.from("projects").select("*").eq("id", id).single(),
     supabase.from("project_tags").select("*").eq("project_id", id),
-    supabase.from("project_entries").select("*").eq("project_id", id).order("position"),
+    fetchProjectEntries(id),
   ]);
 
   return {
     project: unwrap(project) as ProjectRow,
     tagIds: unwrap(tags).map((row) => row.tag_id),
-    entries: unwrap(entries) as ProjectEntryRow[],
+    entries,
   };
 }
 
