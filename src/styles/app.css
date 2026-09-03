@@ -300,6 +300,24 @@ p:last-child {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
+/* The three roles are a key to the table above them, not three separate
+   things worth a card each - and as three cards they orphaned the last one
+   beside a gap as soon as the grid dropped to two across. */
+.role-key {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+  margin: 0;
+}
+.role-key-item dt {
+  font-weight: 650;
+  letter-spacing: -0.011em;
+  margin-bottom: 3px;
+}
+.role-key-item dd {
+  margin: 0;
+}
+
 .row {
   display: flex;
   align-items: center;
@@ -1549,6 +1567,73 @@ th.num {
      is one tap away. */
   .hide-sm {
     display: none;
+  }
+
+  /*
+   * Administrators is four columns - name, email, role, access - and two of
+   * them hold a control, so nothing can be dropped the way a browse list drops
+   * a birthday. At 393px the name broke across two lines and the "You" pill
+   * fell onto a third, beside an email squeezed to nothing.
+   *
+   * Each administrator is a small block instead: who they are, the address
+   * they sign in with, and the two things an owner can change sharing the last
+   * line - the role at the start, the access button at the end.
+   */
+  .admins-table thead {
+    display: none;
+  }
+
+  .admins-table,
+  .admins-table tbody,
+  .admins-table tr,
+  .admins-table td {
+    display: block;
+  }
+
+  .admins-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "who who"
+      "email email"
+      "role access";
+    align-items: center;
+    gap: 7px 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .admins-table tbody tr:last-child {
+    border-bottom: none;
+  }
+
+  .admins-table td {
+    padding: 0;
+    border: none;
+  }
+
+  .admins-table td:nth-child(1) {
+    grid-area: who;
+    font-size: 0.97rem;
+    font-weight: 560;
+  }
+  /* An address is longer than the width it has and has nowhere to break. */
+  .admins-table td:nth-child(2) {
+    grid-area: email;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .admins-table td:nth-child(3) {
+    grid-area: role;
+  }
+  .admins-table td:nth-child(4) {
+    grid-area: access;
+    justify-self: end;
+  }
+
+  .role-key {
+    grid-template-columns: 1fr;
+    gap: 14px;
   }
 
   td,
