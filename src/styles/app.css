@@ -382,12 +382,30 @@ p.hint {
   margin-bottom: 0;
 }
 
-/* Its own decision, not a footnote to the block above - the include-in-print
-   checkbox was butting straight up against the end of the groups block. */
+/* Set apart from whatever ran before it: a decision of its own rather than a
+   footnote to the block above. The include-in-print checkbox was butting
+   straight against the end of the groups block, a choice of separator against
+   the end of a list of toggles, and Delete directory against the row that
+   saves. */
 .form-decision {
   margin-top: 16px;
   padding-top: 14px;
   border-top: 1px solid var(--line);
+}
+
+/* A control that only applies while the box above it is ticked. It was sitting
+   flush with the card's edge - further left than the label of the checkbox it
+   belongs to - so it read as the next decision rather than part of that one.
+   The rule sits under the tick and the content lands level with the checkbox's
+   own label, which reads as nested without spending more of the width than a
+   select needs - the photo shape option runs to 37 characters. */
+.check-child {
+  margin: 0 0 12px 16px;
+  padding-left: 12px;
+  border-left: 2px solid var(--line);
+}
+.check-child .field {
+  margin-bottom: 0;
 }
 
 input[type="text"],

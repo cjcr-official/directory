@@ -358,17 +358,21 @@ export function ProjectEditPage() {
                   onChange={(value) => set({ showPhotos: value })}
                 />
                 {settings.showPhotos ? (
-                  <Field label="Photo shape" htmlFor="photo_fit">
-                    <select
-                      id="photo_fit"
-                      value={settings.photoFit}
-                      disabled={!canEdit}
-                      onChange={(event) => set({ photoFit: event.target.value as "fill" | "fit" })}
-                    >
-                      <option value="fill">Crop to a matching portrait (tidiest)</option>
-                      <option value="fit">Show the whole photo</option>
-                    </select>
-                  </Field>
+                  <div className="check-child">
+                    <Field label="Photo shape" htmlFor="photo_fit">
+                      <select
+                        id="photo_fit"
+                        value={settings.photoFit}
+                        disabled={!canEdit}
+                        onChange={(event) =>
+                          set({ photoFit: event.target.value as "fill" | "fit" })
+                        }
+                      >
+                        <option value="fill">Crop to a matching portrait (tidiest)</option>
+                        <option value="fit">Show the whole photo</option>
+                      </select>
+                    </Field>
+                  </div>
                 ) : null}
                 <Checkbox
                   label="Family members' names"
@@ -377,19 +381,23 @@ export function ProjectEditPage() {
                   onChange={(value) => set({ showMembers: value })}
                 />
                 {settings.showMembers ? (
-                  <Field label="Member style" htmlFor="member_style">
-                    <select
-                      id="member_style"
-                      value={settings.memberStyle}
-                      disabled={!canEdit}
-                      onChange={(event) =>
-                        set({ memberStyle: event.target.value as "compact" | "detailed" })
-                      }
-                    >
-                      <option value="compact">One line of first names</option>
-                      <option value="detailed">A line each, with their own contact details</option>
-                    </select>
-                  </Field>
+                  <div className="check-child">
+                    <Field label="Member style" htmlFor="member_style">
+                      <select
+                        id="member_style"
+                        value={settings.memberStyle}
+                        disabled={!canEdit}
+                        onChange={(event) =>
+                          set({ memberStyle: event.target.value as "compact" | "detailed" })
+                        }
+                      >
+                        <option value="compact">One line of first names</option>
+                        <option value="detailed">
+                          A line each, with their own contact details
+                        </option>
+                      </select>
+                    </Field>
+                  </div>
                 ) : null}
                 <Checkbox
                   label="Address"
@@ -421,18 +429,20 @@ export function ProjectEditPage() {
                   disabled={!canEdit}
                   onChange={(value) => set({ showAnniversary: value })}
                 />
-                <Field label="How records are separated" htmlFor="card_style">
-                  <select
-                    id="card_style"
-                    value={settings.cardStyle}
-                    disabled={!canEdit}
-                    onChange={(event) => set({ cardStyle: event.target.value as CardStyle })}
-                  >
-                    <option value="rule">A hairline between records</option>
-                    <option value="box">A light box around each record</option>
-                    <option value="none">Nothing — space only</option>
-                  </select>
-                </Field>
+                <div className="form-decision">
+                  <Field label="How records are separated" htmlFor="card_style">
+                    <select
+                      id="card_style"
+                      value={settings.cardStyle}
+                      disabled={!canEdit}
+                      onChange={(event) => set({ cardStyle: event.target.value as CardStyle })}
+                    >
+                      <option value="rule">A hairline between records</option>
+                      <option value="box">A light box around each record</option>
+                      <option value="none">Nothing — space only</option>
+                    </select>
+                  </Field>
+                </div>
               </div>
             </div>
 
@@ -537,22 +547,26 @@ export function ProjectEditPage() {
             <Link className="btn ghost" to="/projects">
               Back
             </Link>
-            <span className="spacer" />
-            {!isNew && id ? (
-              <ConfirmButton
-                label="Delete directory"
-                confirmLabel="Delete permanently"
-                onConfirm={async () => {
-                  await deleteProject(id);
-                  await reload();
-                  navigate("/projects");
-                }}
-              />
-            ) : null}
           </div>
         ) : (
           <Notice kind="warn">You have read-only access. You can still preview and print.</Notice>
         )}
+
+        {/* Deleting is not one of the ways to leave this page, so it does not
+            sit in the row that saves and goes back. */}
+        {canEdit && !isNew && id ? (
+          <div className="form-decision">
+            <ConfirmButton
+              label="Delete directory"
+              confirmLabel="Delete permanently"
+              onConfirm={async () => {
+                await deleteProject(id);
+                await reload();
+                navigate("/projects");
+              }}
+            />
+          </div>
+        ) : null}
       </form>
     </div>
   );
