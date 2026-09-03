@@ -136,11 +136,15 @@ export function RestorePanel() {
           Choose a backup file to see what is in it. Nothing is written until you say so.
         </p>
 
+        {/* No accept filter on purpose. iOS greys out anything outside it and
+            decides what a .zip is by its own file type rather than the
+            extension, so a backup that cannot be picked at all is the worse
+            failure - and the wrong file is refused below with a sentence
+            saying what to choose instead. */}
         <input
           ref={fileInput}
           id="restore-file"
           type="file"
-          accept=".zip,application/zip"
           className="file-input"
           disabled={reading || busy}
           onChange={(event) => void choose(event.target.files?.[0])}
@@ -171,7 +175,7 @@ export function RestorePanel() {
                 <dt>Missing now</dt>
                 <dd>
                   {plan.missing.households} families, {plan.missing.people} people,{" "}
-                  {plan.missing.tags} groups, {plan.missing.links} group labels
+                  {plan.missing.tags} groups, {plan.missing.links} group memberships
                 </dd>
               </div>
               {plan.newerThanBackup.households + plan.newerThanBackup.people > 0 ? (
@@ -200,7 +204,7 @@ export function RestorePanel() {
                     {plan.missing.people === 1 ? "person" : "people"} this file has and the
                     directory does not
                     {plan.missing.links > 0
-                      ? `, and ${plan.missing.links} group ${plan.missing.links === 1 ? "label" : "labels"} that ${plan.missing.links === 1 ? "is" : "are"} no longer recorded`
+                      ? `, and ${plan.missing.links} group ${plan.missing.links === 1 ? "membership" : "memberships"} that ${plan.missing.links === 1 ? "is" : "are"} no longer recorded`
                       : ""}
                     . Nothing already here is changed or deleted.
                   </span>
