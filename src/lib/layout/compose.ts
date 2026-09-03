@@ -99,6 +99,8 @@ export interface BookPage {
   runs: TextRun[];
   rules: RuleModel[];
   fills: FillModel[];
+  /** Pictures belonging to the page rather than to any card - the cover's. */
+  photos: PhotoSlot[];
 }
 
 /** One sheet of paper. */
@@ -618,6 +620,14 @@ function translate(page: BookPage, dx: number, dy: number): BookPage {
     runs: page.runs.map(moveRun),
     rules: page.rules.map((rule) => ({ ...rule, x: rule.x + dx, y: rule.y + dy })),
     fills: page.fills.map((fill) => ({ ...fill, x: fill.x + dx, y: fill.y + dy })),
+    // A page's own pictures move with it exactly as a card's do. Spreading the
+    // page and forgetting these left the cover's photograph at half-page
+    // coordinates while its text had been shifted onto the sheet, so the
+    // picture sat over the rule above it.
+    photos: page.photos.map((photo) => ({
+      ...photo,
+      box: { ...photo.box, x: photo.box.x + dx, y: photo.box.y + dy },
+    })),
     cards: page.cards.map((card) => ({
       ...card,
       box: { ...card.box, x: card.box.x + dx, y: card.box.y + dy },
@@ -732,9 +742,25 @@ function blankPage(geo: Geometry): BookPage {
     runs: [],
     rules: [],
     fills: [],
+    photos: [],
   };
 }
 
+/** How tall the logo sits on the cover, and the photograph's shape. */
+const COVER_LOGO_HEIGHT = 46;
+const COVER_PHOTO_WIDTH = 0.74;
+const COVER_PHOTO_ASPECT = 0.66;
+
+/**
+ * The cover, built as a measured stack.
+ *
+ * Every part is optional, and a church that fills all of them wants a
+ * different vertical arrangement from one that only sets a title - so nothing
+ * is placed at a fixed height. Each block that has something to say reports
+ * how tall it is and how much air it wants above it; the whole stack is then
+ * centred as one. An empty field contributes nothing at all, not an empty line,
+ * which is what keeps a plain cover from drifting down the page.
+ */
 function composeCover(
   settings: ProjectSettings,
   geo: Geometry,
@@ -744,60 +770,132 @@ function composeCover(
   const page = blankPage(geo);
   page.kind = "cover";
 
-  const centerY = geo.pageHeight * 0.34;
-  const inner = geo.pageWidth - 48;
+  const margin = 34;
+  const inner = geo.pageWidth - margin * 2;
 
-  if (settings.churchName.trim()) {
-    page.runs.push({
-      x: 24,
-      y: centerY - 34,
-      w: inner,
-      size: 11,
-      weight: "regular",
-      color: COLORS.accent,
-      align: "center",
-      text: settings.churchName.trim().toUpperCase(),
-    });
+  interface Block {
+    height: number;
+    /** Air above this block, ignored when it is the first thing on the page. */
+    gap: number;
+    place: (top: number) => void;
   }
+  const blocks: Block[] = [];
 
-  const titleSize = Math.min(
-    type.cover,
-    // Shrink an unusually long title until it fits on one line.
-    (type.cover * inner) / Math.max(metrics.widthOf(settings.coverTitle, type.cover, "bold"), 1),
-  );
-  const titleLines = wrapText(settings.coverTitle, inner, titleSize, "bold", metrics);
-  titleLines.forEach((line, i) => {
-    page.runs.push({
-      x: 24,
-      y: centerY + i * metrics.lineHeight(titleSize),
-      w: inner,
-      size: titleSize,
-      weight: "bold",
-      color: COLORS.strong,
-      align: "center",
-      text: line,
-    });
+  const centred = (text: string, size: number, weight: FontWeight, color: string) => ({
+    x: margin,
+    w: inner,
+    size,
+    weight,
+    color,
+    align: "center" as const,
+    text,
   });
 
-  let y = centerY + titleLines.length * metrics.lineHeight(titleSize) + 14;
-  page.rules.push({ x: geo.pageWidth / 2 - 40, y: y + 2, w: 80, color: COLORS.accent });
-  y += 16;
+  /** One block per paragraph, so a blank field takes no room whatsoever. */
+  const paragraph = (
+    text: string,
+    size: number,
+    weight: FontWeight,
+    color: string,
+    gap: number,
+    width = inner,
+  ) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const lines = trimmed
+      .split("\n")
+      .flatMap((line) => (line.trim() ? wrapText(line.trim(), width, size, weight, metrics) : []));
+    if (!lines.length) return;
+    const lineHeight = metrics.lineHeight(size);
+    blocks.push({
+      height: lines.length * lineHeight,
+      gap,
+      place: (top) => {
+        lines.forEach((line, i) => {
+          page.runs.push({
+            ...centred(line, size, weight, color),
+            x: margin + (inner - width) / 2,
+            w: width,
+            y: top + i * lineHeight,
+          });
+        });
+      },
+    });
+  };
 
-  if (settings.coverSubtitle.trim()) {
-    for (const line of wrapText(settings.coverSubtitle, inner, 11, "regular", metrics)) {
-      page.runs.push({
-        x: 24,
-        y,
-        w: inner,
-        size: 11,
-        weight: "regular",
-        color: COLORS.muted,
-        align: "center",
-        text: line,
-      });
-      y += metrics.lineHeight(11);
-    }
+  // The mark, if there is one. A logo is artwork with its own margins, so it
+  // is fitted whole rather than cropped to a shape the way a portrait is.
+  if (settings.coverLogoPath) {
+    blocks.push({
+      height: COVER_LOGO_HEIGHT,
+      gap: 0,
+      place: (top) =>
+        page.photos.push({
+          box: { x: margin, y: top, w: inner, h: COVER_LOGO_HEIGHT },
+          path: settings.coverLogoPath,
+          fit: "fit",
+          initials: "",
+        }),
+    });
   }
+
+  paragraph(settings.churchName.toUpperCase(), 11, "regular", COLORS.accent, 18);
+
+  // Shrink an unusually long title until it fits on one line.
+  const titleSize = Math.min(
+    type.cover,
+    // 0.98, not 1: sized to exactly the column width, the wrap that follows
+    // breaks the title in two on the next rounding - which is how "2026 Spring
+    // Directory" came to print as two lines while this was busy fitting it to
+    // one.
+    (type.cover * inner * 0.98) /
+      Math.max(metrics.widthOf(settings.coverTitle, type.cover, "bold"), 1),
+  );
+  paragraph(settings.coverTitle, titleSize, "bold", COLORS.strong, 10);
+
+  // The rule belongs to the title, and goes when the title does.
+  if (settings.coverTitle.trim()) {
+    blocks.push({
+      height: 1,
+      gap: 14,
+      place: (top) =>
+        page.rules.push({ x: geo.pageWidth / 2 - 40, y: top, w: 80, color: COLORS.accent }),
+    });
+  }
+
+  paragraph(settings.coverSubtitle, 11, "regular", COLORS.muted, 14);
+
+  if (settings.coverPhotoPath) {
+    const width = inner * COVER_PHOTO_WIDTH;
+    const height = width * COVER_PHOTO_ASPECT;
+    blocks.push({
+      height,
+      gap: 22,
+      place: (top) =>
+        page.photos.push({
+          box: { x: margin + (inner - width) / 2, y: top, w: width, h: height },
+          path: settings.coverPhotoPath,
+          fit: "fill",
+          initials: "",
+        }),
+    });
+  }
+
+  // Narrower than the page, because a centred paragraph running the full width
+  // is hard to read back to the start of the next line.
+  paragraph(settings.coverStatement, 10.5, "italic", COLORS.ink, 24, inner * 0.82);
+  paragraph(settings.coverContact, 9.5, "regular", COLORS.muted, 22);
+
+  const total = blocks.reduce((sum, block, i) => sum + block.height + (i === 0 ? 0 : block.gap), 0);
+
+  // Centred as one stack, but never above the top margin - a cover carrying
+  // everything is taller than the page's middle third.
+  let y = Math.max(margin, (geo.pageHeight - total) / 2);
+  blocks.forEach((block, i) => {
+    if (i > 0) y += block.gap;
+    block.place(y);
+    y += block.height;
+  });
 
   return page;
 }
@@ -1065,6 +1163,12 @@ export function composeBook(
   for (const page of pages) {
     for (const card of page.cards) {
       if (card.photo?.path) photoPaths.add(card.photo.path);
+    }
+    // The cover's logo and photograph are fetched and embedded by the same
+    // pass as every portrait; missing them here would leave the cover blank in
+    // the PDF while the preview, which loads from the same list, showed them.
+    for (const photo of page.photos) {
+      if (photo.path) photoPaths.add(photo.path);
     }
   }
 

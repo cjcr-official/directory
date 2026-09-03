@@ -264,6 +264,13 @@ export async function renderPdf(
         for (const run of card.runs) drawRun(page, run, fonts, h);
       }
 
+      // No hairline around these, unlike a card's portrait: a logo is artwork
+      // with its own margins and a box drawn round it reads as a mistake.
+      for (const slot of bookPage.photos) {
+        const image = slot.path ? images.get(slot.path) : null;
+        if (image) drawPhoto(page, slot, image, h);
+      }
+
       for (const run of bookPage.runs) drawRun(page, run, fonts, h);
     }
 

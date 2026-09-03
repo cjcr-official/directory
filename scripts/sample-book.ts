@@ -33,6 +33,17 @@ async function main() {
     churchName: "Fairhaven Community Church",
     coverTitle: "Church Directory",
     coverSubtitle: "Spring 2026",
+    // The sample carries a full cover so this run renders one every time. CI
+    // builds this book, so a cover that cannot be drawn - a picture the
+    // renderer never fetched, artwork left off the sheet - fails here rather
+    // than at the printer.
+    coverStatement:
+      "OUR VISION\nTo be a God-glorifying, Spirit-filled community of believers, " +
+      "discipling one another & impacting the world for Christ.",
+    coverContact:
+      "505 West 5th Street\nP.O. Box 368\nFairhaven, MT 59859\n406.555.0100\noffice@example.org",
+    coverPhotoPath: "covers/building.jpg",
+    coverLogoPath: "covers/logo.jpg",
     footerText: "Please keep this directory for church use only.",
     showBirthdays: true,
     showAnniversary: true,
