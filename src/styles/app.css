@@ -177,11 +177,53 @@ p:last-child {
   font-variant-numeric: tabular-nums;
 }
 
+/* Who is signed in, what they may do, and how to leave - two rows, each with
+   something at either end, rather than four things stacked hard against the
+   left edge with a different gap above each. */
 .sidebar-foot {
   margin-top: auto;
-  padding-top: 16px;
+  padding-top: 14px;
   border-top: 1px solid var(--line);
   font-size: 0.82rem;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sidebar-who {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* An account with no name falls back to an email address, which is long and
+   has nowhere to wrap in a 264px drawer. It takes the room the pill leaves. */
+.sidebar-name {
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-who .pill {
+  flex: 0 0 auto;
+}
+
+/* The way out at one end, the build at the other. The version was loose text
+   under everything else, which read as something left switched on rather than
+   as a footnote to the account. */
+.sidebar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  /* The pair fits the 232px desktop sidebar with about eight pixels to spare,
+     which a wider mono face would eat. Wrapping puts the version on its own
+     line rather than pushing it out of the drawer. */
+  flex-wrap: wrap;
+  row-gap: 8px;
 }
 
 .main {
@@ -758,12 +800,13 @@ th.num {
 }
 
 .sidebar-version {
-  margin-top: 10px;
   font-family: var(--mono);
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   letter-spacing: 0.02em;
+  /* A settled grey rather than a faded one: it is quiet on purpose, not
+     half-erased. */
   color: var(--ink-3);
-  opacity: 0.72;
+  white-space: nowrap;
 }
 
 /* --- family members -------------------------------------------------------

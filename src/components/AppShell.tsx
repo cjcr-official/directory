@@ -84,22 +84,22 @@ export function AppShell() {
         {isOwner ? <Item to="/administrators" label="Administrators" /> : null}
 
         <div className="sidebar-foot">
-          <div style={{ fontWeight: 600 }}>{profile?.full_name || profile?.email}</div>
-          <div className="row tight" style={{ marginTop: 5 }}>
+          <div className="sidebar-who">
+            <span className="sidebar-name">{profile?.full_name || profile?.email}</span>
             <span className="pill role">{role ?? "no access"}</span>
-            <button type="button" className="btn ghost small" onClick={() => void signOut()}>
-              Sign out
-            </button>
           </div>
           {individuals > 0 ? (
-            <div className="muted small" style={{ marginTop: 8 }}>
-              {individuals} listed on their own
-            </div>
+            <div className="muted small">{individuals} listed on their own</div>
           ) : null}
-          {/* So "which version are you on?" has an answer that does not
-              involve reading a URL bar that is not there. */}
-          <div className="sidebar-version" title={`Build ${APP_VERSION}`}>
-            Version {APP_VERSION.slice(0, 7)}
+          <div className="sidebar-actions">
+            <button type="button" className="btn small" onClick={() => void signOut()}>
+              Sign out
+            </button>
+            {/* So "which version are you on?" has an answer that does not
+                involve reading a URL bar that is not there. */}
+            <span className="sidebar-version" title={`Build ${APP_VERSION}`}>
+              Version {APP_VERSION.slice(0, 7)}
+            </span>
           </div>
         </div>
       </nav>
