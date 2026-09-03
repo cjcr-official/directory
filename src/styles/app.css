@@ -1261,18 +1261,31 @@ th.num {
   .preview-tools-spacer {
     display: none;
   }
-  /* The sizes matter most on a phone, so they take the room rather than
-     sharing a line with a slider's label. */
+  /* The sizes matter most on a phone, so they take the room. */
+  .preview-check {
+    flex: 0 0 auto;
+  }
   .zoom-levels {
-    flex: 1;
+    flex: 1 1 auto;
   }
   .zoom-level {
     flex: 1;
     padding: 8px 10px;
   }
+  /* Half a row each, so two buttons pair instead of the second taking a whole
+     row to itself. A row of a phone spent on one button is a row of the proof
+     you cannot see, and the proof is what the screen is for. Grow is left on,
+     so a screen with only one button still gets a full-width one. */
   .preview-tools .btn {
-    flex: 1;
+    flex: 1 1 calc(50% - 5px);
     justify-content: center;
+  }
+
+  /* The explanation is worth reading once, not worth a third of the screen
+     every time. */
+  .preview-notice .notice {
+    font-size: 0.85rem;
+    padding: 12px 13px;
   }
 }
 
