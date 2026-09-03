@@ -748,8 +748,6 @@ function blankPage(geo: Geometry): BookPage {
 
 /** How tall the logo sits on the cover, and the photograph's shape. */
 const COVER_LOGO_HEIGHT = 46;
-const COVER_PHOTO_WIDTH = 0.74;
-const COVER_PHOTO_ASPECT = 0.66;
 
 /**
  * The cover, built as a measured stack.
@@ -761,6 +759,33 @@ const COVER_PHOTO_ASPECT = 0.66;
  * centred as one. An empty field contributes nothing at all, not an empty line,
  * which is what keeps a plain cover from drifting down the page.
  */
+/**
+ * Letterspacing, done the only way the standard fonts allow: with real
+ * spaces. Plain ASCII spaces, because anything typographic is stripped on the
+ * way into WinAnsi and would print as a question mark between every letter.
+ */
+function tracked(text: string): string {
+  return text
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.split("").join(" "))
+    .join("   ");
+}
+
+/**
+ * The cover.
+ *
+ * Three zones rather than one centred stack. The top carries the mark and the
+ * church's name over a photograph that runs the full width of the page; the
+ * foot carries the address, sitting on the bottom rule where a reader expects
+ * to find it; and the title block is centred in whatever is left between them.
+ * A stack centred as one lump - which is what this was - leaves a cover with
+ * no relationship to its own edges, and reads as a form that happens to have
+ * been filled in.
+ *
+ * The photograph absorbs the slack, so a long vision statement takes room from
+ * the picture rather than pushing the address off the page.
+ */
 function composeCover(
   settings: ProjectSettings,
   geo: Geometry,
@@ -770,131 +795,163 @@ function composeCover(
   const page = blankPage(geo);
   page.kind = "cover";
 
+  const W = geo.pageWidth;
+  const H = geo.pageHeight;
   const margin = 34;
-  const inner = geo.pageWidth - margin * 2;
+  const inner = W - margin * 2;
 
-  interface Block {
-    height: number;
-    /** Air above this block, ignored when it is the first thing on the page. */
-    gap: number;
-    place: (top: number) => void;
-  }
-  const blocks: Block[] = [];
+  /** The rules top and bottom. Ink enough to frame the page, not to flood it. */
+  const BAND = 6;
+  const PHOTO_TARGET = W * 0.56;
+  const PHOTO_MIN = 96;
 
-  const centred = (text: string, size: number, weight: FontWeight, color: string) => ({
-    x: margin,
-    w: inner,
-    size,
-    weight,
-    color,
-    align: "center" as const,
-    text,
-  });
+  const lay = (text: string, size: number, weight: FontWeight, width: number): string[] =>
+    text
+      .trim()
+      .split("\n")
+      .flatMap((line) => (line.trim() ? wrapText(line.trim(), width, size, weight, metrics) : []));
 
-  /** One block per paragraph, so a blank field takes no room whatsoever. */
-  const paragraph = (
-    text: string,
+  const put = (
+    lines: string[],
+    top: number,
     size: number,
     weight: FontWeight,
     color: string,
-    gap: number,
-    width = inner,
+    width: number,
   ) => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-    const lines = trimmed
-      .split("\n")
-      .flatMap((line) => (line.trim() ? wrapText(line.trim(), width, size, weight, metrics) : []));
-    if (!lines.length) return;
     const lineHeight = metrics.lineHeight(size);
-    blocks.push({
-      height: lines.length * lineHeight,
-      gap,
-      place: (top) => {
-        lines.forEach((line, i) => {
-          page.runs.push({
-            ...centred(line, size, weight, color),
-            x: margin + (inner - width) / 2,
-            w: width,
-            y: top + i * lineHeight,
-          });
-        });
-      },
+    lines.forEach((line, i) => {
+      page.runs.push({
+        x: margin + (inner - width) / 2,
+        y: top + i * lineHeight,
+        w: width,
+        size,
+        weight,
+        color,
+        align: "center",
+        text: line,
+      });
     });
+    return lines.length * lineHeight;
   };
 
-  // The mark, if there is one. A logo is artwork with its own margins, so it
-  // is fitted whole rather than cropped to a shape the way a portrait is.
+  page.fills.push({ x: 0, y: 0, w: W, h: BAND, color: COLORS.accent });
+  page.fills.push({ x: 0, y: H - BAND, w: W, h: BAND, color: COLORS.accent });
+
+  // --- the foot, measured from the bottom rule up --------------------------
+  let floor = H - BAND - 20;
+  const contact = lay(settings.coverContact, 9.5, "regular", inner);
+  if (contact.length) {
+    const height = contact.length * metrics.lineHeight(9.5);
+    const top = floor - height;
+    put(contact, top, 9.5, "regular", COLORS.muted, inner);
+    page.rules.push({ x: W / 2 - 26, y: top - 15, w: 52, color: COLORS.rule });
+    floor = top - 32;
+  }
+
+  // --- the head ------------------------------------------------------------
+  let y = BAND + 24;
+
   if (settings.coverLogoPath) {
-    blocks.push({
-      height: COVER_LOGO_HEIGHT,
-      gap: 0,
-      place: (top) =>
-        page.photos.push({
-          box: { x: margin, y: top, w: inner, h: COVER_LOGO_HEIGHT },
-          path: settings.coverLogoPath,
-          fit: "fit",
-          initials: "",
-        }),
+    page.photos.push({
+      box: { x: margin, y, w: inner, h: COVER_LOGO_HEIGHT },
+      path: settings.coverLogoPath,
+      fit: "fit",
+      initials: "",
     });
+    y += COVER_LOGO_HEIGHT + 16;
   }
 
-  paragraph(settings.churchName.toUpperCase(), 11, "regular", COLORS.accent, 18);
+  if (settings.churchName.trim()) {
+    // Tracked, and fitted rather than wrapped: a church's name broken across
+    // two lines with a space between every letter is unreadable.
+    const spaced = tracked(settings.churchName.toUpperCase());
+    const fitted = Math.min(10, (10 * inner) / Math.max(metrics.widthOf(spaced, 10, "regular"), 1));
+    const usable = fitted >= 6.6;
+    const text = usable ? spaced : settings.churchName.toUpperCase();
+    const size = usable
+      ? fitted
+      : Math.min(11, (11 * inner) / Math.max(metrics.widthOf(text, 11, "regular"), 1));
+    y += put([text], y, size, "regular", COLORS.accent, inner) + 20;
+  }
 
-  // Shrink an unusually long title until it fits on one line.
-  const titleSize = Math.min(
-    type.cover,
-    // 0.98, not 1: sized to exactly the column width, the wrap that follows
-    // breaks the title in two on the next rounding - which is how "2026 Spring
-    // Directory" came to print as two lines while this was busy fitting it to
-    // one.
-    (type.cover * inner * 0.98) /
-      Math.max(metrics.widthOf(settings.coverTitle, type.cover, "bold"), 1),
-  );
-  paragraph(settings.coverTitle, titleSize, "bold", COLORS.strong, 10);
+  // --- the middle, measured so the photograph can take what is left --------
+  interface Item {
+    height: number;
+    gap: number;
+    place: (top: number) => void;
+  }
+  const middle: Item[] = [];
 
-  // The rule belongs to the title, and goes when the title does.
   if (settings.coverTitle.trim()) {
-    blocks.push({
+    // 0.98, not 1: sized to exactly the column width, the wrap that follows
+    // breaks the title in two on the next rounding.
+    const size = Math.min(
+      type.cover,
+      (type.cover * inner * 0.98) /
+        Math.max(metrics.widthOf(settings.coverTitle, type.cover, "bold"), 1),
+    );
+    const lines = lay(settings.coverTitle, size, "bold", inner);
+    middle.push({
+      height: lines.length * metrics.lineHeight(size),
+      gap: 0,
+      place: (top) => put(lines, top, size, "bold", COLORS.strong, inner),
+    });
+    middle.push({
       height: 1,
-      gap: 14,
-      place: (top) =>
-        page.rules.push({ x: geo.pageWidth / 2 - 40, y: top, w: 80, color: COLORS.accent }),
+      gap: 15,
+      place: (top) => page.rules.push({ x: W / 2 - 27, y: top, w: 54, color: COLORS.accent }),
     });
   }
 
-  paragraph(settings.coverSubtitle, 11, "regular", COLORS.muted, 14);
+  const subtitle = lay(settings.coverSubtitle, 11, "regular", inner);
+  if (subtitle.length) {
+    middle.push({
+      height: subtitle.length * metrics.lineHeight(11),
+      gap: 15,
+      place: (top) => put(subtitle, top, 11, "regular", COLORS.muted, inner),
+    });
+  }
 
-  if (settings.coverPhotoPath) {
-    const width = inner * COVER_PHOTO_WIDTH;
-    const height = width * COVER_PHOTO_ASPECT;
-    blocks.push({
-      height,
+  // Narrower than the page: a centred paragraph running the full measure is
+  // hard to read back to the start of the next line.
+  const statementWidth = inner * 0.84;
+  const statement = lay(settings.coverStatement, 10.5, "italic", statementWidth);
+  if (statement.length) {
+    middle.push({
+      height: statement.length * metrics.lineHeight(10.5),
       gap: 22,
-      place: (top) =>
-        page.photos.push({
-          box: { x: margin + (inner - width) / 2, y: top, w: width, h: height },
-          path: settings.coverPhotoPath,
-          fit: "fill",
-          initials: "",
-        }),
+      place: (top) => put(statement, top, 10.5, "italic", COLORS.ink, statementWidth),
     });
   }
 
-  // Narrower than the page, because a centred paragraph running the full width
-  // is hard to read back to the start of the next line.
-  paragraph(settings.coverStatement, 10.5, "italic", COLORS.ink, 24, inner * 0.82);
-  paragraph(settings.coverContact, 9.5, "regular", COLORS.muted, 22);
+  const middleHeight = middle.reduce(
+    (sum, item, i) => sum + item.height + (i === 0 ? 0 : item.gap),
+    0,
+  );
 
-  const total = blocks.reduce((sum, block, i) => sum + block.height + (i === 0 ? 0 : block.gap), 0);
+  // --- the photograph, full width, taking whatever is spare -----------------
+  if (settings.coverPhotoPath) {
+    const spare = floor - y - middleHeight - 46;
+    const height = Math.min(PHOTO_TARGET, spare);
+    if (height >= PHOTO_MIN) {
+      page.photos.push({
+        box: { x: 0, y, w: W, h: height },
+        path: settings.coverPhotoPath,
+        fit: "fill",
+        initials: "",
+      });
+      y += height + 26;
+    }
+  }
 
-  // Centred as one stack, but never above the top margin - a cover carrying
-  // everything is taller than the page's middle third.
-  let y = Math.max(margin, (geo.pageHeight - total) / 2);
-  blocks.forEach((block, i) => {
-    if (i > 0) y += block.gap;
-    block.place(y);
-    y += block.height;
+  // Centred in what is left, so the title block sits in its own space rather
+  // than crowding whichever neighbour happens to be shorter.
+  let cursor = y + Math.max(0, (floor - y - middleHeight) / 2);
+  middle.forEach((item, i) => {
+    if (i > 0) cursor += item.gap;
+    item.place(cursor);
+    cursor += item.height;
   });
 
   return page;
