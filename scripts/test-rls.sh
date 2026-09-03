@@ -23,6 +23,7 @@ run tests/00_supabase_stubs.sql
 echo "Applying migrations…"
 run migrations/0001_initial_schema.sql
 run migrations/0002_storage.sql
+run migrations/0003_atomic_link_writes.sql
 run tests/01_grants.sql
 
 echo "Running row level security tests…"

@@ -114,7 +114,32 @@ export interface Database {
       project_entries: Table<ProjectEntryRow>;
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    /**
+     * Added by 0003. Each replaces a whole set of links in one statement, so a
+     * connection that drops mid-write cannot leave a record with none. Declared
+     * here so the calls stay type-checked like the table queries around them.
+     */
+    Functions: {
+      set_household_tags: {
+        Args: { p_household_id: string; p_tag_ids: string[] };
+        Returns: undefined;
+      };
+      set_person_tags: {
+        Args: { p_person_id: string; p_tag_ids: string[] };
+        Returns: undefined;
+      };
+      set_project_tags: {
+        Args: { p_project_id: string; p_tag_ids: string[] };
+        Returns: undefined;
+      };
+      set_project_entries: {
+        Args: {
+          p_project_id: string;
+          p_entries: { entry_type: "household" | "person"; ref_id: string }[];
+        };
+        Returns: undefined;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
