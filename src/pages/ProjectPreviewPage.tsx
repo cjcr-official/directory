@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useDirectory } from "@/data/DirectoryContext";
 import { BookPreview } from "@/components/BookPreview";
+import { PreviewZoom, usePreviewZoom } from "@/components/PreviewZoom";
 import { LoadingScreen, Notice } from "@/components/ui";
 import { fetchProject } from "@/lib/queries";
 import { downloadPhoto, getPhotoUrls } from "@/lib/photos";
@@ -22,13 +23,13 @@ export function ProjectPreviewPage() {
   const [book, setBook] = useState<BookModel | null>(null);
   const [photoUrls, setPhotoUrls] = useState<Map<string, string>>(new Map());
   const [error, setError] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(0.75);
   const [building, setBuilding] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [showGuides, setShowGuides] = useState(true);
   /** Set while printing so every sheet is in the DOM, not just the preview's. */
   const [printingAll, setPrintingAll] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const { level, setLevel, scale } = usePreviewZoom(book, canvasRef);
 
   useEffect(() => {
     if (!id) return;
@@ -66,19 +67,6 @@ export function ProjectPreviewPage() {
       active = false;
     };
   }, [id, entries]);
-
-  // Fit a sheet to the window the first time, so nothing needs scrolling sideways.
-  useEffect(() => {
-    if (!book) return;
-    const fit = () => {
-      const available = (canvasRef.current?.clientWidth ?? window.innerWidth) - 48;
-      // 1pt = 1/72in and CSS renders at 96dpi, so a point is 96/72 CSS pixels.
-      setZoom(Math.min(1.1, Math.max(0.25, available / (book.width * (96 / 72)))));
-    };
-    fit();
-    window.addEventListener("resize", fit);
-    return () => window.removeEventListener("resize", fit);
-  }, [book]);
 
   const settings = useMemo(() => (project ? normalizeSettings(project.settings) : null), [project]);
 
@@ -185,18 +173,7 @@ export function ProjectPreviewPage() {
             Fold guides
           </label>
 
-          <label className="preview-zoom">
-            <span>Zoom</span>
-            <input
-              type="range"
-              min={0.25}
-              max={1.5}
-              step={0.05}
-              value={zoom}
-              aria-label="Zoom"
-              onChange={(event) => setZoom(Number(event.target.value))}
-            />
-          </label>
+          <PreviewZoom value={level} onChange={setLevel} />
 
           <span className="preview-tools-spacer" />
 
@@ -248,7 +225,8 @@ export function ProjectPreviewPage() {
         <BookPreview
           book={book}
           photoUrls={photoUrls}
-          zoom={zoom}
+          zoom={scale}
+          level={level}
           limit={printingAll ? undefined : PREVIEW_SHEET_LIMIT}
         />
       </div>

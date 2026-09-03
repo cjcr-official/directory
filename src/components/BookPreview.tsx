@@ -8,6 +8,8 @@ interface Props {
   photoUrls: Map<string, string>;
   /** 1 renders at true size; the preview screen scales to fit the window. */
   zoom: number;
+  /** Only decides the layout around the paper; the scale arrives as zoom. */
+  level?: "page" | "sheet" | "spread";
   /** Limits how many sheets are drawn, to keep a large book responsive. */
   limit?: number;
 }
@@ -170,17 +172,19 @@ function Page({
  * paints what the composer already worked out, which is what lets the screen
  * be trusted as a proof of the print.
  */
-export function BookPreview({ book, photoUrls, zoom, limit }: Props) {
+export function BookPreview({ book, photoUrls, zoom, limit, level = "sheet" }: Props) {
   const sheets = limit ? book.sheets.slice(0, limit) : book.sheets;
   const fontStack = CSS_FONT_STACKS[book.typeface as Typeface] ?? CSS_FONT_STACKS.sans;
 
   return (
-    <div className="sheet-stack">
+    <div className={`sheet-stack level-${level}`}>
       {sheets.map((sheet) => (
         <div key={sheet.index} className="sheet-holder">
           <div className="sheet-caption screen-only">
             Sheet {sheet.index + 1} of {book.sheets.length}
           </div>
+          {/* At page size the paper is wider than the screen, so the frame
+              scrolls between the two halves rather than the page doing it. */}
           <div
             className="sheet-frame"
             style={{ width: `${book.width * zoom}pt`, height: `${book.height * zoom}pt` }}

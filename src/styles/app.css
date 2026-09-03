@@ -1094,19 +1094,45 @@ th.num {
 }
 
 .preview-check,
-.preview-zoom {
+/* How much of the book to show, as three named sizes rather than a slider.
+   The sizes people want are three specific things - a page, a sheet, two
+   sheets - not points on a continuum, and dragging to find the one where a
+   name becomes legible is not a task worth giving anybody. */
+.zoom-levels {
   display: inline-flex;
-  align-items: center;
-  gap: 7px;
   flex: none;
-  font-size: 0.82rem;
-  color: rgb(255 255 255 / 74%);
-  white-space: nowrap;
-  cursor: pointer;
+  padding: 2px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 10%);
+  border: 1px solid rgb(255 255 255 / 14%);
 }
-.preview-zoom input[type="range"] {
-  width: 108px;
-  accent-color: var(--accent);
+
+.zoom-level {
+  font: inherit;
+  font-size: 0.79rem;
+  font-weight: 560;
+  line-height: 1;
+  padding: 7px 13px;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: rgb(255 255 255 / 72%);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+.zoom-level:hover:not(.active) {
+  color: #fff;
+}
+.zoom-level.active {
+  background: rgb(255 255 255 / 92%);
+  color: var(--brand-dark);
+}
+.zoom-level:focus-visible {
+  outline: 2px solid rgb(255 255 255 / 70%);
+  outline-offset: 1px;
 }
 .preview-check input[type="checkbox"] {
   accent-color: var(--accent);
@@ -1168,6 +1194,26 @@ th.num {
   max-width: 100%;
 }
 
+/* Two sheets abreast, so a whole book can be run through with an eye rather
+   than a thumb. It wraps rather than shrinking: the scale already fits two,
+   and a window too narrow for that should drop to one instead of squeezing. */
+.sheet-stack.level-spread {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 20px;
+}
+
+/* At page size the paper is wider than the screen on purpose - one page fills
+   it and the other half of the sheet is a swipe away. The frame scrolls, not
+   the screen, so everything around it stays where it was put. */
+.sheet-stack.level-page .sheet-frame {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
 .sheet-caption {
   margin-bottom: 7px;
   font-size: 0.72rem;
@@ -1215,13 +1261,14 @@ th.num {
   .preview-tools-spacer {
     display: none;
   }
-  .preview-zoom {
+  /* The sizes matter most on a phone, so they take the room rather than
+     sharing a line with a slider's label. */
+  .zoom-levels {
     flex: 1;
-    min-width: 140px;
   }
-  .preview-zoom input[type="range"] {
-    width: 100%;
+  .zoom-level {
     flex: 1;
+    padding: 8px 10px;
   }
   .preview-tools .btn {
     flex: 1;
