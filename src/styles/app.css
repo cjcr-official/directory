@@ -53,11 +53,13 @@ body {
 }
 
 /* Grows with the content instead of stopping at the viewport, so a background
-   on it covers the whole document rather than ending at the fold. Only
-   .shell's min-height reads this as a percentage, and nothing paints on the
-   shell; every full-height screen sizes itself in viewport units. */
+   on it covers the whole document rather than ending at the fold. Sized in the
+   same units as .shell deliberately: when the two disagree, the taller one
+   leaves dead space below the other that the sticky top bar scrolls away
+   into. */
 #root {
-  min-height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 html {
@@ -1373,16 +1375,24 @@ th.num {
     flex-direction: column;
   }
 
-  /* Pulled past the top, iOS rubber-bands and paints the gap it opens with the
-     canvas - the root element's background. Nothing inside the page can reach
-     that area: the overscroll is composited outside the page's own layer, so a
-     fixed element parked above the viewport never shows there, which is what an
-     earlier attempt at this got wrong. The canvas itself has to carry the
-     colour. The pale page background moves onto #root, which grows with the
-     content, so the page still reads light all the way down.
+  /* Two things stop a pull opening a band of near-white.
 
-     This colours the bounce at both ends, since a canvas has one colour. */
+     First, there is no bounce to fill. overscroll-behavior on the root element
+     is what governs the document's rubber-band, and turning it off means the
+     page simply stops at its ends - which also takes away the pull upward that
+     was scrolling the top bar out of sight.
+
+     Second, the colour, for any overscroll that still happens. Setting it on
+     html alone was not enough: WebKit went on painting the overscroll with
+     body's pale --canvas, which is why the gap stayed white after the last
+     attempt. So body takes the dark with it and the page background moves onto
+     #root, leaving nothing pale at document level to be picked up. */
   html {
+    overscroll-behavior: none;
+  }
+
+  html,
+  body {
     background: var(--brand-dark);
   }
 
