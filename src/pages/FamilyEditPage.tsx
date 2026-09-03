@@ -478,13 +478,15 @@ export function FamilyEditPage() {
                 </p>
               </fieldset>
 
-              <Checkbox
-                label="Include in printed directories"
-                hint="Turn off to keep the record but leave it out of every book."
-                checked={form.is_active}
-                disabled={!canEdit}
-                onChange={(value) => patch({ is_active: value })}
-              />
+              <div className="form-decision">
+                <Checkbox
+                  label="Include in printed directories"
+                  hint="Turn off to keep the record but leave it out of every book."
+                  checked={form.is_active}
+                  disabled={!canEdit}
+                  onChange={(value) => patch({ is_active: value })}
+                />
+              </div>
             </div>
           </div>
         </div>

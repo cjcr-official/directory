@@ -397,14 +397,21 @@ export function PersonEditPage() {
                   onCreated={reload}
                   onChange={setTagIds}
                 />
+                <p className="hint" style={{ marginTop: 8 }}>
+                  Groups are how you build a smaller directory later — tag the choir once, then
+                  print a choir booklet in two clicks.
+                </p>
               </fieldset>
 
-              <Checkbox
-                label="Include in printed directories"
-                checked={form.is_active}
-                disabled={!canEdit}
-                onChange={(value) => patch({ is_active: value })}
-              />
+              <div className="form-decision">
+                <Checkbox
+                  label="Include in printed directories"
+                  hint="Turn off to keep the record but leave it out of every book."
+                  checked={form.is_active}
+                  disabled={!canEdit}
+                  onChange={(value) => patch({ is_active: value })}
+                />
+              </div>
             </div>
           </div>
         </div>

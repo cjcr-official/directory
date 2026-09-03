@@ -368,9 +368,26 @@ p:last-child {
   font-weight: 600;
   color: var(--ink-2);
 }
-.field .hint {
+/* Anywhere, not only inside a .field. As a descendant selector this reached
+   none of the bare <p class="hint"> - the groups explanation, the photo
+   guidance, the tag picker's errors - so they rendered as full-size body
+   paragraphs in the middle of a form, heavier than the fields they explain. */
+.hint {
   font-size: 0.78rem;
   color: var(--ink-3);
+}
+/* A hint sits under the thing it explains and is spaced by it; the base
+   paragraph margin only adds a gap underneath. */
+p.hint {
+  margin-bottom: 0;
+}
+
+/* Its own decision, not a footnote to the block above - the include-in-print
+   checkbox was butting straight up against the end of the groups block. */
+.form-decision {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
 }
 
 input[type="text"],
@@ -390,6 +407,10 @@ textarea {
   border-radius: var(--radius-sm);
   padding: 7px 10px;
   width: 100%;
+  /* iOS sizes a date input from its own content and will happily run past the
+     card edge; these hold every field to the width it is given. */
+  min-width: 0;
+  max-width: 100%;
   transition:
     border-color 0.12s,
     box-shadow 0.12s;
@@ -490,9 +511,14 @@ legend {
 .btn.danger:hover:not(:disabled) {
   background: var(--danger-soft);
 }
+/* Quieter than a default button, but still visibly one. Transparent on both
+   counts left Cancel, Back and "+ New group" reading as bold text beside
+   whatever they sat next to - and next to a pill or a solid primary, the other
+   thing looked more like the button. */
 .btn.ghost {
-  border-color: transparent;
+  border-color: var(--line);
   background: transparent;
+  color: var(--ink-2);
 }
 .btn.ghost:hover:not(:disabled) {
   background: var(--canvas);
