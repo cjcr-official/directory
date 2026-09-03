@@ -10,6 +10,12 @@ interface Props {
   zoom: number;
   /** Only decides the layout around the paper; the scale arrives as zoom. */
   level?: "page" | "sheet" | "spread";
+  /**
+   * Draw the dashed line down each fold. Matches the option the PDF is written
+   * with, so the toggle that sets it can be seen doing something here rather
+   * than only in a file that has not been made yet.
+   */
+  guides?: boolean;
   /** Limits how many sheets are drawn, to keep a large book responsive. */
   limit?: number;
 }
@@ -172,7 +178,14 @@ function Page({
  * paints what the composer already worked out, which is what lets the screen
  * be trusted as a proof of the print.
  */
-export function BookPreview({ book, photoUrls, zoom, limit, level = "sheet" }: Props) {
+export function BookPreview({
+  book,
+  photoUrls,
+  zoom,
+  limit,
+  level = "sheet",
+  guides = true,
+}: Props) {
   const sheets = limit ? book.sheets.slice(0, limit) : book.sheets;
   const fontStack = CSS_FONT_STACKS[book.typeface as Typeface] ?? CSS_FONT_STACKS.sans;
 
@@ -198,7 +211,7 @@ export function BookPreview({ book, photoUrls, zoom, limit, level = "sheet" }: P
                 transformOrigin: "top left",
               }}
             >
-              {sheet.foldX.map((x, i) => (
+              {(guides ? sheet.foldX : []).map((x, i) => (
                 <div
                   key={`fold-${i}`}
                   className="fold-line"
