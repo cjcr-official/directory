@@ -128,7 +128,7 @@ export function FamiliesPage() {
                       <Avatar path={household.photo_path} initials={household.sort_name} />
                     </td>
                     <td>
-                      <Link className="list-link" to={`/families/${household.id}`}>
+                      <Link className="list-link row-link" to={`/families/${household.id}`}>
                         {household.display_name}
                       </Link>
                       {!household.is_active ? (

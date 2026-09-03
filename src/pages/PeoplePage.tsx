@@ -136,7 +136,7 @@ export function PeoplePage() {
                       />
                     </td>
                     <td>
-                      <Link className="list-link" to={`/people/${person.id}`}>
+                      <Link className="list-link row-link" to={`/people/${person.id}`}>
                         {fileAsName(person)}
                       </Link>
                       {!person.is_active ? (

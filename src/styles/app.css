@@ -579,6 +579,28 @@ th.num {
   text-decoration: underline;
 }
 
+/* The name was the only thing in a row you could hit. The portrait, the line
+   under it and every gap between them did nothing, so opening a record meant
+   aiming at a line of text - most of the way across a phone, and none of it
+   where a thumb lands. The row's own link now covers the whole row, and stays
+   a real link while it does: keyboard, middle-click and open-in-new-tab all
+   still work, which an onClick handler would have cost. */
+.list-table tbody tr {
+  position: relative;
+}
+.row-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+/* A person's row also links to their family, and that has to stay reachable
+   above the one covering everything. */
+.list-table .list-link:not(.row-link) {
+  position: relative;
+  z-index: 1;
+}
+
 /* --- bits ---------------------------------------------------------------- */
 
 .avatar {
