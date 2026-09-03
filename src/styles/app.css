@@ -891,10 +891,18 @@ th.num {
   }
 }
 
+/* One centred cluster: spinner, then its label under it.
+   Was display:grid, which put each child in its own implicit row - and rows
+   stretch by default, so the two halves of one message ended up 317px apart on
+   a phone, a quarter of the way down and three quarters of the way down. The
+   gap of 10px below never had a chance to apply. */
 .loading-screen {
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   min-height: 100vh;
+  min-height: 100dvh;
   gap: 10px;
   color: var(--ink-3);
 }
