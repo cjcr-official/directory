@@ -158,11 +158,40 @@ export async function deleteTag(id: string): Promise<void> {
 }
 
 /**
+ * PostgREST could not find the function it was asked for.
+ *
+ * Migrations here are pasted into the SQL editor by hand while the deploy goes
+ * out on its own, so a build can reach the site before 0003 reaches the
+ * database. That is not an error worth showing anyone - it just means the old
+ * path is still the only one available.
+ */
+function missingFunction(error: { code?: string; message: string }): boolean {
+  return error.code === "PGRST202" || /could not find the function/i.test(error.message);
+}
+
+/**
+ * True when the write went through the single-statement function, false when
+ * the database has not got it yet and the caller should do it the old way.
+ *
+ * The two-statement way leaves a moment with the links deleted and the
+ * replacements not yet written, and a connection that drops there loses them
+ * outright. 0003 adds functions that do both halves inside one transaction.
+ */
+async function tryReplaceLinks(
+  call: PromiseLike<{ error: { code?: string; message: string } | null }>,
+): Promise<boolean> {
+  const { error } = await call;
+  if (!error) return true;
+  if (missingFunction(error)) return false;
+  throw new Error(error.message);
+}
+
+/**
  * Replaces the whole tag set for one household or person.
  *
- * Written as two explicit branches rather than one parameterised query: the
- * join tables have different key columns, and spelling them out keeps the
- * query types checkable.
+ * The fallbacks are written out per table rather than shared: the join tables
+ * have different key columns, and spelling them out keeps the query types
+ * checkable, which a Record<string, unknown> row would not.
  */
 export async function setTags(
   kind: "household" | "person",
@@ -170,6 +199,13 @@ export async function setTags(
   tagIds: string[],
 ): Promise<void> {
   if (kind === "household") {
+    if (
+      await tryReplaceLinks(
+        supabase.rpc("set_household_tags", { p_household_id: id, p_tag_ids: tagIds }),
+      )
+    )
+      return;
+
     const remove = await supabase.from("household_tags").delete().eq("household_id", id);
     if (remove.error) throw new Error(remove.error.message);
     if (!tagIds.length) return;
@@ -179,6 +215,11 @@ export async function setTags(
     if (insert.error) throw new Error(insert.error.message);
     return;
   }
+
+  if (
+    await tryReplaceLinks(supabase.rpc("set_person_tags", { p_person_id: id, p_tag_ids: tagIds }))
+  )
+    return;
 
   const remove = await supabase.from("person_tags").delete().eq("person_id", id);
   if (remove.error) throw new Error(remove.error.message);
@@ -261,6 +302,13 @@ export async function deleteProject(id: string): Promise<void> {
 }
 
 export async function setProjectTags(projectId: string, tagIds: string[]): Promise<void> {
+  if (
+    await tryReplaceLinks(
+      supabase.rpc("set_project_tags", { p_project_id: projectId, p_tag_ids: tagIds }),
+    )
+  )
+    return;
+
   const remove = await supabase.from("project_tags").delete().eq("project_id", projectId);
   if (remove.error) throw new Error(remove.error.message);
   if (!tagIds.length) return;
@@ -275,6 +323,13 @@ export async function setProjectEntries(
   projectId: string,
   entries: { entry_type: "household" | "person"; ref_id: string }[],
 ): Promise<void> {
+  if (
+    await tryReplaceLinks(
+      supabase.rpc("set_project_entries", { p_project_id: projectId, p_entries: entries }),
+    )
+  )
+    return;
+
   const remove = await supabase.from("project_entries").delete().eq("project_id", projectId);
   if (remove.error) throw new Error(remove.error.message);
   if (!entries.length) return;

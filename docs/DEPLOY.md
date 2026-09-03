@@ -18,9 +18,17 @@ database exists.
 4. Paste the entire contents of `supabase/migrations/0001_initial_schema.sql`
    and run it. It should report success with no rows.
 5. New query again. Paste `supabase/migrations/0002_storage.sql` and run it.
+6. Once more for `supabase/migrations/0003_atomic_link_writes.sql`.
 
-Both files are safe to run twice, so if you are unsure whether one took, run it
-again.
+All three files are safe to run twice, so if you are unsure whether one took,
+run it again.
+
+An existing directory needs step 6 too. Setting a record's groups used to be a
+delete and an insert sent separately, with a moment in between where the record
+had none — and a connection that dropped there left it that way. 0003 adds the
+functions that do both halves at once. The app asks for them and quietly falls
+back to the old pair when they are not there, so nothing breaks while the file
+is still waiting to be run; it simply keeps the old risk until it is.
 
 > **What these do.** The first creates the tables and — more importantly — the
 > row level security policies that stop anyone reading the directory without an

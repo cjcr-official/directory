@@ -218,5 +218,51 @@ select assert(
   (select not public from storage.buckets where id = 'directory-photos'),
   'the photo bucket is private');
 
+-- --------------------------------------------------------------------------
+-- The link-setting functions from 0003
+--
+-- They are a second door into the same tables, and they are security invoker
+-- precisely so it is the same door. A definer function here would run as the
+-- owner and hand a viewer a way past every policy above, so these ask the new
+-- path the same questions the direct writes were asked.
+-- --------------------------------------------------------------------------
+
+insert into public.households (id, sort_name, display_name)
+  values ('dddddddd-0000-0000-0000-00000000000d', 'Probe', 'The Probe Family')
+  on conflict do nothing;
+insert into public.tags (id, name, color)
+  values ('eeeeeeee-0000-0000-0000-00000000000e', 'Probe group', '#2f6d63')
+  on conflict do nothing;
+
+-- One statement per step: an assertion that both performs a write and counts
+-- the rows it wrote is at the mercy of whichever side the planner evaluates
+-- first, which is not a thing to leave to chance in a security test.
+
+select assert(
+  rows_written(:'stranger_id',
+    $q$select public.set_household_tags(
+         'dddddddd-0000-0000-0000-00000000000d',
+         array['eeeeeeee-0000-0000-0000-00000000000e']::uuid[])$q$) <= 0,
+  'a stranger is refused by set_household_tags');
+
+select assert(
+  (select count(*) from public.household_tags
+     where household_id = 'dddddddd-0000-0000-0000-00000000000d') = 0,
+  'and the stranger changed no groups');
+
+-- The other half, so the assertions above are about the policy rather than
+-- about the function simply not working.
+select assert(
+  rows_written(:'editor_id',
+    $q$select public.set_household_tags(
+         'dddddddd-0000-0000-0000-00000000000d',
+         array['eeeeeeee-0000-0000-0000-00000000000e']::uuid[])$q$) >= 0,
+  'an editor is allowed through set_household_tags');
+
+select assert(
+  (select count(*) from public.household_tags
+     where household_id = 'dddddddd-0000-0000-0000-00000000000d') = 1,
+  'and the group the editor set is there');
+
 \echo ''
 \echo 'All row level security checks passed.'

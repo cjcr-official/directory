@@ -23,7 +23,13 @@ export interface PreparedPhoto {
 
 /** Decodes, downscales and re-encodes a chosen file as a JPEG. */
 export async function preparePhoto(file: File): Promise<PreparedPhoto> {
-  const bitmap = await createImageBitmap(file);
+  // A phone writes the sensor's pixels and an EXIF tag saying which way up they
+  // were held; asking for "from-image" is what applies that tag. Without it a
+  // portrait taken on a phone decodes on its side, and since the canvas below
+  // re-encodes it the wrong way round is what gets stored - and printed. The
+  // option has been the specified default for some time, but not for as long
+  // as the phones in a congregation have been in use, so it is asked for.
+  const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
   try {
     const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
     const width = Math.max(1, Math.round(bitmap.width * scale));

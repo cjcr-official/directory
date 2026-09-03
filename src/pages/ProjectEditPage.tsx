@@ -359,7 +359,11 @@ export function ProjectEditPage() {
                 />
                 {settings.showPhotos ? (
                   <div className="check-child">
-                    <Field label="Photo shape" htmlFor="photo_fit">
+                    <Field
+                      label="Photo shape"
+                      hint="Cropping gives every card the same shape, which is tidiest on the page."
+                      htmlFor="photo_fit"
+                    >
                       <select
                         id="photo_fit"
                         value={settings.photoFit}
@@ -368,7 +372,7 @@ export function ProjectEditPage() {
                           set({ photoFit: event.target.value as "fill" | "fit" })
                         }
                       >
-                        <option value="fill">Crop to a matching portrait (tidiest)</option>
+                        <option value="fill">Crop to a matching portrait</option>
                         <option value="fit">Show the whole photo</option>
                       </select>
                     </Field>
