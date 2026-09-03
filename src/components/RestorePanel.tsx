@@ -36,6 +36,8 @@ export function RestorePanel() {
   const [progress, setProgress] = useState<RestoreProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<RestoreResult | null>(null);
+  /** Set when a write failed, so the notice can say what to do about it. */
+  const [partial, setPartial] = useState(false);
 
   function forget() {
     setPlan(null);
@@ -45,6 +47,7 @@ export function RestorePanel() {
     setTyped("");
     setError(null);
     setResult(null);
+    setPartial(false);
     if (fileInput.current) fileInput.current.value = "";
   }
 
@@ -53,6 +56,7 @@ export function RestorePanel() {
     setReading(true);
     setError(null);
     setResult(null);
+    setPartial(false);
     setPlan(null);
     setTyped("");
     setMode("missing");
@@ -83,6 +87,7 @@ export function RestorePanel() {
     if (!plan || !live) return;
     setBusy(true);
     setError(null);
+    setPartial(false);
     try {
       const done = await applyRestore(plan, mode, live, setProgress);
       setResult(done);
@@ -92,7 +97,20 @@ export function RestorePanel() {
       if (fileInput.current) fileInput.current.value = "";
       await reload();
     } catch (cause) {
+      // The writes are separate requests, so a failure part way through leaves
+      // a half-restored directory. Running it again is safe - adding back
+      // skips what is already there by id, and replacing starts by clearing -
+      // but only against the directory as it now stands, so the plan and the
+      // chosen file are dropped and it has to be read again. Reusing this one
+      // would try to insert rows that landed before the failure.
+      setPartial(true);
       setError(cause instanceof Error ? cause.message : String(cause));
+      setPlan(null);
+      setLive(null);
+      setTyped("");
+      setFileName("");
+      if (fileInput.current) fileInput.current.value = "";
+      await reload();
     } finally {
       setBusy(false);
       setProgress(null);
@@ -302,7 +320,15 @@ export function RestorePanel() {
 
         {error ? (
           <div style={{ marginTop: 14 }}>
-            <Notice kind="error">{error}</Notice>
+            <Notice kind="error">
+              {error}
+              {partial ? (
+                <div style={{ marginTop: 8 }}>
+                  Some of it may have been written before this stopped. Choose the same file again
+                  and it will pick up from where the directory now is — nothing goes in twice.
+                </div>
+              ) : null}
+            </Notice>
           </div>
         ) : null}
 
