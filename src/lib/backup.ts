@@ -68,6 +68,9 @@ function familiesCsv(data: DirectoryData): string {
     household.anniversary,
     tagNames(data.tags, linked.get(household.id) ?? []),
     household.notes,
+    // Office-only, and in the spreadsheet for the same reason it is in the
+    // JSON: a backup that cannot rebuild what was on screen is not a backup.
+    household.office_label ?? "",
     household.is_active,
     household.photo_path ? `photos/${household.photo_path}` : "",
     household.id,
@@ -88,6 +91,7 @@ function familiesCsv(data: DirectoryData): string {
       "Anniversary",
       "Groups",
       "Notes",
+      "Which one (office only)",
       "In printed directories",
       "Photo file",
       "Id",

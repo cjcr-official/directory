@@ -9,7 +9,7 @@ import { Avatar, Checkbox, ConfirmButton, Field, LoadingScreen, Notice } from "@
 import type { HouseholdRole, PersonRow } from "@/lib/database.types";
 import { removePhoto, uploadPhoto } from "@/lib/photos";
 import { createPerson, deletePerson, isStaleWrite, setTags, updatePerson } from "@/lib/queries";
-import { addressLines, fullName, samePersonName } from "@/lib/format";
+import { addressLines, fullName, labelledHouseholdName, samePersonName } from "@/lib/format";
 
 const ROLES: { value: HouseholdRole; label: string }[] = [
   { value: "head", label: "Head of household" },
@@ -457,7 +457,7 @@ export function PersonEditPage() {
                   <option value="">Not in a family — prints on their own</option>
                   {households.map((option) => (
                     <option key={option.id} value={option.id}>
-                      {option.display_name}
+                      {labelledHouseholdName(option)}
                     </option>
                   ))}
                 </select>

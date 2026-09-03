@@ -87,8 +87,56 @@ export async function fetchDirectory(): Promise<DirectoryData> {
 
 export type HouseholdInput = Omit<HouseholdRow, "id" | "created_at" | "updated_at">;
 
+/**
+ * PostgREST was asked to write a column the table has not got.
+ *
+ * Migrations here are pasted into the SQL editor by hand while the deploy goes
+ * out on its own, so a build that knows about office_label can reach the site
+ * before 0004 reaches the database. Refusing the whole save then would mean an
+ * address change could not be made until somebody ran a migration, which is a
+ * far worse failure than the label not sticking.
+ */
+export function missingColumn(error: { code?: string; message: string }): boolean {
+  return error.code === "PGRST204" || /could not find the .* column/i.test(error.message);
+}
+
+/**
+ * Set the first time a write has to drop office_label to get through.
+ *
+ * A property of the database rather than of any one call - once it is known
+ * that 0004 has not been run, it stays known - so the family form can say so
+ * instead of letting a label the office typed disappear without explanation.
+ * It is never unset: the app is reloaded when a migration is run.
+ */
+let officeLabelDropped = false;
+
+/** True once a write has had to leave the office label out to succeed. */
+export function officeLabelUnavailable(): boolean {
+  return officeLabelDropped;
+}
+
+/** Called from each fallback, where dropping the column is actually decided. */
+export function noteOfficeLabelMissing(): void {
+  officeLabelDropped = true;
+}
+
+/** The same write with the columns 0004 adds taken back out of it. */
+export function withoutOfficeLabel<T extends { office_label?: string | null }>(
+  patch: T,
+): Omit<T, "office_label"> {
+  const { office_label: _dropped, ...rest } = patch;
+  return rest;
+}
+
 export async function createHousehold(input: HouseholdInput): Promise<HouseholdRow> {
-  return unwrap(await supabase.from("households").insert(input).select().single());
+  const first = await supabase.from("households").insert(input).select().single();
+  if (first.error && "office_label" in input && missingColumn(first.error)) {
+    noteOfficeLabelMissing();
+    return unwrap(
+      await supabase.from("households").insert(withoutOfficeLabel(input)).select().single(),
+    );
+  }
+  return unwrap(first);
 }
 
 /**
@@ -145,10 +193,21 @@ export async function updateHousehold(
   patch: Partial<HouseholdInput>,
   expectedUpdatedAt?: string | null,
 ): Promise<HouseholdRow> {
-  let query = supabase.from("households").update(patch).eq("id", id);
-  if (expectedUpdatedAt) query = query.eq("updated_at", expectedUpdatedAt);
+  const write = (body: Partial<HouseholdInput>) => {
+    let query = supabase.from("households").update(body).eq("id", id);
+    if (expectedUpdatedAt) query = query.eq("updated_at", expectedUpdatedAt);
+    return query.select();
+  };
 
-  const rows = unwrap(await query.select()) as HouseholdRow[];
+  let result = await write(patch);
+  // The retry keeps expectedUpdatedAt, so a save that races somebody else is
+  // still refused rather than quietly let through by the second attempt.
+  if (result.error && "office_label" in patch && missingColumn(result.error)) {
+    noteOfficeLabelMissing();
+    result = await write(withoutOfficeLabel(patch));
+  }
+
+  const rows = unwrap(result) as HouseholdRow[];
   return rows[0] ?? (await explainMiss("households", "family", id));
 }
 

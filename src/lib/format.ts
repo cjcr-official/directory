@@ -106,6 +106,41 @@ export function sameDisplayName(a: string, b: string): boolean {
 }
 
 /**
+ * A family's name with the office's label after it, where there is one.
+ *
+ * Used on the three screens that show a family by name and nothing else - the
+ * family a person belongs to, the Family column on the people list, and the
+ * hand-picked checklist. Everywhere a reader can see, and everywhere the book
+ * is composed from, uses display_name on its own.
+ */
+export function labelledHouseholdName(
+  household: Pick<HouseholdRow, "display_name"> & { office_label?: string | null },
+): string {
+  const label = household.office_label?.trim();
+  return label ? `${household.display_name} (${label})` : household.display_name;
+}
+
+/**
+ * The next free number for a family that shares its name with another.
+ *
+ * Only ever a suggestion, and deliberately the smallest unused one rather than
+ * a count: numbers are labels, not positions. A family leaving does not
+ * renumber the rest - the gap it leaves is simply available again, and every
+ * other family keeps the label the office already knows it by.
+ */
+export function suggestOfficeLabel(taken: (string | null | undefined)[]): string {
+  const used = new Set(
+    taken
+      .map((label) => label?.trim())
+      .filter((label): label is string => Boolean(label && /^\d+$/.test(label)))
+      .map(Number),
+  );
+  let next = 1;
+  while (used.has(next)) next += 1;
+  return String(next);
+}
+
+/**
  * Every name one person answers to, as sort keys.
  *
  * Usually one. Someone with a preferred name answers to two - William Smith is

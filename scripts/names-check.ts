@@ -8,7 +8,12 @@
  * Run with: npm run names:check
  */
 
-import { sameDisplayName, samePersonName } from "@/lib/format";
+import {
+  labelledHouseholdName,
+  sameDisplayName,
+  samePersonName,
+  suggestOfficeLabel,
+} from "@/lib/format";
 import type { PersonRow } from "@/lib/database.types";
 
 let failures = 0;
@@ -110,6 +115,66 @@ console.log("\nfamilies whose cards would read the same");
   check("different names", sameDisplayName("The Smith Family", "The Jones Family"), false);
   check("an empty name matches nothing", sameDisplayName("", ""), false);
   check("an empty name against a real one", sameDisplayName("", "The Smith Family"), false);
+}
+
+console.log("\ntelling two same-named families apart, in the office");
+{
+  const named = (display_name: string, office_label: string | null = null) => ({
+    display_name,
+    office_label,
+  });
+
+  check(
+    "a family with no label reads exactly as before",
+    labelledHouseholdName(named("The Johnston Family")),
+    "The Johnston Family",
+  );
+  check(
+    "a labelled family carries it beside the name",
+    labelledHouseholdName(named("The Johnston Family", "2")),
+    "The Johnston Family (2)",
+  );
+  check(
+    "the label can be words rather than a number",
+    labelledHouseholdName(named("The Johnston Family", "Elm St")),
+    "The Johnston Family (Elm St)",
+  );
+  // An input that has been typed in and cleared holds "", and a row from a
+  // database that has not run 0004 holds nothing at all. Neither is a label.
+  check(
+    "an empty label is no label",
+    labelledHouseholdName(named("The Smith Family", "")),
+    "The Smith Family",
+  );
+  check(
+    "a label of only spaces is no label",
+    labelledHouseholdName(named("The Smith Family", "   ")),
+    "The Smith Family",
+  );
+  check(
+    "a row from before the migration",
+    labelledHouseholdName({ display_name: "The Smith Family" }),
+    "The Smith Family",
+  );
+}
+
+console.log("\nwhich number to suggest next");
+{
+  check("nobody is labelled yet", suggestOfficeLabel([]), "1");
+  check("one family is already 1", suggestOfficeLabel(["1"]), "2");
+  check("two are taken", suggestOfficeLabel(["1", "2"]), "3");
+  check("they were not entered in order", suggestOfficeLabel(["3", "1"]), "2");
+  check("blanks and nothings do not count", suggestOfficeLabel([null, undefined, "", "  "]), "1");
+  check("stray spaces around a number still count", suggestOfficeLabel([" 1 "]), "2");
+  check("a worded label does not consume a number", suggestOfficeLabel(["Elm St"]), "1");
+  check("a worded label alongside a numbered one", suggestOfficeLabel(["Elm St", "1"]), "2");
+
+  // The point of the gap: a family that leaves must not renumber the ones that
+  // stay. If 2 moves away, the office still knows the other two as 1 and 3,
+  // and the next family to need a label takes the 2 that came free - rather
+  // than every card and every habit shifting by one.
+  check("a family that left leaves its number free", suggestOfficeLabel(["1", "3"]), "2");
+  check("and the one after that", suggestOfficeLabel(["1", "2", "3"]), "4");
 }
 
 console.log(failures === 0 ? "\nno problems found in this pass" : `\n${failures} CHECKS FAILED`);

@@ -26,6 +26,7 @@ import {
   type Typeface,
 } from "@/lib/layout/settings";
 import { resolveEntries, type Selection } from "@/lib/projectEntries";
+import { labelledHouseholdName } from "@/lib/format";
 
 export function ProjectEditPage() {
   const { id } = useParams();
@@ -98,6 +99,21 @@ export function ProjectEditPage() {
   );
 
   const included = useMemo(() => resolveEntries(entries, selection), [entries, selection]);
+
+  // The checklist is the one place a family is picked by its name alone, so it
+  // is the one place the office label belongs. It is added here rather than in
+  // buildEntries because `title` is also what the printed card and the index
+  // are composed from - putting it there would print the office's filing note
+  // in the congregation's book.
+  const pickable = useMemo(
+    () =>
+      entries.map((entry) => ({
+        type: entry.type,
+        id: entry.id,
+        title: entry.type === "household" ? labelledHouseholdName(entry.household) : entry.title,
+      })),
+    [entries],
+  );
   // The rows/columns inputs can hold a half-typed or empty value; the summary
   // and the saved record both use the clamped version so neither can show or
   // store "0 records to a sheet".
@@ -319,7 +335,7 @@ export function ProjectEditPage() {
 
                 {mode === "manual" ? (
                   <ManualPicker
-                    entries={entries}
+                    entries={pickable}
                     picked={picked}
                     disabled={!canEdit}
                     onChange={setPicked}

@@ -296,6 +296,65 @@ async function main() {
     );
   }
 
+  // ---- 9. the office's label never reaches paper ---------------------------
+  {
+    // The whole promise of office_label is that it is for the office. It is
+    // written next to display_name on the same row, and display_name is what
+    // heads the card and fills the index - so a card or index line built by
+    // spreading the household, or by reaching for the wrong field, would print
+    // the office's filing note in the congregation's book. Nobody would see it
+    // until it came back from the printer.
+    const labelled = {
+      households: [
+        blankHousehold({ id: "h1", office_label: "1" }),
+        blankHousehold({ id: "h2", office_label: "Elm St" }),
+        // The index lists members by name and falls back to the family's own
+        // name only when it has none - so an empty family is the only shape
+        // that puts display_name in the index at all, and the only one that
+        // can carry a label there.
+        blankHousehold({ id: "h3", office_label: "3", sort_name: "Alvarez" }),
+      ],
+      people: [
+        blankPerson({ id: "p1", household_id: "h1", first_name: "Ann" }),
+        blankPerson({ id: "p2", household_id: "h2", first_name: "Bob" }),
+      ],
+      tags: [],
+      householdTags: [],
+      personTags: [],
+    };
+    // The same congregation with nobody labelled, to compare against.
+    const plain = {
+      ...labelled,
+      households: labelled.households.map(
+        ({ office_label: _dropped, ...rest }) => rest as HouseholdRow,
+      ),
+    };
+
+    const settings = normalizeSettings({
+      ...DEFAULT_SETTINGS,
+      includeCover: true,
+      includeIndex: true,
+    });
+    const withLabels = composeBook(buildEntries(labelled), settings, metrics);
+    const withoutLabels = composeBook(buildEntries(plain), settings, metrics);
+
+    // Every string the book will draw, cards and index alike.
+    const printed = JSON.stringify(withLabels);
+    const leaked = ["(1)", "Elm St", "(3)", "office_label"].filter((needle) =>
+      printed.includes(needle),
+    );
+
+    ok(leaked.length === 0, `the office label reached the page: ${leaked.join(", ")}`);
+    ok(
+      JSON.stringify(withLabels) === JSON.stringify(withoutLabels),
+      "labelling a family changed the composed book",
+    );
+    console.log(
+      `office labels: ${withLabels.index.length} index lines, ` +
+        `${leaked.length ? leaked.join(", ") : "nothing"} leaked onto the page`,
+    );
+  }
+
   // -------------------------------------------------------------------------
   // Measuring text is cached, and a cache that returns a wrong width would not
   // throw - it would set a line slightly off and print it that way. So compose

@@ -8,6 +8,7 @@ import {
   fileAsName,
   formatPhone,
   formatShortDate,
+  labelledHouseholdName,
   personPhotoPath,
   sortKey,
 } from "@/lib/format";
@@ -148,7 +149,7 @@ export function PeoplePage() {
                     <td className="small">
                       {household ? (
                         <Link className="list-link" to={`/families/${household.id}`}>
-                          {household.display_name}
+                          {labelledHouseholdName(household)}
                         </Link>
                       ) : (
                         <span className="muted">On their own</span>
