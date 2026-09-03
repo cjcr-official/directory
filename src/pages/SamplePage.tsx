@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { BookPreview } from "@/components/BookPreview";
+import { PreviewZoom, usePreviewZoom } from "@/components/PreviewZoom";
 import { LoadingScreen, Notice } from "@/components/ui";
 import { buildDemoData } from "@/lib/demo";
 import { makeDemoPortrait } from "@/lib/demoPortraits";
@@ -19,10 +20,10 @@ export function SamplePage() {
   const [book, setBook] = useState<BookModel | null>(null);
   const [photoUrls, setPhotoUrls] = useState<Map<string, string>>(new Map());
   const [photoBlobs, setPhotoBlobs] = useState<Map<string, Blob>>(new Map());
-  const [zoom, setZoom] = useState(0.7);
   const [building, setBuilding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const { level, setLevel, scale } = usePreviewZoom(book, canvasRef);
 
   useEffect(() => {
     let active = true;
@@ -76,17 +77,6 @@ export function SamplePage() {
       for (const url of created) URL.revokeObjectURL(url);
     };
   }, []);
-
-  useEffect(() => {
-    if (!book) return;
-    const fit = () => {
-      const available = (canvasRef.current?.clientWidth ?? window.innerWidth) - 48;
-      setZoom(Math.min(1.1, Math.max(0.25, available / (book.width * (96 / 72)))));
-    };
-    fit();
-    window.addEventListener("resize", fit);
-    return () => window.removeEventListener("resize", fit);
-  }, [book]);
 
   async function download() {
     if (!book) return;
@@ -150,18 +140,7 @@ export function SamplePage() {
         </div>
 
         <div className="preview-tools">
-          <label className="preview-zoom">
-            <span>Zoom</span>
-            <input
-              type="range"
-              min={0.25}
-              max={1.5}
-              step={0.05}
-              value={zoom}
-              aria-label="Zoom"
-              onChange={(event) => setZoom(Number(event.target.value))}
-            />
-          </label>
+          <PreviewZoom value={level} onChange={setLevel} />
 
           <span className="preview-tools-spacer" />
 
@@ -185,7 +164,7 @@ export function SamplePage() {
       </div>
 
       <div className="preview-canvas" ref={canvasRef}>
-        <BookPreview book={book} photoUrls={photoUrls} zoom={zoom} limit={12} />
+        <BookPreview book={book} photoUrls={photoUrls} zoom={scale} level={level} limit={12} />
       </div>
     </div>
   );
