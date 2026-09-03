@@ -802,8 +802,15 @@ function composeCover(
 
   /** The rules top and bottom. Ink enough to frame the page, not to flood it. */
   const BAND = 6;
-  const PHOTO_TARGET = W * 0.56;
-  const PHOTO_MIN = 96;
+  /**
+   * The picture keeps this shape whatever room it is given. Squeezing the
+   * height alone - which is what it used to do when a long vision statement
+   * took the space - left a 349x119 slot, and a photograph cropped to nearly
+   * three to one loses whatever it was of: the church sign on the cover this
+   * was built from had its top line cut off.
+   */
+  const PHOTO_ASPECT = 0.56;
+  const PHOTO_MIN_WIDTH = W * 0.52;
 
   const lay = (text: string, size: number, weight: FontWeight, width: number): string[] =>
     text
@@ -930,13 +937,17 @@ function composeCover(
     0,
   );
 
-  // --- the photograph, full width, taking whatever is spare -----------------
+  // --- the photograph, taking whatever is spare, in one piece ---------------
+  //
+  // Full width when there is room for it, and a smaller plate centred on the
+  // page when there is not - never the same picture flattened.
   if (settings.coverPhotoPath) {
     const spare = floor - y - middleHeight - 46;
-    const height = Math.min(PHOTO_TARGET, spare);
-    if (height >= PHOTO_MIN) {
+    const height = Math.min(W * PHOTO_ASPECT, spare);
+    const width = height / PHOTO_ASPECT;
+    if (width >= PHOTO_MIN_WIDTH) {
       page.photos.push({
-        box: { x: 0, y, w: W, h: height },
+        box: { x: (W - width) / 2, y, w: width, h: height },
         path: settings.coverPhotoPath,
         fit: "fill",
         initials: "",

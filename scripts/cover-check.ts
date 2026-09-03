@@ -90,6 +90,22 @@ const cases: [string, Partial<ProjectSettings>][] = [
     },
   ],
   [
+    // The shape from the office: a short headline sitting on top of everything
+    // else, which is what squeezed the picture flat.
+    "a short title with everything else",
+    {
+      churchName: "Plains Alliance Church",
+      coverTitle: "Yo",
+      coverSubtitle: "2026 Spring Directory",
+      coverStatement:
+        "OUR VISION...\nTo be a God-glorifying, Spirit-filled community of believers, discipling one another & impacting the world for Christ.",
+      coverContact:
+        "505 West 5th Street\nP.O. Box 368\nPlains, MT 59859\n406.826.3916\noffice@cmaplains.org",
+      coverPhotoPath: "a.jpg",
+      coverLogoPath: "b.jpg",
+    },
+  ],
+  [
     "one column",
     {
       columns: 1,
@@ -153,6 +169,23 @@ for (const [name, overrides] of cases) {
       (!rights.length || Math.max(...rights) <= geoW + 0.5),
     `${lefts.length ? Math.min(...lefts).toFixed(1) : "-"}..${rights.length ? Math.max(...rights).toFixed(1) : "-"} of ${geoW.toFixed(1)}`,
   );
+
+  for (const photo of cover.photos) {
+    // The logo is fitted whole, so only the filled picture is cropped and only
+    // its shape matters.
+    if (photo.fit !== "fill") continue;
+    const ratio = photo.box.w / photo.box.h;
+    check(
+      `${name}: the picture keeps its shape`,
+      ratio > 1.6 && ratio < 1.95,
+      `${photo.box.w.toFixed(0)}x${photo.box.h.toFixed(0)} = ${ratio.toFixed(2)}:1`,
+    );
+    check(
+      `${name}: the picture is centred`,
+      Math.abs(photo.box.x - ox + photo.box.w / 2 - geoW / 2) < 0.5,
+      `${(photo.box.x - ox).toFixed(1)}`,
+    );
+  }
 
   if (overrides.coverContact) {
     const contactLines = cover.runs.filter((r) => Math.abs(r.size - 9.5) < 0.01);
