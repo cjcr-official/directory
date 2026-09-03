@@ -336,6 +336,35 @@ function householdBlocks(
       color: COLORS.muted,
       spaceBefore: 3,
     });
+  } else if (settings.showMembers && settings.memberStyle === "compact") {
+    // A family with no shared home line still has people who can be reached.
+    //
+    // Only the family's own record was ever consulted here, so a congregation
+    // that keeps a mobile against each person - which is most of them now -
+    // switched "Phone numbers" on, got nothing, and had nothing on screen to
+    // say why. Detailed members already put these on each member's own line,
+    // which is why only compact needs the fallback; and it is skipped when
+    // members are not listed at all, so this can never reintroduce a name the
+    // settings asked to leave off.
+    let first = true;
+    for (const member of members) {
+      const theirs = join(
+        [
+          settings.showPhone ? formatPhone(member.phone) : "",
+          settings.showEmail ? (member.email ?? "") : "",
+        ],
+        " · ",
+      );
+      if (!theirs) continue;
+      blocks.push({
+        text: `${firstName(member)} — ${theirs}`,
+        size: type.small,
+        weight: "regular",
+        color: COLORS.muted,
+        spaceBefore: first ? 3 : 0,
+      });
+      first = false;
+    }
   }
 
   // Birthdays belong to people, so in detailed mode they are already beside
