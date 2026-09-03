@@ -110,7 +110,12 @@ p:last-child {
 
 .shell {
   display: flex;
-  min-height: 100%;
+  /* Viewport units, not a percentage: #root is min-height, so it has no
+     definite height for a percentage to resolve against and the shell would
+     collapse to its content, leaving the page short of the bottom of the
+     screen. .auth-screen and .sidebar size themselves the same way. */
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .sidebar {
@@ -223,19 +228,10 @@ p:last-child {
   flex: 0 0 auto;
 }
 
-/* The way out at one end, the build at the other. The version was loose text
-   under everything else, which read as something left switched on rather than
-   as a footnote to the account. */
-.sidebar-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  /* The pair fits the 232px desktop sidebar with about eight pixels to spare,
-     which a wider mono face would eat. Wrapping puts the version on its own
-     line rather than pushing it out of the drawer. */
-  flex-wrap: wrap;
-  row-gap: 8px;
+/* Left, at its own width - a full-width bar would give a rarely-used action
+   more weight than it deserves. */
+.sidebar-signout {
+  align-self: flex-start;
 }
 
 .main {
@@ -829,13 +825,25 @@ th.num {
   color: var(--ink-3);
 }
 
+/* The build sits at the very bottom, where it was, but as a label and a value
+   with a rule above them rather than a line of loose mono - so it reads as a
+   stamp on the drawer instead of as text someone forgot to take out. A settled
+   grey, too, rather than a faded one: quiet on purpose, not half-erased. */
 .sidebar-version {
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.02em;
-  /* A settled grey rather than a faded one: it is quiet on purpose, not
-     half-erased. */
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 0.72rem;
   color: var(--ink-3);
+}
+
+.sidebar-build {
+  font-family: var(--mono);
+  letter-spacing: 0.02em;
   white-space: nowrap;
 }
 

@@ -91,15 +91,18 @@ export function AppShell() {
           {individuals > 0 ? (
             <div className="muted small">{individuals} listed on their own</div>
           ) : null}
-          <div className="sidebar-actions">
-            <button type="button" className="btn small" onClick={() => void signOut()}>
-              Sign out
-            </button>
-            {/* So "which version are you on?" has an answer that does not
-                involve reading a URL bar that is not there. */}
-            <span className="sidebar-version" title={`Build ${APP_VERSION}`}>
-              Version {APP_VERSION.slice(0, 7)}
-            </span>
+          <button
+            type="button"
+            className="btn small sidebar-signout"
+            onClick={() => void signOut()}
+          >
+            Sign out
+          </button>
+          {/* So "which version are you on?" has an answer that does not
+              involve reading a URL bar that is not there. */}
+          <div className="sidebar-version" title={`Build ${APP_VERSION}`}>
+            <span>Version</span>
+            <span className="sidebar-build">{APP_VERSION.slice(0, 7)}</span>
           </div>
         </div>
       </nav>
