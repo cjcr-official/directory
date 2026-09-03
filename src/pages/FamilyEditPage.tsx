@@ -9,6 +9,7 @@ import { Avatar, Checkbox, ConfirmButton, Field, LoadingScreen, Notice } from "@
 import type { HouseholdRole, HouseholdRow } from "@/lib/database.types";
 import { removePhoto, uploadPhoto } from "@/lib/photos";
 import {
+  isStaleWrite,
   createHousehold,
   deleteHousehold,
   setPersonHousehold,
@@ -95,10 +96,26 @@ export function FamilyEditPage() {
   const [nameTouched, setNameTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * The version this form was opened on. Not read from `existing`, which is
+   * refreshed by every reload and would quietly become whatever is current -
+   * the point is to hold the value that was on screen when the typing started.
+   */
+  const [openedAt, setOpenedAt] = useState<string | null>(null);
+  const [stale, setStale] = useState(false);
+  /**
+   * Bumped to fill the form in again from the record as it now stands. The
+   * effect below keys on the record's id, which does not change when somebody
+   * else's version is pulled in, so without this "reload" would leave the old
+   * typing on screen and change nothing.
+   */
+  const [reseed, setReseed] = useState(0);
 
   useEffect(() => {
     if (isNew || !existing) return;
     setForm({ ...existing });
+    setPhotoBlob(null);
+    setPhotoRemoved(false);
     setMembers(
       membersOf(existing.id).map((person) => ({
         id: person.id,
@@ -107,7 +124,9 @@ export function FamilyEditPage() {
     );
     setTagIds(tagsOfHousehold(existing.id));
     setNameTouched(true);
-  }, [existing?.id, isNew]); // eslint-disable-line react-hooks/exhaustive-deps
+    setOpenedAt(existing.updated_at);
+    setStale(false);
+  }, [existing?.id, isNew, reseed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const memberPeople = useMemo(
     () => members.map((m) => ({ link: m, person: personById.get(m.id) })).filter((m) => m.person),
@@ -206,7 +225,7 @@ export function FamilyEditPage() {
    * the submit handler so "add a new person" can save first and come back to a
    * family that exists, rather than losing what was typed.
    */
-  async function persist(): Promise<string> {
+  async function persist(force = false): Promise<string> {
     let photoPath = form.photo_path;
     if (photoRemoved && form.photo_path) {
       await removePhoto(form.photo_path);
@@ -231,8 +250,9 @@ export function FamilyEditPage() {
     };
 
     const household = existing
-      ? await updateHousehold(existing.id, payload)
+      ? await updateHousehold(existing.id, payload, force ? null : openedAt)
       : await createHousehold(payload);
+    setOpenedAt(household.updated_at);
 
     await setTags("household", household.id, tagIds);
 
@@ -275,12 +295,40 @@ export function FamilyEditPage() {
       return;
     }
 
+    await store(false);
+  }
+
+  /**
+   * Throws this browser's typing away and shows the family as somebody else
+   * left it. The reload has to land before the form is filled in again, or it
+   * would be seeded from the same stale copy it is trying to replace.
+   */
+  async function discardMine() {
+    setSaving(true);
+    try {
+      await reload();
+      setError(null);
+      setStale(false);
+      setReseed((n) => n + 1);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /**
+   * Writes the family and goes to it. `force` drops the check that the record
+   * has not moved since it was opened - only reached by the button offered
+   * when it has, so overwriting somebody is a decision rather than an accident.
+   */
+  async function store(force: boolean) {
     setSaving(true);
     setError(null);
     try {
-      const householdId = await persist();
+      const householdId = await persist(force);
+      setStale(false);
       navigate(`/families/${householdId}`, { replace: true });
     } catch (cause) {
+      setStale(isStaleWrite(cause));
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setSaving(false);
@@ -300,6 +348,9 @@ export function FamilyEditPage() {
       const householdId = await persist();
       navigate(`/people/new?household=${householdId}`);
     } catch (cause) {
+      // Same conflict can happen on this path, so offer the same way out of it
+      // rather than a message with nothing to do about it.
+      setStale(isStaleWrite(cause));
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setSaving(false);
@@ -320,7 +371,31 @@ export function FamilyEditPage() {
         </Link>
       </div>
 
-      {error ? <Notice kind="error">{error}</Notice> : null}
+      {error ? (
+        <Notice kind="error">
+          {error}
+          {stale ? (
+            <div className="row tight" style={{ marginTop: 10 }}>
+              <button
+                type="button"
+                className="btn small"
+                disabled={saving}
+                onClick={() => void discardMine()}
+              >
+                Reload and lose my changes
+              </button>
+              <button
+                type="button"
+                className="btn small danger"
+                disabled={saving}
+                onClick={() => void store(true)}
+              >
+                Save mine over theirs
+              </button>
+            </div>
+          ) : null}
+        </Notice>
+      ) : null}
 
       <form onSubmit={save}>
         <div className="grid two" style={{ alignItems: "start" }}>

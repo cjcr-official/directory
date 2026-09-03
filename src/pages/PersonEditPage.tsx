@@ -8,7 +8,7 @@ import { TagPicker } from "@/components/TagPicker";
 import { Avatar, Checkbox, ConfirmButton, Field, LoadingScreen, Notice } from "@/components/ui";
 import type { HouseholdRole, PersonRow } from "@/lib/database.types";
 import { removePhoto, uploadPhoto } from "@/lib/photos";
-import { createPerson, deletePerson, setTags, updatePerson } from "@/lib/queries";
+import { createPerson, deletePerson, isStaleWrite, setTags, updatePerson } from "@/lib/queries";
 import { addressLines } from "@/lib/format";
 
 const ROLES: { value: HouseholdRole; label: string }[] = [
@@ -58,6 +58,20 @@ export function PersonEditPage() {
   const [photoRemoved, setPhotoRemoved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * The version this form was opened on. Not read from `existing`, which every
+   * reload refreshes - the point is the value that was on screen when the
+   * typing started.
+   */
+  const [openedAt, setOpenedAt] = useState<string | null>(null);
+  const [stale, setStale] = useState(false);
+  /**
+   * Bumped to fill the form in again from the record as it now stands. The
+   * effect below keys on the record's id, which does not change when somebody
+   * else's version is pulled in, so without this "reload" would leave the old
+   * typing on screen and change nothing.
+   */
+  const [reseed, setReseed] = useState(0);
 
   useEffect(() => {
     if (isNew) {
@@ -68,8 +82,12 @@ export function PersonEditPage() {
     }
     if (!existing) return;
     setForm({ ...existing });
+    setPhotoBlob(null);
+    setPhotoRemoved(false);
+    setOpenedAt(existing.updated_at);
+    setStale(false);
     setTagIds(tagsOfPerson(existing.id));
-  }, [existing?.id, isNew]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [existing?.id, isNew, reseed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!isNew && loading && !existing) return <LoadingScreen />;
   if (!isNew && !loading && !existing) {
@@ -94,6 +112,32 @@ export function PersonEditPage() {
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
+    await store(false);
+  }
+
+  /**
+   * Throws this browser's typing away and shows the person as somebody else
+   * left them. The reload has to land before the form is filled in again, or
+   * it would be seeded from the same stale copy it is trying to replace.
+   */
+  async function discardMine() {
+    setSaving(true);
+    try {
+      await reload();
+      setError(null);
+      setStale(false);
+      setReseed((n) => n + 1);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /**
+   * `force` drops the check that the record has not moved since it was opened.
+   * Only reached from the button offered when it has, so overwriting somebody
+   * is a decision rather than an accident.
+   */
+  async function store(force: boolean) {
     if (!canEdit) return;
 
     if (!form.first_name.trim() || !form.last_name.trim()) {
@@ -138,8 +182,10 @@ export function PersonEditPage() {
       };
 
       const person = existing
-        ? await updatePerson(existing.id, payload)
+        ? await updatePerson(existing.id, payload, force ? null : openedAt)
         : await createPerson(payload);
+      setOpenedAt(person.updated_at);
+      setStale(false);
       await setTags("person", person.id, tagIds);
       await reload();
       // Made from a family's page, so go back there - that is the job that
@@ -149,6 +195,7 @@ export function PersonEditPage() {
         replace: true,
       });
     } catch (cause) {
+      setStale(isStaleWrite(cause));
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setSaving(false);
@@ -178,7 +225,31 @@ export function PersonEditPage() {
         </Link>
       </div>
 
-      {error ? <Notice kind="error">{error}</Notice> : null}
+      {error ? (
+        <Notice kind="error">
+          {error}
+          {stale ? (
+            <div className="row tight" style={{ marginTop: 10 }}>
+              <button
+                type="button"
+                className="btn small"
+                disabled={saving}
+                onClick={() => void discardMine()}
+              >
+                Reload and lose my changes
+              </button>
+              <button
+                type="button"
+                className="btn small danger"
+                disabled={saving}
+                onClick={() => void store(true)}
+              >
+                Save mine over theirs
+              </button>
+            </div>
+          ) : null}
+        </Notice>
+      ) : null}
 
       <form onSubmit={save}>
         <div className="grid two" style={{ alignItems: "start" }}>

@@ -91,11 +91,65 @@ export async function createHousehold(input: HouseholdInput): Promise<HouseholdR
   return unwrap(await supabase.from("households").insert(input).select().single());
 }
 
+/**
+ * Raised when a record was saved by somebody else while this browser had it
+ * open. The write is refused rather than applied, because applying it would
+ * throw their work away without either of them being told.
+ */
+export class StaleWriteError extends Error {
+  readonly stale = true;
+  constructor(what: string) {
+    super(
+      `Somebody else saved this ${what} while you had it open. Nothing has been saved, ` +
+        `so their changes are still there.`,
+    );
+    this.name = "StaleWriteError";
+  }
+}
+
+export function isStaleWrite(error: unknown): boolean {
+  return error instanceof StaleWriteError;
+}
+
+/**
+ * Says why a guarded write matched nothing.
+ *
+ * Either the row moved on or it is not there at all, and those two want
+ * different words, so ask which it was rather than guessing.
+ */
+async function explainMiss(
+  table: "households" | "people",
+  what: string,
+  id: string,
+): Promise<never> {
+  const check = await supabase.from(table).select("id").eq("id", id).maybeSingle();
+  if (check.error) throw new Error(check.error.message);
+  if (!check.data) throw new Error(`That ${what} no longer exists.`);
+  throw new StaleWriteError(what);
+}
+
+/**
+ * Writes a family, refusing if it has moved underneath us.
+ *
+ * updated_at is maintained by a trigger, so the value a form loaded with is a
+ * fingerprint of the version it was editing. Adding it to the where clause
+ * makes the update land only while that is still the current version - two
+ * people editing one family used to mean whoever saved second silently won,
+ * and the first one's work was gone with nothing on screen about it.
+ *
+ * Without an expected value it behaves as it always did, which is what a fresh
+ * record wants.
+ */
 export async function updateHousehold(
   id: string,
   patch: Partial<HouseholdInput>,
+  expectedUpdatedAt?: string | null,
 ): Promise<HouseholdRow> {
-  return unwrap(await supabase.from("households").update(patch).eq("id", id).select().single());
+  let query = supabase.from("households").update(patch).eq("id", id);
+  if (expectedUpdatedAt) query = query.eq("updated_at", expectedUpdatedAt);
+
+  const rows = unwrap(await query.select()) as HouseholdRow[];
+  return rows[0] ?? (await explainMiss("households", "family", id));
 }
 
 export async function deleteHousehold(id: string): Promise<void> {
@@ -113,8 +167,17 @@ export async function createPerson(input: PersonInput): Promise<PersonRow> {
   return unwrap(await supabase.from("people").insert(input).select().single());
 }
 
-export async function updatePerson(id: string, patch: Partial<PersonInput>): Promise<PersonRow> {
-  return unwrap(await supabase.from("people").update(patch).eq("id", id).select().single());
+/** As updateHousehold, guarded the same way and for the same reason. */
+export async function updatePerson(
+  id: string,
+  patch: Partial<PersonInput>,
+  expectedUpdatedAt?: string | null,
+): Promise<PersonRow> {
+  let query = supabase.from("people").update(patch).eq("id", id);
+  if (expectedUpdatedAt) query = query.eq("updated_at", expectedUpdatedAt);
+
+  const rows = unwrap(await query.select()) as PersonRow[];
+  return rows[0] ?? (await explainMiss("people", "person", id));
 }
 
 export async function deletePerson(id: string): Promise<void> {
