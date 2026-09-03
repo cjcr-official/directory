@@ -6,6 +6,15 @@ import { sortByKey, sortKey } from "@/lib/format";
 
 interface DirectoryState {
   loading: boolean;
+  /**
+   * True once the first load has settled, whether it found rows or failed.
+   *
+   * Separate from `loading`, which goes true again on every save. This one only
+   * ever flips once, and it is what the app waits on before drawing anything -
+   * so the shell and a populated page arrive together instead of the shell
+   * arriving first with a spinner inside it.
+   */
+  ready: boolean;
   error: string | null;
   households: HouseholdRow[];
   people: PersonRow[];
@@ -43,6 +52,7 @@ const EMPTY: DirectoryData = {
 export function DirectoryProvider({ children }: { children: React.ReactNode }) {
   const [data, setData] = useState<DirectoryData>(EMPTY);
   const [loading, setLoading] = useState(true);
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
@@ -54,6 +64,7 @@ export function DirectoryProvider({ children }: { children: React.ReactNode }) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setLoading(false);
+      setReady(true);
     }
   }, []);
 
@@ -118,8 +129,8 @@ export function DirectoryProvider({ children }: { children: React.ReactNode }) {
   }, [data]);
 
   const value = useMemo<DirectoryState>(
-    () => ({ ...derived, loading, error, reload }),
-    [derived, loading, error, reload],
+    () => ({ ...derived, loading, ready, error, reload }),
+    [derived, loading, ready, error, reload],
   );
 
   return <DirectoryContext value={value}>{children}</DirectoryContext>;
