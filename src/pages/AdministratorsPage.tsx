@@ -66,7 +66,7 @@ export function AdministratorsPage() {
       </Notice>
 
       <div className="card" style={{ marginTop: 16 }}>
-        <table>
+        <table className="admins-table">
           <thead>
             <tr>
               <th>Name</th>
@@ -132,15 +132,20 @@ export function AdministratorsPage() {
         </table>
       </div>
 
-      <div className="grid three" style={{ marginTop: 16 }}>
-        {ROLES.map((role) => (
-          <div key={role.value} className="card">
-            <div className="card-body">
-              <h3 style={{ marginBottom: 4 }}>{role.label}</h3>
-              <p className="muted small">{role.blurb}</p>
-            </div>
-          </div>
-        ))}
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="card-head">
+          <h3>What each role can do</h3>
+        </div>
+        <div className="card-body">
+          <dl className="role-key">
+            {ROLES.map((role) => (
+              <div key={role.value} className="role-key-item">
+                <dt>{role.label}</dt>
+                <dd className="muted small">{role.blurb}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
       </div>
     </div>
   );
