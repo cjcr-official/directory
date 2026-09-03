@@ -207,6 +207,7 @@ src/
     queries.ts         every database read and write
     demo.ts            the invented congregation used by /sample
     version.ts         what build this is, and what build is being served
+    zoom.ts            holds the app at 1x - no pinch, no double-tap zoom
   components/          shared UI, and the preview renderer
   pages/               one file per screen
 scripts/

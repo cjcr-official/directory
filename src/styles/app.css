@@ -42,6 +42,16 @@ html,
 body,
 #root {
   height: 100%;
+  /* Panning and scrolling, but no pinch to zoom and no double-tap to zoom.
+     The gesture handlers in lib/zoom.ts cover iOS Safari, which decides page
+     zoom for itself regardless of this. */
+  touch-action: pan-x pan-y;
+}
+
+html {
+  /* Stops iOS inflating text of its own accord when a phone is turned. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
