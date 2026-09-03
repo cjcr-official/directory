@@ -393,6 +393,14 @@ p:last-child {
   flex-direction: column;
   gap: 5px;
   margin-bottom: 14px;
+  /* A grid or flex item's automatic minimum is its content, and a date input
+     reports an intrinsic width of its own - about 184px here - that the
+     min-width on the input itself does not lower. Two of them side by side in
+     a "1fr 1fr" row therefore held the track open at 418px inside a 361px
+     column, and the whole card, the page and the top bar were dragged 41px
+     wider than the phone. This lets a field shrink to the track it was
+     given, which is what "1fr" was asking for. */
+  min-width: 0;
 }
 .field > label {
   font-size: 0.82rem;
