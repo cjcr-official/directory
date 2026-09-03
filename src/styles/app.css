@@ -51,6 +51,33 @@ body,
   touch-action: pan-x pan-y;
 }
 
+/* ---------------------------------------------------------------------------
+   No vertical scroll indicator on a touch screen
+   ---------------------------------------------------------------------------
+
+   The page itself is what scrolls, and the top bar is sticky - which keeps it
+   inside that scrolling box rather than outside it. A scroll indicator is not
+   an element, it is painted by the browser at the right edge of the box above
+   everything on the page, so it ran straight down over the dark bar and no
+   z-index could lift the bar over it. A native app avoids this by insetting
+   the indicator below its nav bar; the web has no equivalent for the page.
+
+   Hiding it costs nothing on a touch screen, where scrolling is done by
+   dragging the content and the indicator is only a readout. It is kept on a
+   mouse, where it is a control someone drags and the only sign of how far
+   down the page they are - hence pointer: coarse rather than a width.
+
+   Vertical only. The print preview at page size is wider than the screen on
+   purpose, with the other half of the sheet a swipe away, and its horizontal
+   bar is the only thing that says so. */
+@media (pointer: coarse) {
+  html::-webkit-scrollbar:vertical,
+  body::-webkit-scrollbar:vertical,
+  ::-webkit-scrollbar:vertical {
+    display: none;
+  }
+}
+
 html,
 body {
   height: 100%;
