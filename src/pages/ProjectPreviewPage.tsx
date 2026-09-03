@@ -227,6 +227,7 @@ export function ProjectPreviewPage() {
           photoUrls={photoUrls}
           zoom={scale}
           level={level}
+          guides={showGuides}
           limit={printingAll ? undefined : PREVIEW_SHEET_LIMIT}
         />
       </div>
