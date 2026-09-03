@@ -472,6 +472,22 @@ textarea {
     border-color 0.12s,
     box-shadow 0.12s;
 }
+/*
+ * iOS keeps its own sizing for a date control while the platform appearance is
+ * on, and that sizing ignores box-sizing: the field came out its container's
+ * width PLUS its own 10px of padding either side, so "Date of birth" and
+ * "Anniversary" hung about 20px past the card edge. Turning the appearance off
+ * hands the box back to the stylesheet. Nothing is lost: the border, radius and
+ * padding here are the app's own, and tapping still opens the native picker.
+ */
+input[type="date"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 textarea {
   min-height: 72px;
   resize: vertical;

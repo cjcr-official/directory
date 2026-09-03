@@ -17,6 +17,7 @@
     "names:check": "node scripts/run.mjs scripts/names-check.ts",
     "contrast:check": "node scripts/run.mjs scripts/contrast-check.ts",
     "cover:check": "node scripts/run.mjs scripts/cover-check.ts",
+    "fields:check": "node scripts/run.mjs scripts/fields-check.ts",
     "bundle:check": "node scripts/run.mjs scripts/bundle-check.ts",
     "bench": "node scripts/run.mjs scripts/bench.ts",
     "seed": "node scripts/run.mjs scripts/seed.ts",
@@ -24,7 +25,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "verify": "node scripts/run.mjs scripts/verify-setup.ts",
-    "checks": "npm run invariants && npm run restore:check && npm run batch:check && npm run names:check && npm run contrast:check && npm run cover:check"
+    "checks": "npm run invariants && npm run restore:check && npm run batch:check && npm run names:check && npm run contrast:check && npm run cover:check && npm run fields:check"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",
