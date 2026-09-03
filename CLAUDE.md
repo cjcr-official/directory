@@ -37,14 +37,17 @@ again. There is no separate rollback.
 
 ## Before pushing
 
-CI runs formatting, types, the build, a real render of the sample book, and
-the row level security suite. Run the same things locally first:
+CI runs formatting, types, the build, a real render of the sample book, the
+layout and restore checks, and the row level security suite. Run the same
+things locally first:
 
 ```
 npm run format:check
 npm run typecheck
 npm run build
 npm run sample:pdf -- /tmp/sample.pdf
+npm run invariants
+npm run restore:check
 ```
 
 Prettier is not advisory - `format:check` fails the build, and it also fails

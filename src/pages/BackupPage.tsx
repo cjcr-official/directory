@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { useDirectory } from "@/data/DirectoryContext";
 import { Checkbox, LoadingScreen, Notice } from "@/components/ui";
+import { RestorePanel } from "@/components/RestorePanel";
 import { buildBackup, type BackupProgress } from "@/lib/backup";
 
 const LAST_BACKUP_KEY = "church-directory:last-backup";
@@ -93,7 +94,8 @@ export function BackupPage() {
         <div className="grow">
           <h1>Backup</h1>
           <div className="sub">
-            Download everything as one file — the records, the groups and the photographs.
+            Download everything as one file — the records, the groups and the photographs — and load
+            it back if something is lost.
           </div>
         </div>
       </div>
@@ -202,6 +204,8 @@ export function BackupPage() {
             </Notice>
           </div>
         </div>
+
+        <RestorePanel />
       </div>
     </div>
   );

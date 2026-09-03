@@ -38,11 +38,13 @@ jobs:
 
       - run: npm ci
 
-      - name: Formatting, types and layout engine
+      - name: Formatting, types, layout engine and restore
         run: |
           npm run format:check
           npm run typecheck
           npm run sample:pdf -- /tmp/sample.pdf
+          npm run invariants
+          npm run restore:check
 
       - name: Check the deploy secrets are set
         id: secrets

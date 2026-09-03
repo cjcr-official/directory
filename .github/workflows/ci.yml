@@ -32,6 +32,16 @@ jobs:
       - name: Render the sample directory
         run: npm run sample:pdf -- /tmp/sample-directory.pdf
 
+      # Both of these are pure: they need no database and no browser, and they
+      # cover the two things nobody would notice going wrong until it mattered
+      # - a record dropped from a printed book, and a restore writing the wrong
+      # rows.
+      - name: Layout invariants
+        run: npm run invariants
+
+      - name: Restore decisions
+        run: npm run restore:check
+
       - uses: actions/upload-artifact@v4
         with:
           name: sample-directory-pdf
