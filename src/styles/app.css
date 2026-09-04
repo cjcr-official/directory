@@ -2399,3 +2399,20 @@ th.num {
     padding: 9px 15px;
   }
 }
+
+/* TEMPORARY, with ViewportProbe in AppShell - delete both together. */
+.probe-inset {
+  height: 0;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.probe {
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  margin-bottom: 10px;
+  word-break: break-all;
+}
