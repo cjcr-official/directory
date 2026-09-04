@@ -27,6 +27,18 @@ export function AppShell() {
   // Following a link should put the drawer away.
   useEffect(() => setMenuOpen(false), [location.pathname]);
 
+  /*
+   * Installed to the Home Screen, the strip behind the home indicator is
+   * painted from the document's background rather than from anything drawn
+   * over it - so the document has to be told the drawer is open, or the
+   * dimmed page ends on a pale bar. The stylesheet also says this with
+   * :has(.scrim); this is the half that cannot fail to match.
+   */
+  useEffect(() => {
+    document.documentElement.classList.toggle("drawer-open", menuOpen);
+    return () => document.documentElement.classList.remove("drawer-open");
+  }, [menuOpen]);
+
   useEffect(() => {
     if (!menuOpen) return;
     const onKey = (event: KeyboardEvent) => {

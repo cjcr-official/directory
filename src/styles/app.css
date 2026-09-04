@@ -36,13 +36,6 @@
 
   --brand-dark: #10211e;
   --brand-dark-2: #17332c;
-
-  /* The dimming behind the drawer. Named rather than inlined because the
-     home-indicator strip has to be mixed from the same two numbers - see
-     html:has(.scrim). The scrim itself keeps a plain rgb() below, so a
-     browser without color-mix still dims the page. */
-  --scrim-ink: #0a1412;
-  --scrim-alpha: 46%;
 }
 
 * {
@@ -1923,13 +1916,28 @@ th.num {
 
   /* The open drawer is the fourth thing that covers the screen, and it needs
      the strip as much as the other three: a dimmed page ending on a pale band
-     read as a white bar rising from the bottom of the phone. The scrim is a
-     translucent ink over the canvas, so the strip is the same ink at the same
-     strength mixed into the same canvas - the dimming carries on down to the
-     edge of the glass instead of stopping short of it. Sourced from the one
-     pair of numbers below, which strip-check holds to the scrim's own. */
-  html:has(.scrim) {
-    background: color-mix(in srgb, var(--scrim-ink) var(--scrim-alpha), var(--canvas));
+     read as a white bar rising from the bottom of the phone.
+
+     The number is rgb(10 20 18 / 46%) - the scrim - composited over
+     #f4f7f6 - the canvas it is drawn on - so the dimming carries on down to
+     the edge of the glass instead of stopping short of it.
+
+     Written out rather than mixed. color-mix() said the same thing far more
+     legibly, and it is where the first attempt at this went: Safari has had
+     parser bugs with var() inside color-mix, an unparsed declaration is
+     dropped, and a dropped declaration here falls straight back to the pale
+     canvas - which looks exactly like no fix at all. A plain colour cannot
+     fail that way. strip-check does the arithmetic instead, so the number
+     being spelled out does not mean it can quietly go stale.
+
+     Two selectors for the same reason. :has() says it in CSS alone, which is
+     right for the three screens above - they have no state to read. The
+     drawer does, so the shell puts the class on the document as well: this is
+     the one screen where a selector quietly failing to match is invisible
+     until somebody photographs the bottom of their phone. */
+  html:has(.scrim),
+  html.drawer-open {
+    background: rgb(136 143 141);
   }
 
   #root {

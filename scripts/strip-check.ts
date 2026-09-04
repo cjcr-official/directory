@@ -92,10 +92,18 @@ for (const selector of [...covers].sort()) {
 }
 
 /*
- * The drawer's strip is mixed rather than named, because it has to come out
- * the same colour as a translucent scrim over the canvas. That is only true
- * while both are made of the same two numbers.
+ * The drawer's strip is a colour written out rather than mixed, because
+ * color-mix() is one more thing that can fail to parse on the one browser
+ * this matters on - and a dropped declaration here looks exactly like no fix
+ * at all. So the arithmetic happens here instead: the scrim composited over
+ * the canvas has to be the colour the strip is painted.
  */
+function channels(colour: string): number[] {
+  const hex = colour.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  if (hex) return hex.slice(1).map((pair) => parseInt(pair, 16));
+  return [...colour.matchAll(/\d+/g)].map((m) => Number(m[0])).slice(0, 3);
+}
+
 const scrim = all.find(
   (rule) =>
     rule.selector.split(",").some((one) => one.trim() === ".scrim") && /background/.test(rule.body),
@@ -103,26 +111,48 @@ const scrim = all.find(
 const scrimGround = scrim?.body.match(/background:\s*rgb\(\s*(\d+)\s+(\d+)\s+(\d+)\s*\/\s*(\d+)%/);
 check("the scrim paints a translucent ink", Boolean(scrimGround), scrimGround?.[0] ?? "not found");
 
-if (scrimGround) {
-  const [, r, g, b, alpha] = scrimGround;
-  const hex = "#" + [r, g, b].map((n) => Number(n).toString(16).padStart(2, "0")).join("");
-  const ink = clean.match(/--scrim-ink:\s*(#[0-9a-f]{6})/i)?.[1];
-  const strength = clean.match(/--scrim-alpha:\s*(\d+)%/)?.[1];
+const canvas = clean.match(/--canvas:\s*(#[0-9a-f]{6})/i)?.[1];
+check("the canvas it is drawn over is named", Boolean(canvas), canvas ?? "not found");
+
+const stripRule = clean.match(/html:has\(\.scrim\),\s*html\.drawer-open\s*\{([^}]*)\}/);
+const strip = stripRule?.[1].match(/background:\s*(rgb\([^)]*\)|#[0-9a-f]{6})/i)?.[1];
+check(
+  "the strip is keyed to the drawer both ways",
+  Boolean(stripRule),
+  stripRule
+    ? ""
+    : "needs html:has(.scrim), html.drawer-open - a selector that only might match is not enough here",
+);
+
+/*
+ * And the half that cannot fail to match only works while something actually
+ * puts the class there.
+ */
+const shell = readFileSync("src/components/AppShell.tsx", "utf8");
+const toggles = /documentElement\.classList\.toggle\(\s*"drawer-open"/.test(shell);
+check(
+  "the shell puts the class on the document",
+  toggles,
+  toggles ? "" : "needs AppShell to toggle drawer-open on documentElement",
+);
+
+check(
+  "the strip is painted a plain colour",
+  Boolean(strip) && !/color-mix|var\(/.test(strip ?? ""),
+  strip ?? "no html:has(.scrim) background - iOS will end the drawer on a band of the page behind",
+);
+
+if (scrimGround && canvas && strip) {
+  const [, ...ink] = scrimGround;
+  const alpha = Number(ink.pop()) / 100;
+  const over = channels(canvas);
+  const want = ink.map((n, i) => Number(n) * alpha + over[i] * (1 - alpha));
+  const got = channels(strip);
+  const drift = Math.max(...want.map((n, i) => Math.abs(n - got[i])));
   check(
-    `the strip is mixed from the scrim's own ink`,
-    ink?.toLowerCase() === hex,
-    `${ink} vs ${hex}`,
-  );
-  check(
-    `the strip is mixed at the scrim's own strength`,
-    strength === alpha,
-    `${strength}% vs ${alpha}%`,
-  );
-  check(
-    "and mixed into the canvas the scrim is drawn over",
-    /html:has\(\.scrim\)\s*\{[^}]*color-mix\(in srgb, var\(--scrim-ink\) var\(--scrim-alpha\), var\(--canvas\)\)/.test(
-      clean,
-    ),
+    "and it is the scrim composited over that canvas",
+    drift <= 1,
+    `wanted ${want.map((n) => n.toFixed(1)).join(", ")}, painted ${got.join(", ")}`,
   );
 }
 
