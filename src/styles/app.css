@@ -2017,7 +2017,15 @@ th.num {
   }
 
   /* The drawer. Off-canvas until opened, and always a column - never a
-     wrapping row. */
+     wrapping row.
+
+     Top and bottom, and no height: with all three the box is over-constrained,
+     the CSS rules say bottom loses, and the height decides. That is what left
+     a band across the foot of the phone - installed to the Home Screen, 100dvh
+     came up short of the screen by the height of the home indicator, so the
+     panel stopped above it. Two insets stretch to whatever the containing
+     block turns out to be, which is the thing actually wanted here and needs
+     no unit to be right about it. */
   .sidebar {
     position: fixed;
     top: 0;
@@ -2026,7 +2034,6 @@ th.num {
     z-index: 50;
     width: 264px;
     max-width: 84vw;
-    height: 100dvh;
     flex-direction: column;
     padding: 0 14px calc(20px + env(safe-area-inset-bottom));
     overflow-y: auto;

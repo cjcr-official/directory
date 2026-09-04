@@ -165,5 +165,25 @@ if (scrimGround && canvas && strip) {
   );
 }
 
+/*
+ * And the other way a thing fails to reach the bottom of the phone, which is
+ * how the drawer did it: a fixed box given top, bottom AND a height is
+ * over-constrained, and the rules say bottom is the one that loses. That is
+ * silent everywhere the height happens to equal the viewport - which is every
+ * desktop browser - and wrong on an iPhone, where 100dvh in an installed app
+ * comes up short by the height of the home indicator.
+ */
+for (const { selector, body } of all) {
+  if (!/position:\s*fixed/.test(body)) continue;
+  const stretched = /(^|[;\s])top:/.test(body) && /(^|[;\s])bottom:/.test(body);
+  const height = body.match(/(?:^|[;\s])height:\s*([^;]+)/);
+  if (!stretched || !height) continue;
+  check(
+    `${selector}: stretched top to bottom, so it must not also set a height`,
+    false,
+    `height: ${height[1].trim()} wins over bottom, and silently - drop it`,
+  );
+}
+
 console.log(failures ? `\n${failures} failed` : "\nall passed");
 process.exit(failures ? 1 : 0);
