@@ -111,25 +111,14 @@ export function GroupsPage() {
                 {tags.map((tag) => (
                   <tr key={tag.id}>
                     <td>
-                      <span className="row tight">
-                        <span
-                          className="dot"
-                          style={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: "50%",
-                            background: tag.color,
-                          }}
-                        />
+                      <span className="group-row">
+                        <span className="group-dot" style={{ background: tag.color }} />
                         {canEdit ? (
                           <input
+                            className="group-name"
                             type="text"
                             defaultValue={tag.name}
-                            style={{
-                              maxWidth: 220,
-                              border: "1px solid transparent",
-                              background: "transparent",
-                            }}
+                            aria-label={`Rename ${tag.name}`}
                             onBlur={async (event) => {
                               const field = event.target;
                               const next = field.value.trim();

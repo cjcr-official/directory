@@ -717,6 +717,53 @@ td {
   border-bottom: 1px solid var(--line);
   vertical-align: middle;
 }
+/* --- groups ----------------------------------------------------------------
+ *
+ * The name is an input, because renaming a group is a thing you do in place.
+ * That has to survive a narrow column: left to its own devices an input asks
+ * for about twenty characters' width, which on a phone was wider than the
+ * cell and pushed the colour dot onto a line of its own.
+ * -------------------------------------------------------------------------- */
+
+.group-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.group-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+/* input.group-name, not .group-name: the shared input rule is written as
+   input[type="text"], which out-specifies a bare class and would box every
+   name in the list. */
+input.group-name {
+  flex: 1;
+  min-width: 0;
+  max-width: 260px;
+  /* A hairline under the name rather than a box around it. The list reads as a
+     list, and the rule still says the name can be typed over - which a hover
+     state alone would never say on a phone. */
+  border: 1px solid transparent;
+  border-bottom-color: var(--line);
+  border-radius: 0;
+  background: transparent;
+  padding: 5px 2px;
+}
+input.group-name:hover:not(:disabled),
+input.group-name:focus {
+  border-color: var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  padding: 5px 7px;
+}
+
 /* --- the browse lists -------------------------------------------------------
  *
  * A fixed column grid, so the table reads as a designed set of columns rather
@@ -1922,14 +1969,47 @@ th.num {
     font-size: 1.35rem;
   }
 
-  /* Cards holding real content need the full width; a stat is a number and a
-     label, and four of them stacked is a lot of scrolling for very little. */
-  .grid.two {
+  /*
+   * Cards holding real content take the full width. Two of them side by side
+   * on a phone is two columns of about 160px, which turns a paragraph into a
+   * word a line - and that is what happened here when the overview's stats
+   * moved out of .grid.three and its content cards moved in.
+   *
+   * A number and a label is the exception, and it has its own rule below.
+   */
+  .grid.two,
+  .grid.three {
     grid-template-columns: 1fr;
   }
-  .grid.three {
+
+  /* Four numbers, two by two: stacking them is a lot of scrolling for very
+     little, and they are short enough to read at half the width. */
+  .stat-strip {
     grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+  }
+  .stat:nth-child(2n) {
+    border-right: none;
+  }
+  .stat:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--line);
+  }
+
+  /*
+   * The column grid is for a wide screen. At phone width its percentages left
+   * the Delete button wider than the track it was given, so it hung over the
+   * edge of the card, and "Records" truncated to "RECO...". Content decides
+   * the widths here instead.
+   */
+  .grid-table {
+    table-layout: auto;
+  }
+  .grid-table th,
+  .grid-table td {
+    overflow: visible;
+    text-overflow: clip;
+  }
+  .grid-table th {
+    white-space: normal;
   }
 
   .stat {
