@@ -36,6 +36,13 @@
 
   --brand-dark: #10211e;
   --brand-dark-2: #17332c;
+
+  /* The dimming behind the drawer. Named rather than inlined because the
+     home-indicator strip has to be mixed from the same two numbers - see
+     html:has(.scrim). The scrim itself keeps a plain rgb() below, so a
+     browser without color-mix still dims the page. */
+  --scrim-ink: #0a1412;
+  --scrim-alpha: 46%;
 }
 
 * {
@@ -1912,6 +1919,17 @@ th.num {
   html:has(.preview),
   html:has(.update-screen) {
     background: var(--brand-dark);
+  }
+
+  /* The open drawer is the fourth thing that covers the screen, and it needs
+     the strip as much as the other three: a dimmed page ending on a pale band
+     read as a white bar rising from the bottom of the phone. The scrim is a
+     translucent ink over the canvas, so the strip is the same ink at the same
+     strength mixed into the same canvas - the dimming carries on down to the
+     edge of the glass instead of stopping short of it. Sourced from the one
+     pair of numbers below, which strip-check holds to the scrim's own. */
+  html:has(.scrim) {
+    background: color-mix(in srgb, var(--scrim-ink) var(--scrim-alpha), var(--canvas));
   }
 
   #root {
