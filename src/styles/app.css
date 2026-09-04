@@ -109,6 +109,38 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/*
+ * That rule reaches every scroller on the page but one: the page. iOS draws
+ * the document's own indicator as a system overlay rather than as a scrollbar
+ * pseudo-element, so no ::-webkit-scrollbar rule can touch it - which is why
+ * a grey bar kept running down the right of the People list.
+ *
+ * The only thing that does work is to stop the document being the scroller and
+ * scroll an element instead, whose indicator is a pseudo-element and can be
+ * hidden. That has a cost in a browser tab - Safari only collapses its address
+ * bar for the document scroller - so it is limited to the installed app, which
+ * has no address bar to collapse. A tab keeps the behaviour it had.
+ */
+@media (display-mode: standalone) and (pointer: coarse) {
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  #root {
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: none;
+  }
+
+  #root::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+}
+
 a {
   color: var(--accent);
 }

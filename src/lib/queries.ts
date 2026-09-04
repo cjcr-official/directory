@@ -9,9 +9,25 @@ import type {
 } from "./database.types";
 import type { DirectoryData } from "./entries";
 
+/**
+ * Postgres speaks in constraint names. A person reading the screen should not
+ * have to.
+ */
+function readable(error: { code?: string; message: string }, subject: string): string {
+  if (error.code === "23505") return `A ${subject} with that name already exists.`;
+  if (error.code === "42501" || /row-level security/i.test(error.message)) {
+    return `You do not have permission to change ${subject}s. Ask an owner for editor access.`;
+  }
+  return error.message;
+}
+
 /** Throws Supabase errors as plain Errors so callers can just try/catch. */
-function unwrap<T>(result: { data: T | null; error: { message: string } | null }): T {
-  if (result.error) throw new Error(result.error.message);
+function unwrap<T>(
+  result: { data: T | null; error: { code?: string; message: string } | null },
+  subject?: string,
+): T {
+  if (result.error)
+    throw new Error(subject ? readable(result.error, subject) : result.error.message);
   return result.data as T;
 }
 
@@ -267,16 +283,34 @@ export async function createTag(
   color: string,
   description: string | null,
 ): Promise<TagRow> {
-  return unwrap(await supabase.from("tags").insert({ name, color, description }).select().single());
+  return unwrap(
+    await supabase.from("tags").insert({ name, color, description }).select().single(),
+    "group",
+  );
 }
 
 export async function updateTag(id: string, patch: Partial<TagRow>): Promise<TagRow> {
   return unwrap(await supabase.from("tags").update(patch).eq("id", id).select().single());
 }
 
+/**
+ * Deletes a group, and insists on having actually deleted one.
+ *
+ * A policy that forbids the delete does not raise: its USING clause simply
+ * matches no rows, so the statement succeeds having removed nothing. The list
+ * then reloads and looks for all the world as though it worked - until the
+ * name is used again and the database says it is taken. Asking for the deleted
+ * row back is what turns that silence into a sentence.
+ */
 export async function deleteTag(id: string): Promise<void> {
-  const { error } = await supabase.from("tags").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+  const { data, error } = await supabase.from("tags").delete().eq("id", id).select("id");
+  if (error) throw new Error(readable(error, "group"));
+  if (!data?.length) {
+    throw new Error(
+      "That group was not deleted. You may not have permission to change groups, " +
+        "or somebody else removed it first — reload and check.",
+    );
+  }
 }
 
 /**

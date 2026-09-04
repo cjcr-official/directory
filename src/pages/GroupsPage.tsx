@@ -45,6 +45,16 @@ export function GroupsPage() {
     event.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) return;
+
+    // Caught here rather than by the unique index, so the answer names the
+    // group instead of a constraint - and so a group that only differs by
+    // capitals is refused too, which the index would happily allow.
+    const clash = tags.find((tag) => tag.name.toLowerCase() === trimmed.toLowerCase());
+    if (clash) {
+      setFormError(`There is already a group called “${clash.name}”.`);
+      return;
+    }
+
     setBusy(true);
     setFormError(null);
     try {
@@ -154,7 +164,16 @@ export function GroupsPage() {
                           label="Delete"
                           confirmLabel="Delete group"
                           onConfirm={async () => {
-                            await deleteTag(tag.id);
+                            setFormError(null);
+                            try {
+                              await deleteTag(tag.id);
+                            } catch (cause) {
+                              // Shown at the top of the card, where the add
+                              // form's errors go, rather than as small print
+                              // beside a button in a row.
+                              setFormError(cause instanceof Error ? cause.message : String(cause));
+                              throw cause;
+                            }
                             await reload();
                           }}
                         />
