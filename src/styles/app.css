@@ -719,49 +719,100 @@ td {
 }
 /* --- groups ----------------------------------------------------------------
  *
+ * A list, not a table. Three columns whose meaning is obvious from the card's
+ * own title did not need headings, and the headings were what forced "Records"
+ * to truncate on a phone; the count says what it is instead.
+ *
  * The name is an input, because renaming a group is a thing you do in place.
- * That has to survive a narrow column: left to its own devices an input asks
- * for about twenty characters' width, which on a phone was wider than the
- * cell and pushed the colour dot onto a line of its own.
+ * It is sized to the word rather than to the column, so the rule under it
+ * stops where the name does - stretched to a fixed width it read as a blank
+ * waiting to be filled in rather than as a name that can be changed.
  * -------------------------------------------------------------------------- */
 
-.group-row {
+.group-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.group-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: nowrap;
-  min-width: 0;
+  gap: 10px;
+  padding: 9px 18px;
+  border-top: 1px solid var(--line);
+}
+.group-item:first-child {
+  border-top: none;
 }
 
 .group-dot {
   flex: none;
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
 }
 
-/* input.group-name, not .group-name: the shared input rule is written as
+.group-name-text {
+  font-weight: 560;
+}
+
+/* input.group-name, not .group-name: the shared field rule is written as
    input[type="text"], which out-specifies a bare class and would box every
    name in the list. */
 input.group-name {
-  flex: 1;
+  width: auto;
+  flex: 0 1 auto;
   min-width: 0;
-  max-width: 260px;
-  /* A hairline under the name rather than a box around it. The list reads as a
+  font-weight: 560;
+  /* A rule under the name rather than a box around it: the list reads as a
      list, and the rule still says the name can be typed over - which a hover
      state alone would never say on a phone. */
   border: 1px solid transparent;
-  border-bottom-color: var(--line);
+  border-bottom-color: var(--line-strong);
   border-radius: 0;
   background: transparent;
-  padding: 5px 2px;
+  padding: 4px 2px;
+  /* Sized to the word, but a narrow screen still wins: the field shrinks and
+     says so with an ellipsis rather than cutting the name mid-letter. */
+  text-overflow: ellipsis;
 }
 input.group-name:hover:not(:disabled),
 input.group-name:focus {
   border-color: var(--line-strong);
   border-radius: var(--radius-sm);
   background: var(--paper);
-  padding: 5px 7px;
+  padding: 4px 7px;
+}
+
+/* Pushed to the right, which is what closes the band of empty space that a
+   table column left between the name and its count. */
+.group-count {
+  margin-left: auto;
+  /* Its own breathing room on top of the row gap, so a name long enough to be
+     clipped still ends clear of the count rather than flush against it. */
+  padding-left: 8px;
+  flex: none;
+  color: var(--ink-3);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.group-actions {
+  flex: none;
+}
+/* Quiet until it is wanted. Four bordered Delete buttons down a short list
+   put the weight of the card on its most destructive action. */
+.group-actions .btn {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-3);
+}
+.group-actions .btn:hover:not(:disabled),
+.group-actions .btn:focus-visible {
+  border-color: var(--line-strong);
+  background: var(--paper);
+  color: var(--danger);
 }
 
 /* --- the browse lists -------------------------------------------------------
@@ -1979,13 +2030,17 @@ th.num {
    */
   .grid.two,
   .grid.three {
-    grid-template-columns: 1fr;
+    /* minmax(0, 1fr), not 1fr: a bare 1fr track is minmax(auto, 1fr), and
+       that auto floor is the widest single thing in the column - one long
+       group name was enough to push the whole card off the side of the
+       screen. A zero floor lets the content inside do the shrinking. */
+    grid-template-columns: minmax(0, 1fr);
   }
 
   /* Four numbers, two by two: stacking them is a lot of scrolling for very
      little, and they are short enough to read at half the width. */
   .stat-strip {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .stat:nth-child(2n) {
     border-right: none;
@@ -1994,23 +2049,8 @@ th.num {
     border-bottom: 1px solid var(--line);
   }
 
-  /*
-   * The column grid is for a wide screen. At phone width its percentages left
-   * the Delete button wider than the track it was given, so it hung over the
-   * edge of the card, and "Records" truncated to "RECO...". Content decides
-   * the widths here instead.
-   */
-  .grid-table {
-    table-layout: auto;
-  }
-  .grid-table th,
-  .grid-table td {
-    overflow: visible;
-    text-overflow: clip;
-  }
-  .grid-table th {
-    white-space: normal;
-  }
+  /* The two tables left are the browse lists, and on a phone their rows are
+     cards rather than rows - so the column grid has nothing to do here. */
 
   .stat {
     padding: 13px 14px;
@@ -2158,7 +2198,7 @@ th.num {
   }
 
   .role-key {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 14px;
   }
 
