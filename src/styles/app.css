@@ -122,7 +122,19 @@ body {
  * has no address bar to collapse. A tab keeps the behaviour it had.
  */
 @media (display-mode: standalone) and (pointer: coarse) {
-  html,
+  /*
+   * The height iOS does not admit to. A translucent standalone app is laid out
+   * from the top of the screen but told the viewport is one status bar
+   * shorter, so 100% comes up exactly env(safe-area-inset-top) short of the
+   * glass and everything anchored to the bottom stops there. Adding it back
+   * once, on the root, carries through body and #root and every screen inside
+   * them. It is inert everywhere else: off a phone, and on any install whose
+   * status bar is opaque, that inset is 0 and this is plain 100%.
+   */
+  html {
+    height: calc(100% + env(safe-area-inset-top));
+    overflow: hidden;
+  }
   body {
     height: 100%;
     overflow: hidden;
@@ -2008,10 +2020,16 @@ th.num {
     height: 21px;
   }
 
+  /* Fixed to the viewport, and the viewport is the short one - see the
+     standalone block. Giving the root its height back does nothing for a
+     fixed box, which is measured against the viewport rather than against
+     html, so it reaches past the bottom by the same amount instead. On any
+     install where the inset is 0 this is bottom: 0 and changes nothing. */
   .scrim {
     display: block;
     position: fixed;
     inset: 0;
+    bottom: calc(-1 * env(safe-area-inset-top));
     z-index: 45;
     background: rgb(10 20 18 / 46%);
   }
@@ -2025,12 +2043,20 @@ th.num {
      came up short of the screen by the height of the home indicator, so the
      panel stopped above it. Two insets stretch to whatever the containing
      block turns out to be, which is the thing actually wanted here and needs
-     no unit to be right about it. */
+     no unit to be right about it.
+
+     And past the bottom by the top inset, for the same reason as the scrim:
+     the viewport a fixed box is measured against is the short one. min-height
+     says it a second way, so the panel still reaches the glass if the negative
+     bottom is clamped rather than honoured - it is not a height, so it does
+     not override the insets the way 100dvh did. Both are 100% and 0 on an
+     install whose status bar is opaque. */
   .sidebar {
     position: fixed;
     top: 0;
     left: 0;
-    bottom: 0;
+    bottom: calc(-1 * env(safe-area-inset-top));
+    min-height: calc(100% + env(safe-area-inset-top));
     z-index: 50;
     width: 264px;
     max-width: 84vw;
