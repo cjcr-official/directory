@@ -205,19 +205,37 @@ if (translucent) {
   // Every rule for the selector, not the first: these all appear two or three
   // times over - once plainly, once inside the phone's block, once inside the
   // installed app's - and it is a later one that gives the height back.
-  const givesItBack = (selector: string, declaration: RegExp) => {
+  const givesItBack = (selector: string, what: string, declaration: RegExp) => {
     const rules = all.filter((one) =>
       one.selector.split(",").some((part) => part.trim() === selector),
     );
     check(
-      `${selector}: gives the status bar's height back`,
+      `${selector}: ${what}`,
       rules.some((one) => declaration.test(one.body)),
       rules.length ? "" : "no rule for it at all",
     );
   };
-  givesItBack("html", /height:\s*calc\(100% \+ env\(safe-area-inset-top\)\)/);
-  givesItBack(".sidebar", /bottom:\s*calc\(-1 \* env\(safe-area-inset-top\)\)/);
-  givesItBack(".scrim", /bottom:\s*calc\(-1 \* env\(safe-area-inset-top\)\)/);
+  // The boxes reach the glass.
+  givesItBack("html", "reaches the glass", /height:\s*calc\(100% \+ env\(safe-area-inset-top\)\)/);
+  givesItBack(
+    ".sidebar",
+    "reaches the glass",
+    /bottom:\s*calc\(-1 \* env\(safe-area-inset-top\)\)/,
+  );
+  givesItBack(".scrim", "reaches the glass", /bottom:\s*calc\(-1 \* env\(safe-area-inset-top\)\)/);
+  // And the content is pushed back up by the same amount, so nothing moves -
+  // which is also the clearance the home indicator does not get from the
+  // bottom inset here, that inset being 0 when the viewport ends above it.
+  givesItBack(
+    ".sidebar",
+    "keeps its content where it was",
+    /padding-bottom:[^;]*\+ env\(safe-area-inset-top\)/,
+  );
+  givesItBack(
+    ".page",
+    "keeps its content where it was",
+    /padding-bottom:[^;]*\+ env\(safe-area-inset-top\)/,
+  );
 } else {
   check("the status bar is opaque, so nothing needs giving back", true);
 }

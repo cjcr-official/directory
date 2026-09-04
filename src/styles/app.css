@@ -122,19 +122,7 @@ body {
  * has no address bar to collapse. A tab keeps the behaviour it had.
  */
 @media (display-mode: standalone) and (pointer: coarse) {
-  /*
-   * The height iOS does not admit to. A translucent standalone app is laid out
-   * from the top of the screen but told the viewport is one status bar
-   * shorter, so 100% comes up exactly env(safe-area-inset-top) short of the
-   * glass and everything anchored to the bottom stops there. Adding it back
-   * once, on the root, carries through body and #root and every screen inside
-   * them. It is inert everywhere else: off a phone, and on any install whose
-   * status bar is opaque, that inset is 0 and this is plain 100%.
-   */
-  html {
-    height: calc(100% + env(safe-area-inset-top));
-    overflow: hidden;
-  }
+  html,
   body {
     height: 100%;
     overflow: hidden;
@@ -2020,16 +2008,10 @@ th.num {
     height: 21px;
   }
 
-  /* Fixed to the viewport, and the viewport is the short one - see the
-     standalone block. Giving the root its height back does nothing for a
-     fixed box, which is measured against the viewport rather than against
-     html, so it reaches past the bottom by the same amount instead. On any
-     install where the inset is 0 this is bottom: 0 and changes nothing. */
   .scrim {
     display: block;
     position: fixed;
     inset: 0;
-    bottom: calc(-1 * env(safe-area-inset-top));
     z-index: 45;
     background: rgb(10 20 18 / 46%);
   }
@@ -2043,20 +2025,12 @@ th.num {
      came up short of the screen by the height of the home indicator, so the
      panel stopped above it. Two insets stretch to whatever the containing
      block turns out to be, which is the thing actually wanted here and needs
-     no unit to be right about it.
-
-     And past the bottom by the top inset, for the same reason as the scrim:
-     the viewport a fixed box is measured against is the short one. min-height
-     says it a second way, so the panel still reaches the glass if the negative
-     bottom is clamped rather than honoured - it is not a height, so it does
-     not override the insets the way 100dvh did. Both are 100% and 0 on an
-     install whose status bar is opaque. */
+     no unit to be right about it. */
   .sidebar {
     position: fixed;
     top: 0;
     left: 0;
-    bottom: calc(-1 * env(safe-area-inset-top));
-    min-height: calc(100% + env(safe-area-inset-top));
+    bottom: 0;
     z-index: 50;
     width: 264px;
     max-width: 84vw;
@@ -2423,5 +2397,57 @@ th.num {
 
   .btn {
     padding: 9px 15px;
+  }
+}
+
+/* --- the height iOS does not admit to --------------------------------------
+ *
+ * Last in the sheet on purpose. Everything here overrides a rule of the same
+ * weight higher up, and it has to be scoped exactly this narrowly: an app
+ * added to the Home Screen while the status bar tag said translucent. iOS
+ * bakes that tag in at install and never re-reads it, so the mode cannot be
+ * changed by deploying anything - it can only be paid for.
+ *
+ * What it costs: such an app is laid out from the top of the screen, under the
+ * status bar, but told the viewport is one status bar shorter than the glass.
+ * Measured on a 15 Pro Max - 932pt of screen, a viewport of 872.67, and the
+ * missing 59.33 exactly the top inset the app is told to pad by. So everything
+ * anchored to the bottom stopped 59pt short and left a band of whatever was
+ * painted behind it.
+ *
+ * Two halves, and both are needed. The boxes reach the glass: the root gets
+ * the height back, and the fixed pair get it again, because a fixed box is
+ * measured against the viewport rather than against html. Then the content is
+ * pushed back up by the same amount, so nothing moves and only the background
+ * reaches further - which also replaces the clearance the home indicator
+ * normally gets from the bottom inset, and does not get here, that inset being
+ * 0 when the viewport ends above the indicator entirely.
+ *
+ * Every term is env(safe-area-inset-top): 0 in a browser tab, 0 on a desktop,
+ * 0 on any install whose status bar is opaque. Where it is 0 this whole block
+ * is the rules it overrides, to the pixel.
+ * -------------------------------------------------------------------------- */
+
+@media (display-mode: standalone) and (pointer: coarse) {
+  html {
+    height: calc(100% + env(safe-area-inset-top));
+  }
+
+  .sidebar,
+  .scrim {
+    bottom: calc(-1 * env(safe-area-inset-top));
+  }
+  /* Said twice, so the panel still reaches the glass if the negative bottom is
+     clamped rather than honoured. A min-height is safe where a height was not:
+     it cannot override the insets the way 100dvh did. */
+  .sidebar {
+    min-height: calc(100% + env(safe-area-inset-top));
+  }
+
+  .sidebar {
+    padding-bottom: calc(20px + env(safe-area-inset-bottom) + env(safe-area-inset-top));
+  }
+  .page {
+    padding-bottom: calc(48px + env(safe-area-inset-bottom) + env(safe-area-inset-top));
   }
 }
