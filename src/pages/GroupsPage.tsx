@@ -18,6 +18,15 @@ const PALETTE = [
 ];
 
 /**
+ * Characters wide, so the field is the size of the name it holds. The ceiling
+ * only stops a pathological name from running the length of the card - a
+ * narrow screen is handled by the field shrinking, not by this.
+ */
+function nameSize(value: string): number {
+  return Math.min(Math.max(value.trim().length, 6), 34);
+}
+
+/**
  * Groups are plain labels, but they are the mechanism behind event booklets:
  * tag once here, then a project can select "everyone in the choir" without
  * anybody re-picking names.
@@ -94,60 +103,56 @@ export function GroupsPage() {
             </div>
           ) : null}
           {tags.length ? (
-            <table className="grid-table">
-              <colgroup>
-                <col className="c-rest" />
-                <col className="c-mid" />
-                <col className="c-mid" />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>Group</th>
-                  <th className="num">Records</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {tags.map((tag) => (
-                  <tr key={tag.id}>
-                    <td>
-                      <span className="group-row">
-                        <span className="group-dot" style={{ background: tag.color }} />
-                        {canEdit ? (
-                          <input
-                            className="group-name"
-                            type="text"
-                            defaultValue={tag.name}
-                            aria-label={`Rename ${tag.name}`}
-                            onBlur={async (event) => {
-                              const field = event.target;
-                              const next = field.value.trim();
-                              if (!next || next === tag.name) {
-                                field.value = tag.name;
-                                return;
-                              }
-                              try {
-                                setFormError(null);
-                                await updateTag(tag.id, { name: next });
-                                await reload();
-                              } catch (cause) {
-                                // Group names are unique; a clash must not leave
-                                // the new name on screen and the old one stored.
-                                field.value = tag.name;
-                                setFormError(
-                                  cause instanceof Error ? cause.message : String(cause),
-                                );
-                              }
-                            }}
-                          />
-                        ) : (
-                          tag.name
-                        )}
-                      </span>
-                    </td>
-                    <td className="num muted">{counts.get(tag.id) ?? 0}</td>
-                    <td style={{ textAlign: "right" }}>
-                      {canEdit ? (
+            <ul className="group-list">
+              {tags.map((tag) => {
+                const count = counts.get(tag.id) ?? 0;
+                return (
+                  <li key={tag.id} className="group-item">
+                    <span className="group-dot" style={{ background: tag.color }} />
+                    {canEdit ? (
+                      <input
+                        className="group-name"
+                        type="text"
+                        defaultValue={tag.name}
+                        // Sized to the word rather than to the column, so the
+                        // rule under it stops where the name does instead of
+                        // running on like a blank to be filled in.
+                        size={nameSize(tag.name)}
+                        aria-label={`Rename ${tag.name}`}
+                        onInput={(event) => {
+                          event.currentTarget.size = nameSize(event.currentTarget.value);
+                        }}
+                        onBlur={async (event) => {
+                          const field = event.target;
+                          const next = field.value.trim();
+                          if (!next || next === tag.name) {
+                            field.value = tag.name;
+                            field.size = nameSize(tag.name);
+                            return;
+                          }
+                          try {
+                            setFormError(null);
+                            await updateTag(tag.id, { name: next });
+                            await reload();
+                          } catch (cause) {
+                            // Group names are unique; a clash must not leave
+                            // the new name on screen and the old one stored.
+                            field.value = tag.name;
+                            field.size = nameSize(tag.name);
+                            setFormError(cause instanceof Error ? cause.message : String(cause));
+                          }
+                        }}
+                      />
+                    ) : (
+                      <span className="group-name-text">{tag.name}</span>
+                    )}
+
+                    <span className="group-count">
+                      {count === 0 ? "No records" : count === 1 ? "1 record" : `${count} records`}
+                    </span>
+
+                    {canEdit ? (
+                      <span className="group-actions">
                         <ConfirmButton
                           subtle
                           label="Delete"
@@ -166,12 +171,12 @@ export function GroupsPage() {
                             await reload();
                           }}
                         />
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      </span>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
           ) : (
             <EmptyState title="No groups yet">
               Groups are optional. Add one when you want to print a directory for part of the
