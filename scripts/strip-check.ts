@@ -114,14 +114,23 @@ check("the scrim paints a translucent ink", Boolean(scrimGround), scrimGround?.[
 const canvas = clean.match(/--canvas:\s*(#[0-9a-f]{6})/i)?.[1];
 check("the canvas it is drawn over is named", Boolean(canvas), canvas ?? "not found");
 
-const stripRule = clean.match(/html:has\(\.scrim\),\s*html\.drawer-open\s*\{([^}]*)\}/);
+const stripSelectors =
+  "html:has(.scrim), html.drawer-open, html:has(.scrim) body, html.drawer-open body";
+const stripRule = clean.match(
+  new RegExp(
+    stripSelectors
+      .split(", ")
+      .map((one) => one.replace(/[.()]/g, "\\$&"))
+      .join(",\\s*") + "\\s*\\{([^}]*)\\}",
+  ),
+);
 const strip = stripRule?.[1].match(/background:\s*(rgb\([^)]*\)|#[0-9a-f]{6})/i)?.[1];
 check(
-  "the strip is keyed to the drawer both ways",
+  "the strip is keyed to the drawer on both elements, both ways",
   Boolean(stripRule),
   stripRule
     ? ""
-    : "needs html:has(.scrim), html.drawer-open - a selector that only might match is not enough here",
+    : `needs ${stripSelectors} - the strip is filled by one of html and body, and which one is not observable from here`,
 );
 
 /*

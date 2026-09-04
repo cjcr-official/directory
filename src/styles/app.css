@@ -1934,9 +1934,20 @@ th.num {
      right for the three screens above - they have no state to read. The
      drawer does, so the shell puts the class on the document as well: this is
      the one screen where a selector quietly failing to match is invisible
-     until somebody photographs the bottom of their phone. */
+     until somebody photographs the bottom of their phone.
+
+     And on body as well as html, which is what the last attempt was missing.
+     The strip came out the exact pale of --canvas, and html and body are both
+     --canvas; painting html alone through a class the app sets itself changed
+     nothing, so html is not what fills that strip. body is the other element
+     of that colour. It costs nothing to paint both: #root carries the page's
+     own background across the whole viewport, so neither html nor body is
+     visible anywhere except the strip, and darkening them cannot darken the
+     page behind the scrim. */
   html:has(.scrim),
-  html.drawer-open {
+  html.drawer-open,
+  html:has(.scrim) body,
+  html.drawer-open body {
     background: rgb(136 143 141);
   }
 
