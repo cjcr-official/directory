@@ -186,22 +186,41 @@ for (const { selector, body } of all) {
 }
 
 /*
- * And the one that cost the most to find. A standalone iOS app asking for a
- * translucent status bar is laid out from the top of the screen but told the
- * viewport is one status bar shorter than it is, so everything full-height
- * stops that far above the bottom of the phone. It is invisible in every
- * browser, because no browser but an installed iOS app does it.
+ * And the one that cost the most to find, plus the reason it cannot be fixed
+ * where it comes from. A translucent standalone app is laid out from the top
+ * of the screen and told the viewport is one status bar shorter, so anything
+ * anchored to the bottom stops env(safe-area-inset-top) above the glass.
+ *
+ * Setting the tag to opaque fixes the arithmetic and reaches nobody: iOS reads
+ * it when the icon is added to the Home Screen and bakes it in, so an app
+ * installed while it said translucent stays translucent for good. The height
+ * has to be given back in CSS, and these are the three places that do it.
  */
 const head = readFileSync("index.html", "utf8");
-const style = head.match(/apple-mobile-web-app-status-bar-style"\s+content="([^"]+)"/)?.[1];
-check("the status bar style is set at all", Boolean(style), style ?? "not found");
-check(
-  "and it is not translucent",
-  style !== "black-translucent",
-  style === "black-translucent"
-    ? "translucent costs the height of the top inset off the bottom of every screen"
-    : `${style}`,
+const translucent = /apple-mobile-web-app-status-bar-style"\s+content="black-translucent"/.test(
+  head,
 );
+
+if (translucent) {
+  // Every rule for the selector, not the first: these all appear two or three
+  // times over - once plainly, once inside the phone's block, once inside the
+  // installed app's - and it is a later one that gives the height back.
+  const givesItBack = (selector: string, declaration: RegExp) => {
+    const rules = all.filter((one) =>
+      one.selector.split(",").some((part) => part.trim() === selector),
+    );
+    check(
+      `${selector}: gives the status bar's height back`,
+      rules.some((one) => declaration.test(one.body)),
+      rules.length ? "" : "no rule for it at all",
+    );
+  };
+  givesItBack("html", /height:\s*calc\(100% \+ env\(safe-area-inset-top\)\)/);
+  givesItBack(".sidebar", /bottom:\s*calc\(-1 \* env\(safe-area-inset-top\)\)/);
+  givesItBack(".scrim", /bottom:\s*calc\(-1 \* env\(safe-area-inset-top\)\)/);
+} else {
+  check("the status bar is opaque, so nothing needs giving back", true);
+}
 
 console.log(failures ? `\n${failures} failed` : "\nall passed");
 process.exit(failures ? 1 : 0);
