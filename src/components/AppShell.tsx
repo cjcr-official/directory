@@ -1,63 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { Logo } from "@/components/Logo";
 import { useAuth } from "@/auth/AuthProvider";
 import { useDirectory } from "@/data/DirectoryContext";
 import { APP_VERSION } from "@/lib/version";
-
-/*
- * TEMPORARY. Reading the boxes off the phone, because a band across the foot
- * of the screen has now survived three fixes reasoned out from a desktop, and
- * the desktop is where every one of them looked right. It prints, in order:
- * the window, the visual viewport, html, body, #root, the screen, the bottom
- * safe-area inset, and where the drawer and the scrim actually end.
- *
- * Delete this and the .probe rule with it once the numbers are in hand.
- */
-function ViewportProbe() {
-  const [text, setText] = useState("measuring");
-  const inset = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const bottomOf = (selector: string) => {
-      const el = document.querySelector(selector);
-      return el ? Math.round(el.getBoundingClientRect().bottom) : 0;
-    };
-    const read = () => {
-      const safeArea = inset.current
-        ? Math.round(parseFloat(getComputedStyle(inset.current).paddingBottom))
-        : -1;
-      setText(
-        [
-          `win ${Math.round(window.innerHeight)}`,
-          `vis ${Math.round(window.visualViewport?.height ?? 0)}`,
-          `html ${document.documentElement.clientHeight}`,
-          `body ${document.body.clientHeight}`,
-          `root ${document.getElementById("root")?.clientHeight ?? 0}`,
-          `scrn ${window.screen.height}`,
-          `inset ${safeArea}`,
-          `drawer ${bottomOf(".sidebar")}`,
-          `dim ${bottomOf(".scrim")}`,
-          `dpr ${window.devicePixelRatio}`,
-        ].join("  "),
-      );
-    };
-    read();
-    const again = setInterval(read, 400);
-    window.addEventListener("resize", read);
-    return () => {
-      clearInterval(again);
-      window.removeEventListener("resize", read);
-    };
-  }, []);
-
-  return (
-    <>
-      <div ref={inset} className="probe-inset" />
-      <div className="probe">{text}</div>
-    </>
-  );
-}
 
 function Item({ to, label, count }: { to: string; label: string; count?: number }) {
   return (
@@ -136,8 +82,6 @@ export function AppShell() {
           <Logo />
           <span className="app-name">Church Directory</span>
         </div>
-
-        <ViewportProbe />
 
         <Item to="/" label="Overview" />
 
