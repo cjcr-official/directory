@@ -275,12 +275,24 @@ p:last-child {
 }
 
 .page {
-  padding: 26px 32px 64px;
-  max-width: 1180px;
+  padding: 26px 36px 64px;
+  /* A desk monitor is wider than a book. 1180 left a fifth of a 1920 screen
+     empty beside a table that had columns squeezed into the rest; this uses
+     the room without letting a line of body text run to the horizon. */
+  max-width: 1560px;
   width: 100%;
 }
 .page.wide {
   max-width: none;
+}
+/*
+ * A form is not a table. Given the whole of a wide screen its two columns
+ * reach 700px each, and a single-line field 700px wide is both awkward to fill
+ * and ugly to look at - the label sits alone at one end of a great empty box.
+ * Lists take the room; forms take a measure.
+ */
+.page.form {
+  max-width: 1240px;
 }
 
 .page-head {
@@ -337,6 +349,21 @@ p:last-child {
 .grid.two {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
+/* Cards keep their own height instead of being stretched to match whichever
+   neighbour has the most in it. */
+/* A head whose note is a sentence, not a word: it goes under the title
+   instead of being squeezed beside it. */
+.card-head.column {
+  display: block;
+}
+.card-head.column .muted {
+  display: block;
+  margin-top: 2px;
+}
+
+.grid.top {
+  align-items: start;
+}
 .grid.three {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
@@ -372,11 +399,38 @@ p:last-child {
   flex: 1;
 }
 
+/*
+ * Four numbers, one strip. As four separate cards they were a hundred pixels
+ * tall apiece and a quarter of the screen wide each, which is a great deal of
+ * furniture around the word "Groups". They read as one band now, divided
+ * rather than boxed.
+ */
+.stat-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  margin-bottom: 18px;
+  overflow: hidden;
+}
+
 .stat {
-  padding: 16px 18px;
+  padding: 13px 18px;
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  border-right: 1px solid var(--line);
+}
+.stat:last-child {
+  border-right: none;
+}
+a.stat {
+  color: inherit;
+  text-decoration: none;
+}
+a.stat:hover {
+  background: var(--canvas);
 }
 .stat .value {
-  font-size: 1.9rem;
+  font-size: 1.45rem;
   font-weight: 660;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
@@ -622,14 +676,66 @@ th {
   letter-spacing: 0.06em;
   color: var(--ink-3);
   font-weight: 600;
-  padding: 9px 12px;
+  padding: 8px 14px;
   border-bottom: 1px solid var(--line);
+  white-space: nowrap;
 }
 td {
-  padding: 9px 12px;
+  padding: 7px 14px;
   border-bottom: 1px solid var(--line);
   vertical-align: middle;
 }
+/* --- the browse lists -------------------------------------------------------
+ *
+ * A fixed column grid, so the table reads as a designed set of columns rather
+ * than as whatever the longest email in the congregation decided. Left to
+ * itself the browser hands the slack out proportionally, which on a wide
+ * screen opened a hand's width between every column and stranded the last one
+ * against the right-hand edge.
+ *
+ * Fixed layout also means a long address truncates instead of forcing the row
+ * two lines tall, which is what keeps the rows even.
+ * -------------------------------------------------------------------------- */
+
+/*
+ * Kept apart from .list-table on purpose: that one also turns a row into a
+ * card on a phone, with the first column read as a portrait. A table whose
+ * first column is a name rather than a face wants the column grid and not
+ * that, so the two are separate classes.
+ */
+.grid-table {
+  table-layout: fixed;
+}
+
+.grid-table td,
+.grid-table th {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The portrait, then the columns in the order each page declares them. */
+.grid-table col.c-portrait {
+  width: 58px;
+}
+.grid-table col.c-wide {
+  width: 22%;
+}
+.grid-table col.c-mid {
+  width: 17%;
+}
+.grid-table col.c-narrow {
+  width: 12%;
+}
+.grid-table col.c-tiny {
+  width: 8%;
+}
+/* The last column takes the slack. Without somewhere to put it, a fixed table
+   shares any unclaimed width out across every column - which quietly made the
+   portrait column twice the width of a portrait. */
+.grid-table col.c-rest {
+  width: auto;
+}
+
 tbody tr:last-child td {
   border-bottom: none;
 }
@@ -677,8 +783,8 @@ th.num {
 /* --- bits ---------------------------------------------------------------- */
 
 .avatar {
-  width: 40px;
-  height: 50px;
+  width: 34px;
+  height: 42px;
   flex: none;
   border-radius: 5px;
   object-fit: cover;
@@ -754,6 +860,11 @@ th.num {
 }
 
 .notice {
+  /* Prose has a comfortable measure whatever the screen is doing. Run across a
+     1560px page the sign-up explanation was a hundred and seventy characters
+     to the line, which is a paragraph nobody finishes. */
+  max-width: 92ch;
+
   padding: 11px 14px;
   border-radius: var(--radius-sm);
   font-size: 0.88rem;

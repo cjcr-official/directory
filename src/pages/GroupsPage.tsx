@@ -84,7 +84,12 @@ export function GroupsPage() {
             </div>
           ) : null}
           {tags.length ? (
-            <table>
+            <table className="grid-table">
+              <colgroup>
+                <col className="c-rest" />
+                <col className="c-mid" />
+                <col className="c-mid" />
+              </colgroup>
               <thead>
                 <tr>
                   <th>Group</th>

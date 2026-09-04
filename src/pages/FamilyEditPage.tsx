@@ -391,7 +391,7 @@ export function FamilyEditPage() {
   }
 
   return (
-    <div className="page">
+    <div className="page form">
       <div className="page-head">
         <div className="grow">
           <h1>{isNew ? "Add a family" : form.display_name || "Family"}</h1>

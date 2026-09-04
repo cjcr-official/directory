@@ -111,7 +111,18 @@ export function PeoplePage() {
 
       <div className="card">
         {filtered.length ? (
-          <table className="list-table">
+          <table className="list-table grid-table">
+            {/* The column widths live here rather than in the cells, so the
+                grid is one thing to read and one thing to change. */}
+            <colgroup>
+              <col className="c-portrait" />
+              <col className="c-wide" />
+              <col className="c-wide" />
+              <col className="c-narrow" />
+              <col className="c-mid" />
+              <col className="c-tiny" />
+              <col className="c-rest" />
+            </colgroup>
             <thead>
               <tr>
                 <th style={{ width: 56 }}></th>

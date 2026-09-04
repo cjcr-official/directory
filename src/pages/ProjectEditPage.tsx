@@ -283,7 +283,7 @@ export function ProjectEditPage() {
   }
 
   return (
-    <div className="page">
+    <div className="page form">
       <div className="page-head">
         <div className="grow">
           <h1>{isNew ? "New directory" : name}</h1>

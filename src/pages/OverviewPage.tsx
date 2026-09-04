@@ -6,18 +6,18 @@ import { firstName, formatMonthDay, fullName, monthDayOrder } from "@/lib/format
 import type { PersonRow } from "@/lib/database.types";
 
 function Stat({ value, label, to }: { value: number | string; label: string; to?: string }) {
-  const body = (
-    <div className="card stat">
-      <div className="value">{value}</div>
-      <div className="label">{label}</div>
-    </div>
+  const inside = (
+    <>
+      <span className="value">{value}</span>
+      <span className="label">{label}</span>
+    </>
   );
   return to ? (
-    <Link to={to} style={{ textDecoration: "none", color: "inherit" }}>
-      {body}
+    <Link className="stat" to={to}>
+      {inside}
     </Link>
   ) : (
-    body
+    <div className="stat">{inside}</div>
   );
 }
 
@@ -104,14 +104,14 @@ export function OverviewPage() {
         </div>
       ) : (
         <>
-          <div className="grid three" style={{ marginBottom: 20 }}>
+          <div className="card stat-strip">
             <Stat value={entries.length} label="Printable records" to="/projects" />
             <Stat value={people.length} label="People" to="/people" />
             <Stat value={households.length} label="Families" to="/families" />
             <Stat value={tags.length} label="Groups" to="/groups" />
           </div>
 
-          <div className="grid two">
+          <div className="grid three top">
             <div className="card">
               <div className="card-head">
                 <h2>Next birthdays</h2>
@@ -171,32 +171,32 @@ export function OverviewPage() {
                 </p>
               </div>
             </div>
-          </div>
 
-          {individuals.length ? (
-            <div className="card" style={{ marginTop: 16 }}>
-              <div className="card-head">
-                <h2>Listed on their own</h2>
-                <span className="muted small">
-                  These people are not part of a family, so each prints as their own record.
-                </span>
-              </div>
-              <div className="card-body tight">
-                <div className="row tight">
-                  {individuals.slice(0, 24).map((person) => (
-                    <Link key={person.id} className="pill" to={`/people/${person.id}`}>
-                      {firstName(person)} {person.last_name}
-                    </Link>
-                  ))}
-                  {individuals.length > 24 ? (
-                    <Link className="pill" to="/people">
-                      +{individuals.length - 24} more
-                    </Link>
-                  ) : null}
+            {individuals.length ? (
+              <div className="card">
+                <div className="card-head column">
+                  <h2>Listed on their own</h2>
+                  <span className="muted small">
+                    These people are not part of a family, so each prints as their own record.
+                  </span>
+                </div>
+                <div className="card-body tight">
+                  <div className="row tight">
+                    {individuals.slice(0, 24).map((person) => (
+                      <Link key={person.id} className="pill" to={`/people/${person.id}`}>
+                        {firstName(person)} {person.last_name}
+                      </Link>
+                    ))}
+                    {individuals.length > 24 ? (
+                      <Link className="pill" to="/people">
+                        +{individuals.length - 24} more
+                      </Link>
+                    ) : null}
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </>
       )}
     </div>

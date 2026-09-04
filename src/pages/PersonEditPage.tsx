@@ -227,7 +227,7 @@ export function PersonEditPage() {
   }
 
   return (
-    <div className="page">
+    <div className="page form">
       <div className="page-head">
         <div className="grow">
           <h1>

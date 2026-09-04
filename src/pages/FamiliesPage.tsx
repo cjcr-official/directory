@@ -107,7 +107,15 @@ export function FamiliesPage() {
 
       <div className="card">
         {filtered.length ? (
-          <table className="list-table">
+          <table className="list-table grid-table">
+            <colgroup>
+              <col className="c-portrait" />
+              <col className="c-wide" />
+              <col className="c-wide" />
+              <col className="c-mid" />
+              <col className="c-narrow" />
+              <col className="c-rest" />
+            </colgroup>
             <thead>
               <tr>
                 <th style={{ width: 56 }}></th>
