@@ -1656,8 +1656,20 @@ th.num {
     overscroll-behavior: none;
   }
 
+  /*
+   * iOS paints the strip behind the home indicator with the document's own
+   * background - not with whatever element is drawn over it, which stops at
+   * the viewport. So the document has to be told which screen is up, or a
+   * light screen ends on a dark band belonging to nothing. Dark for the three
+   * that are dark all over; the page's own canvas for everything else.
+   */
   html,
   body {
+    background: var(--canvas);
+  }
+  html:has(.auth-screen),
+  html:has(.preview),
+  html:has(.update-screen) {
     background: var(--brand-dark);
   }
 
