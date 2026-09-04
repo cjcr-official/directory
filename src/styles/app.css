@@ -993,6 +993,66 @@ th.num {
   white-space: nowrap;
 }
 
+/* --- disclosure ------------------------------------------------------------
+ *
+ * A card with a lid. The head reads as a row you can press, and carries what
+ * the settings inside currently come to so the panel is worth reading shut.
+ * -------------------------------------------------------------------------- */
+
+.disclosure > .disclosure-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+/* Safari draws its own triangle and ignores list-style. */
+.disclosure > .disclosure-head::-webkit-details-marker {
+  display: none;
+}
+.disclosure[open] > .disclosure-head {
+  border-bottom: 1px solid var(--line);
+}
+.disclosure > .disclosure-head:hover {
+  background: var(--canvas);
+}
+.disclosure > .disclosure-head:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.disclosure-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.disclosure-title {
+  font-size: 1rem;
+  font-weight: 640;
+  color: var(--ink);
+}
+
+.disclosure-summary {
+  font-size: 0.8rem;
+  color: var(--ink-3);
+}
+
+.disclosure-mark {
+  flex: none;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--ink-3);
+  transition: transform 0.15s ease;
+}
+.disclosure[open] .disclosure-mark {
+  transform: rotate(180deg);
+}
+
 /* --- family members -------------------------------------------------------
  *
  * A family is a grouping, so this is a list of who is in it and in what order

@@ -47,6 +47,42 @@ export function EmptyState({
   );
 }
 
+/**
+ * A card that stays shut until it is wanted.
+ *
+ * Every setting on a directory has a default that prints a good book, so a
+ * form showing all of them at once asks a question the answer to which is
+ * almost always "leave it". Closed, the panel says what it is currently set
+ * to, which is the part worth reading; open, it is an ordinary card.
+ */
+export function Disclosure({
+  title,
+  summary,
+  open,
+  children,
+}: {
+  title: string;
+  /** What the settings inside currently add up to, in a few words. */
+  summary: string;
+  open?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <details className="card disclosure" open={open}>
+      <summary className="disclosure-head">
+        <span className="disclosure-titles">
+          <span className="disclosure-title">{title}</span>
+          <span className="disclosure-summary">{summary}</span>
+        </span>
+        <span className="disclosure-mark" aria-hidden>
+          ⌄
+        </span>
+      </summary>
+      <div className="card-body">{children}</div>
+    </details>
+  );
+}
+
 export function Field({
   label,
   hint,
