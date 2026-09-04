@@ -185,5 +185,23 @@ for (const { selector, body } of all) {
   );
 }
 
+/*
+ * And the one that cost the most to find. A standalone iOS app asking for a
+ * translucent status bar is laid out from the top of the screen but told the
+ * viewport is one status bar shorter than it is, so everything full-height
+ * stops that far above the bottom of the phone. It is invisible in every
+ * browser, because no browser but an installed iOS app does it.
+ */
+const head = readFileSync("index.html", "utf8");
+const style = head.match(/apple-mobile-web-app-status-bar-style"\s+content="([^"]+)"/)?.[1];
+check("the status bar style is set at all", Boolean(style), style ?? "not found");
+check(
+  "and it is not translucent",
+  style !== "black-translucent",
+  style === "black-translucent"
+    ? "translucent costs the height of the top inset off the bottom of every screen"
+    : `${style}`,
+);
+
 console.log(failures ? `\n${failures} failed` : "\nall passed");
 process.exit(failures ? 1 : 0);

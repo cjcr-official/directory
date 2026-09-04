@@ -21,8 +21,20 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Directory" />
-    <!-- The app's own bar is dark, so the status bar sits on top of it. -->
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!--
+      black, not black-translucent. Translucent puts the app's own bar under
+      the status bar, which looks better and costs more than it looks: iOS
+      lays a translucent standalone app out from the top of the screen but
+      reports a viewport one status bar shorter, so every full-height thing in
+      the app stopped 59pt above the bottom of the phone and left a band of
+      whatever was behind it. Measured on a 15 Pro Max - 932pt of screen, the
+      app ending at 872.67, and the missing 59.33 exactly the top inset it was
+      told to pad by.
+
+      Opaque, the app starts below the status bar and its height is honest.
+      iOS paints that strip itself, in black against a bar that is #10211e.
+    -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <!--
       Delivered as a meta tag rather than only in public/_headers so it applies
       wherever the app is served - dev server, local preview, any host - not just
