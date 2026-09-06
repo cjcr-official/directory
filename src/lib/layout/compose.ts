@@ -1,5 +1,5 @@
 import type { DirectoryEntry } from "../entries";
-import type { PersonRow } from "../database.types";
+import type { HouseholdRow, PersonRow } from "../database.types";
 import {
   addressLines,
   alphaBucket,
@@ -11,6 +11,8 @@ import {
   formatShortDate,
   fullName,
   join,
+  sameEmail,
+  samePhone,
 } from "../format";
 import {
   PAGE_SIZES,
@@ -251,6 +253,30 @@ function memberLabel(person: PersonRow, householdSurname: string): string {
     : `${given} ${person.last_name}`;
 }
 
+/**
+ * A member's own contact details, less anything the family's line already says.
+ *
+ * The house number is commonly typed against the house and against each person
+ * who answers it. Printed as it is stored, a family of four would carry the
+ * same number five times over, which is both noise and the card's remaining
+ * room spent saying nothing new.
+ */
+function memberContact(
+  member: PersonRow,
+  household: HouseholdRow,
+  settings: ProjectSettings,
+): string {
+  return join(
+    [
+      settings.showPhone && !samePhone(member.phone, household.phone)
+        ? formatPhone(member.phone)
+        : "",
+      settings.showEmail && !sameEmail(member.email, household.email) ? (member.email ?? "") : "",
+    ],
+    " · ",
+  );
+}
+
 function personDates(person: PersonRow, settings: ProjectSettings): string[] {
   const parts: string[] = [];
   if (settings.showBirthdays && person.date_of_birth) {
@@ -323,6 +349,18 @@ function householdBlocks(
     });
   }
 
+  // The family's shared line, and then a line for each member who can be
+  // reached some other way.
+  //
+  // Both, never one instead of the other. A congregation that keeps a mobile
+  // against each person - which is most of them now - and then fills in the
+  // home phone, the one field that most looks like "the family's number", used
+  // to watch every one of those mobiles drop off the card: the family's own
+  // line was consulted first and the members' were only a fallback for when it
+  // was empty. Nothing on the page said why, and the numbers were still in the
+  // records. Detailed members already print both, which is why only compact
+  // was affected; both are still skipped when members are not listed at all,
+  // so this cannot reintroduce a name the settings asked to leave off.
   const contact = join(
     [
       settings.showPhone ? formatPhone(household.phone) : "",
@@ -330,44 +368,40 @@ function householdBlocks(
     ],
     " · ",
   );
+
+  const memberContacts =
+    settings.showMembers && settings.memberStyle === "compact"
+      ? members
+          .map((member) => ({ member, detail: memberContact(member, household, settings) }))
+          .filter((line) => line.detail)
+      : [];
+
   if (contact) {
     blocks.push({
-      text: contact,
+      // Named only when people's own lines follow it. Among "Maria — ..." lines
+      // a bare number reads as belonging to whoever was named last, and the one
+      // number in the house that belongs to nobody in particular is exactly the
+      // one worth labelling. On its own it needs no label: it is the only
+      // number on the card.
+      text: memberContacts.length ? `Home — ${contact}` : contact,
       size: type.small,
       weight: "regular",
       color: COLORS.muted,
       spaceBefore: 3,
     });
-  } else if (settings.showMembers && settings.memberStyle === "compact") {
-    // A family with no shared home line still has people who can be reached.
-    //
-    // Only the family's own record was ever consulted here, so a congregation
-    // that keeps a mobile against each person - which is most of them now -
-    // switched "Phone numbers" on, got nothing, and had nothing on screen to
-    // say why. Detailed members already put these on each member's own line,
-    // which is why only compact needs the fallback; and it is skipped when
-    // members are not listed at all, so this can never reintroduce a name the
-    // settings asked to leave off.
-    let first = true;
-    for (const member of members) {
-      const theirs = join(
-        [
-          settings.showPhone ? formatPhone(member.phone) : "",
-          settings.showEmail ? (member.email ?? "") : "",
-        ],
-        " · ",
-      );
-      if (!theirs) continue;
-      blocks.push({
-        text: `${firstName(member)} — ${theirs}`,
-        size: type.small,
-        weight: "regular",
-        color: COLORS.muted,
-        spaceBefore: first ? 3 : 0,
-      });
-      first = false;
-    }
   }
+
+  memberContacts.forEach(({ member, detail }, i) => {
+    blocks.push({
+      text: `${firstName(member)} — ${detail}`,
+      size: type.small,
+      weight: "regular",
+      color: COLORS.muted,
+      // The people's lines are one block: a gap above the first of them only,
+      // and a smaller one when the family's line is already sitting there.
+      spaceBefore: i > 0 ? 0 : contact ? 1 : 3,
+    });
+  });
 
   // Birthdays belong to people, so in detailed mode they are already beside
   // each member's name and only compact mode has to collect them. The

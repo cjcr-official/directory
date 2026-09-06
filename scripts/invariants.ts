@@ -489,10 +489,21 @@ async function main() {
     const timLines = detailed.split("\n").filter((line) => line.includes("555-0101"));
     ok(timLines.length === 1, `a member's phone printed ${timLines.length} times in detailed mode`);
 
-    // And a family with its own line still speaks for itself.
+    // And a family with its own line speaks for itself AND for its people. The
+    // home phone is the field most likely to be filled in, and filling it in
+    // used to take every member's mobile off the card - the numbers most of the
+    // congregation is actually reached on. Ruth answers the house line and it
+    // is typed against her too, so hers is the same number, not another one:
+    // one printing of it, on the family's line, and no line of her own.
     const own = drawn(
       composeBook(
-        buildEntries({ ...data, households: [blankHousehold({ id: "h1", phone: "4065550000" })] }),
+        buildEntries({
+          households: [blankHousehold({ id: "h1", phone: "4065550000" })],
+          people: [...data.people, reach({ id: "p4", first_name: "Ruth", phone: "406-555-0000" })],
+          tags: [],
+          householdTags: [],
+          personTags: [],
+        }),
         normalizeSettings({
           ...DEFAULT_SETTINGS,
           showPhone: true,
@@ -503,8 +514,17 @@ async function main() {
         metrics,
       ),
     ).join("\n");
+    const homeLines = own.split("\n").filter((line) => line.includes("555-0000"));
     ok(own.includes("(406) 555-0000"), "the family's own phone stopped printing");
-    ok(!own.includes("555-0101"), "members' phones printed alongside the family's own");
+    ok(own.includes("(406) 555-0101"), "a member's phone went missing once the family had one");
+    ok(
+      own.includes("tim@example.org"),
+      "a member's email went missing once the family had a phone",
+    );
+    ok(homeLines.length === 1, `the family's own number printed ${homeLines.length} times`);
+    ok(!/Ruth —/.test(own), "a member repeated the family's own number on a line of her own");
+    // Named, so a bare number cannot read as belonging to the person above it.
+    ok(/Home — \(406\) 555-0000/.test(own), "the family's line is not named among the people's");
 
     console.log(
       `reachable family: compact prints ${compact.split("\n").filter((l) => l.includes("—")).length} member contact lines`,
