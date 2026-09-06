@@ -79,7 +79,11 @@ export function AdministratorsPage() {
             {profiles?.map((row) => {
               const isMe = row.id === me?.id;
               // Never let the last owner lock themselves out of their own directory.
-              const lastOwner = row.role === "owner" && owners <= 1;
+              // Only the row actually holding that last active ownership is frozen.
+              // An owner with no access is holding nothing - counting them here
+              // froze their row too, so the one person who could grant them access
+              // was shown a plain "No access" label and no way to change it.
+              const lastOwner = row.role === "owner" && row.is_active && owners <= 1;
               return (
                 <tr key={row.id}>
                   <td>
@@ -130,6 +134,17 @@ export function AdministratorsPage() {
             })}
           </tbody>
         </table>
+
+        {owners <= 1 ? (
+          <div
+            className="card-body tight small muted"
+            style={{ borderTop: "1px solid var(--line)" }}
+          >
+            Your own role and access are fixed while you are the only owner with access, so that
+            somebody is always left who can manage administrators. Give another person the owner
+            role, grant them access, and your own row can be changed again.
+          </div>
+        ) : null}
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
