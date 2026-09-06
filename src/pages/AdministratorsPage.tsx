@@ -10,6 +10,25 @@ const ROLES: { value: AppRole; label: string; blurb: string }[] = [
   { value: "viewer", label: "Viewer", blurb: "Browse and print. No changes." },
 ];
 
+/**
+ * "No access" is not a role. The database knows three - owner, editor, viewer -
+ * and takes access away with is_active, so this is the one menu entry that does
+ * not name one. Somebody sent back here keeps the role they had: it is what the
+ * roster still shows them as, and what they come back as if you let them in
+ * again.
+ */
+const NO_ACCESS = "none";
+
+/** One menu on each row for the whole ladder, ending at nothing. */
+const LEVELS: { value: string; label: string }[] = [
+  ...ROLES.map(({ value, label }) => ({ value, label })),
+  { value: NO_ACCESS, label: "No access" },
+];
+
+function levelPatch(value: string): Partial<ProfileRow> {
+  return value === NO_ACCESS ? { is_active: false } : { role: value as AppRole, is_active: true };
+}
+
 export function AdministratorsPage() {
   const { profile: me, isOwner } = useAuth();
   const [profiles, setProfiles] = useState<ProfileRow[] | null>(null);
@@ -61,8 +80,9 @@ export function AdministratorsPage() {
       <Notice>
         To add someone, send them the address of this app and ask them to create an account on the
         sign-in screen. They arrive here with <strong>no access</strong> — they cannot see a single
-        name or address until you choose <strong>Grant access</strong> and pick a role. Anyone can
-        reach the sign-up form, so this is what keeps the congregation's details private.
+        name or address until you pick a role for them. Choosing <strong>No access</strong> again
+        takes it back. Anyone can reach the sign-up form, so this is what keeps the congregation's
+        details private.
       </Notice>
 
       <div className="card" style={{ marginTop: 16 }}>
@@ -98,16 +118,14 @@ export function AdministratorsPage() {
                   <td>
                     {isOwner && !lastOwner ? (
                       <select
-                        value={row.role}
+                        value={row.is_active ? row.role : NO_ACCESS}
                         disabled={busy === row.id}
                         style={{ width: "auto" }}
-                        onChange={(event) =>
-                          void change(row.id, { role: event.target.value as AppRole })
-                        }
+                        onChange={(event) => void change(row.id, levelPatch(event.target.value))}
                       >
-                        {ROLES.map((role) => (
-                          <option key={role.value} value={role.value}>
-                            {role.label}
+                        {LEVELS.map((level) => (
+                          <option key={level.value} value={level.value}>
+                            {level.label}
                           </option>
                         ))}
                       </select>
@@ -116,18 +134,7 @@ export function AdministratorsPage() {
                     )}
                   </td>
                   <td>
-                    {isOwner && !lastOwner ? (
-                      <button
-                        type="button"
-                        className="btn small"
-                        disabled={busy === row.id}
-                        onClick={() => void change(row.id, { is_active: !row.is_active })}
-                      >
-                        {row.is_active ? "Suspend" : "Grant access"}
-                      </button>
-                    ) : (
-                      <span className="muted small">{row.is_active ? "Active" : "No access"}</span>
-                    )}
+                    <span className="muted small">{row.is_active ? "Active" : "No access"}</span>
                   </td>
                 </tr>
               );
@@ -141,8 +148,8 @@ export function AdministratorsPage() {
             style={{ borderTop: "1px solid var(--line)" }}
           >
             Your own role and access are fixed while you are the only owner with access, so that
-            somebody is always left who can manage administrators. Give another person the owner
-            role, grant them access, and your own row can be changed again.
+            somebody is always left who can manage administrators. Make somebody else an owner and
+            your own row can be changed again.
           </div>
         ) : null}
       </div>
