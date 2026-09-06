@@ -207,6 +207,38 @@ export function formatPhone(raw: string | null | undefined): string {
   return raw.trim();
 }
 
+/**
+ * The one number, however it was typed.
+ *
+ * Compared on digits, so "(406) 555-0000" and "406-555-0000" are the same
+ * number, and a number written with its country code is the same number as one
+ * written without it. Something with no digits at all - a note where a number
+ * should be - is compared as it was typed.
+ */
+function phoneKey(raw: string | null | undefined): string {
+  if (!raw) return "";
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return raw.trim().toLowerCase();
+  return digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+}
+
+/**
+ * Whether two records carry the same phone number.
+ *
+ * The house line is usually typed against the house and against each person who
+ * answers it, so this is what stops a card printing one number five times.
+ */
+export function samePhone(a: string | null | undefined, b: string | null | undefined): boolean {
+  const left = phoneKey(a);
+  return left.length > 0 && left === phoneKey(b);
+}
+
+/** The same, for an address a family and one of its members both carry. */
+export function sameEmail(a: string | null | undefined, b: string | null | undefined): boolean {
+  const left = (a ?? "").trim().toLowerCase();
+  return left.length > 0 && left === (b ?? "").trim().toLowerCase();
+}
+
 export interface AddressParts {
   address_line1: string | null;
   address_line2: string | null;
