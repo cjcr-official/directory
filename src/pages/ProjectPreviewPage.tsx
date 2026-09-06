@@ -46,6 +46,7 @@ export function ProjectPreviewPage() {
           mode: loaded.project.selection_mode,
           tagIds: loaded.tagIds,
           entries: loaded.entries,
+          wholeFamily: settings.groupWholeFamily,
         });
 
         const metrics = await loadMetrics(settings.typeface);

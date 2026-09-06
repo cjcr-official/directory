@@ -13,6 +13,7 @@
  */
 import { PDFDocument } from "pdf-lib";
 import { buildEntries } from "../src/lib/entries";
+import { resolveEntries } from "../src/lib/projectEntries";
 import { composeBook } from "../src/lib/layout/compose";
 import { pdfMetrics } from "../src/lib/layout/pdf";
 import { STANDARD_FONTS, type Metrics } from "../src/lib/layout/metrics";
@@ -636,6 +637,121 @@ async function main() {
     console.log(
       `cover: a full one spans ${Math.round(span(full.page))}pt of page, ` +
         `a title-only one ${Math.round(plainSpan)}pt`,
+    );
+  }
+
+  // ---- 13. a booklet of people, not of the families they belong to --------
+  {
+    // The deacons' list. Tagging a member pulls his whole family in, which is
+    // what the main directory wants and the opposite of what this booklet is:
+    // print the deacons, not their wives and children. So the group can be
+    // asked for the people in it instead - and a family that is in the group
+    // itself still prints as a family, because somebody put the household in.
+    const tag = (id: string, name: string) => ({
+      id,
+      name,
+      color: "#2f6d63",
+      description: null,
+      created_at: "2026-01-01",
+    });
+
+    const data = {
+      households: [
+        blankHousehold({ id: "h1", sort_name: "Smith", display_name: "The Smith Family" }),
+        blankHousehold({ id: "h2", sort_name: "Jones", display_name: "The Jones Family" }),
+        blankHousehold({ id: "h3", sort_name: "Alvarez", display_name: "The Alvarez Family" }),
+      ],
+      people: [
+        blankPerson({ id: "p1", household_id: "h1", first_name: "John", last_name: "Smith" }),
+        blankPerson({ id: "p2", household_id: "h1", first_name: "Mary", last_name: "Smith" }),
+        blankPerson({ id: "p3", household_id: "h2", first_name: "Bob", last_name: "Jones" }),
+        // Keeps her own surname, so as a record of her own she files in a
+        // different place from the family that carried her into the booklet.
+        blankPerson({ id: "p4", household_id: "h3", first_name: "Yuki", last_name: "Zimmer" }),
+        blankPerson({ id: "p5", household_id: "h3", first_name: "Isaac", last_name: "Alvarez" }),
+        blankPerson({ id: "p6", first_name: "Ruth", last_name: "Kemp" }),
+      ],
+      tags: [tag("t1", "Deacons"), tag("t2", "Choir")],
+      // The Jones family is in the group as a family, not through anybody.
+      householdTags: [{ household_id: "h2", tag_id: "t1" }],
+      personTags: [
+        { person_id: "p1", tag_id: "t1" },
+        { person_id: "p4", tag_id: "t1" },
+        { person_id: "p5", tag_id: "t2" },
+        { person_id: "p6", tag_id: "t1" },
+      ],
+    };
+    const entries = buildEntries(data);
+    const pick = (over: Partial<Parameters<typeof resolveEntries>[1]>) =>
+      resolveEntries(entries, { mode: "tags", tagIds: ["t1"], entries: [], ...over });
+    const ids = (list: ReturnType<typeof resolveEntries>) =>
+      list.map((entry) => `${entry.type}:${entry.id}`);
+
+    // Whole families: unchanged, and it stays the default when nothing is said.
+    const families = pick({});
+    ok(
+      JSON.stringify(ids(families)) ===
+        JSON.stringify(["household:h3", "household:h2", "person:p6", "household:h1"]),
+      `whole families: got ${ids(families).join(", ")}`,
+    );
+    ok(
+      JSON.stringify(ids(pick({ wholeFamily: true }))) === JSON.stringify(ids(families)),
+      "saying whole families out loud changed the answer",
+    );
+
+    // The people themselves: the two deacons, the family that is in the group
+    // on its own account, and the deacon who belongs to no family. Filed under
+    // their own names, so Zimmer comes last rather than under Alvarez.
+    const people = pick({ wholeFamily: false });
+    ok(
+      JSON.stringify(ids(people)) ===
+        JSON.stringify(["household:h2", "person:p6", "person:p1", "person:p4"]),
+      `people only: got ${ids(people).join(", ")}`,
+    );
+
+    // And nobody who is not in the group reaches the page - the whole point.
+    const settings = normalizeSettings({ ...DEFAULT_SETTINGS, includeIndex: true });
+    const printed = drawn(composeBook(people, settings, metrics)).join("\n");
+    ok(printed.includes("Smith, John"), "the deacon is not in his own booklet");
+    ok(!printed.includes("Mary"), "a wife printed in a booklet of the people in the group");
+    ok(!printed.includes("Isaac"), "somebody in another group printed");
+    ok(printed.includes("The Jones Family"), "a family in the group on its own account stopped");
+    ok(
+      drawn(composeBook(pick({}), settings, metrics))
+        .join("\n")
+        .includes("Mary"),
+      "a wife stopped printing on the family card, which is the other setting",
+    );
+
+    // The other two modes have nothing to do with groups.
+    const everyone = (wholeFamily: boolean) =>
+      ids(resolveEntries(entries, { mode: "all", tagIds: [], entries: [], wholeFamily }));
+    ok(
+      JSON.stringify(everyone(false)) === JSON.stringify(everyone(true)),
+      "the group setting changed a directory of everyone",
+    );
+    const byHand = (wholeFamily: boolean) =>
+      ids(
+        resolveEntries(entries, {
+          mode: "manual",
+          tagIds: [],
+          wholeFamily,
+          entries: [
+            { project_id: "p", entry_type: "household" as const, ref_id: "h1", position: 0 },
+          ],
+        }),
+      );
+    ok(
+      JSON.stringify(byHand(false)) === JSON.stringify(["household:h1"]),
+      "the group setting changed a hand-picked directory",
+    );
+    ok(
+      pick({ wholeFamily: false, tagIds: [] }).length === 0,
+      "a booklet with no group chosen printed somebody",
+    );
+
+    console.log(
+      `groups: whole families ${ids(families).length} records, the people themselves ${ids(people).length}`,
     );
   }
 

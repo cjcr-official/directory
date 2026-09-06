@@ -39,7 +39,9 @@ head-qualified version — "The Maria Alvarez Family" — in one tap.
 **Groups instead of separate lists.** Tag someone _Choir_ once. An event
 directory then says "everyone in the Choir group" and stays correct forever —
 add a new chorister in March and the April booklet includes them. Tagging one
-member pulls in their whole family, which is almost always what you meant.
+member pulls in their whole family, which is almost always what you meant — and
+where it is not, the directory can print the people in the group on their own
+instead. A deacons' list is a list of deacons, not of their families.
 
 **A preview you can trust.** The screen and the PDF are drawn from the very same
 layout, measured with the same font metrics. If a name wraps on screen, it wraps

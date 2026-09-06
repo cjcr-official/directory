@@ -4,6 +4,15 @@ import { fileAsName, firstName, sortKey } from "./format";
 export interface HouseholdWithMembers extends HouseholdRow {
   members: PersonRow[];
   tags: TagRow[];
+  /**
+   * Each member's own groups, by person id, for the members who have any.
+   *
+   * The entry's tagIds are the family's groups and its members' rolled into
+   * one, which answers "is this family in the choir booklet at all". This
+   * answers the other question - which of them is actually in the choir - and
+   * that is what a booklet printing people rather than families needs.
+   */
+  memberTags: Record<string, TagRow[]>;
 }
 
 export interface PersonWithContext extends PersonRow {
@@ -35,12 +44,48 @@ export type DirectoryEntry =
       person: PersonWithContext;
     };
 
+/**
+ * The order records print in.
+ *
+ * The id breaks ties. Two families with one surname and no members between
+ * them produce the same sort key, and without this their order - and so their
+ * page numbers - would come down to whatever order the database happened to
+ * return, which can differ between two printings of one book.
+ */
+export function byEntryOrder(a: DirectoryEntry, b: DirectoryEntry): number {
+  return a.sortKey.localeCompare(b.sortKey) || a.id.localeCompare(b.id);
+}
+
 export interface DirectoryData {
   households: HouseholdRow[];
   people: PersonRow[];
   tags: TagRow[];
   householdTags: { household_id: string; tag_id: string }[];
   personTags: { person_id: string; tag_id: string }[];
+}
+
+/**
+ * One person as a record of their own.
+ *
+ * Used for somebody who belongs to no printed family, and for a member a
+ * booklet prints alone - a deacons' list, where the family is not the record.
+ * Both go through here so the two are the same record: filed under the same
+ * name, sorted on the same key, and carrying the family behind them, which is
+ * where their address comes from when they share the household's.
+ */
+export function personEntry(
+  person: PersonRow,
+  household: HouseholdRow | null,
+  tags: TagRow[],
+): DirectoryEntry {
+  return {
+    type: "person",
+    id: person.id,
+    sortKey: sortKey(person.last_name, firstName(person)),
+    title: fileAsName(person),
+    tagIds: tags.map((tag) => tag.id),
+    person: { ...person, household, tags },
+  };
 }
 
 /** Members of a household in the order they should be listed on the card. */
@@ -110,9 +155,14 @@ export function buildEntries(data: DirectoryData, includeInactive = false): Dire
     const householdTags = tagsForHousehold.get(household.id) ?? [];
     const tagIds = new Set(householdTags.map((tag) => tag.id));
     // Tagging one chorister should pull their whole family into the choir
-    // booklet, so a member's tags count towards the household.
+    // booklet, so a member's tags count towards the household. Whose tag it
+    // was is kept as well: a booklet can be asked for the choristers
+    // themselves rather than their families, and then it matters.
+    const memberTags: Record<string, TagRow[]> = {};
     for (const member of members) {
-      for (const tag of tagsForPerson.get(member.id) ?? []) tagIds.add(tag.id);
+      const theirs = tagsForPerson.get(member.id) ?? [];
+      if (theirs.length) memberTags[member.id] = theirs;
+      for (const tag of theirs) tagIds.add(tag.id);
     }
     entries.push({
       type: "household",
@@ -122,32 +172,19 @@ export function buildEntries(data: DirectoryData, includeInactive = false): Dire
       sortKey: sortKey(household.sort_name, members[0] ? firstName(members[0]) : ""),
       title: household.display_name,
       tagIds: [...tagIds],
-      household: { ...household, members, tags: householdTags },
+      household: { ...household, members, tags: householdTags, memberTags },
     });
   }
 
   for (const person of people) {
     if (person.household_id && printedHouseholdIds.has(person.household_id)) continue;
-    const personTags = tagsForPerson.get(person.id) ?? [];
-    entries.push({
-      type: "person",
-      id: person.id,
-      sortKey: sortKey(person.last_name, firstName(person)),
-      title: fileAsName(person),
-      tagIds: personTags.map((tag) => tag.id),
-      person: {
-        ...person,
-        household: person.household_id ? (householdsById.get(person.household_id) ?? null) : null,
-        tags: personTags,
-      },
-    });
+    const household = person.household_id
+      ? (householdsById.get(person.household_id) ?? null)
+      : null;
+    entries.push(personEntry(person, household, tagsForPerson.get(person.id) ?? []));
   }
 
-  // The id breaks ties. Two families with one surname and no members between
-  // them produce the same sort key, and without this their order - and so
-  // their page numbers - would come down to whatever order the database
-  // happened to return, which can differ between two printings of one book.
-  return entries.sort((a, b) => a.sortKey.localeCompare(b.sortKey) || a.id.localeCompare(b.id));
+  return entries.sort(byEntryOrder);
 }
 
 /** People inside a record - one for an individual, all members for a household. */
