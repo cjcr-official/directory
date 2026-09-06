@@ -96,6 +96,7 @@ export function ProjectEditPage() {
     () => ({
       mode,
       tagIds,
+      wholeFamily: settings.groupWholeFamily,
       entries: picked.map((key, position) => {
         const [entry_type, ref_id] = key.split(":");
         return {
@@ -106,7 +107,7 @@ export function ProjectEditPage() {
         };
       }),
     }),
-    [mode, tagIds, picked, id],
+    [mode, tagIds, picked, id, settings.groupWholeFamily],
   );
 
   const included = useMemo(() => resolveEntries(entries, selection), [entries, selection]);
@@ -406,9 +407,33 @@ export function ProjectEditPage() {
                       disabled={!canEdit}
                       onChange={setTagIds}
                     />
-                    <p className="hint" style={{ marginTop: 8 }}>
-                      A family is included when the family or any member carries one of these
-                      groups. New people added to a group appear here automatically.
+
+                    {/* The pills above run right up to this label without it. */}
+                    <div style={{ marginTop: 14 }}>
+                      <Field
+                        label="When one person is in a group"
+                        htmlFor="group_scope"
+                        hint="A family that is in a group itself always prints as a family."
+                      >
+                        <select
+                          id="group_scope"
+                          value={settings.groupWholeFamily ? "family" : "person"}
+                          disabled={!canEdit}
+                          onChange={(event) =>
+                            set({ groupWholeFamily: event.target.value === "family" })
+                          }
+                        >
+                          <option value="family">Print their whole family</option>
+                          <option value="person">Print that person on their own</option>
+                        </select>
+                      </Field>
+                    </div>
+
+                    <p className="hint">
+                      {settings.groupWholeFamily
+                        ? "A family is included when the family or any member carries one of these groups."
+                        : "Only the people in these groups print, each on their own record — a deacons' list without their families. Their own photograph prints, and most people in a family have none."}{" "}
+                      New people added to a group appear here automatically.
                     </p>
                   </>
                 ) : null}

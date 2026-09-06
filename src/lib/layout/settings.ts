@@ -18,6 +18,19 @@ export type ProjectSettings = {
   /** Halves across the sheet. Two is the fold-in-the-middle book. */
   columns: number;
 
+  // --- who is in it --------------------------------------------------------
+  /**
+   * Whether a group brings in the whole family of everyone in it.
+   *
+   * True for the main directory, where the family is the record and tagging
+   * one chorister should print the household they belong to. False for the
+   * booklet that is a list of people - the deacons, the elders - where
+   * printing families would print their wives and children alongside them.
+   * Only groups are affected: hand-picked records are already picked one by
+   * one, and "everyone" means everyone either way.
+   */
+  groupWholeFamily: boolean;
+
   // --- what goes on a card -------------------------------------------------
   showPhotos: boolean;
   photoFit: PhotoFit;
@@ -68,6 +81,8 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   pageSize: "letter",
   rows: 3,
   columns: 2,
+
+  groupWholeFamily: true,
 
   showPhotos: true,
   photoFit: "fill",
