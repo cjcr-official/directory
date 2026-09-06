@@ -709,8 +709,56 @@ async function main() {
       `people only: got ${ids(people).join(", ")}`,
     );
 
-    // And nobody who is not in the group reaches the page - the whole point.
+    // The picture on a card of one person's own. A member of a family cannot
+    // upload one - the person form offers the family portrait instead - so
+    // insisting on their own would print a booklet of initials and ask the
+    // office to photograph half the congregation again.
     const settings = normalizeSettings({ ...DEFAULT_SETTINGS, includeIndex: true });
+    const photoOf = (id: string, list: ReturnType<typeof resolveEntries>) => {
+      for (const sheet of composeBook(list, settings, metrics).sheets)
+        for (const page of sheet.pages)
+          for (const card of page.cards) if (card.entryId === id) return card.photo;
+      return null;
+    };
+    const withPortraits = {
+      ...data,
+      households: data.households.map((h) =>
+        h.id === "h1" ? blankHousehold({ ...h, photo_path: "families/smith.jpg" }) : h,
+      ),
+      people: data.people.map((person) =>
+        person.id === "p4" ? { ...person, photo_path: "people/yuki.jpg" } : person,
+      ),
+    };
+    const pictured = resolveEntries(buildEntries(withPortraits), {
+      mode: "tags",
+      tagIds: ["t1"],
+      entries: [],
+      wholeFamily: false,
+    });
+    ok(
+      photoOf("p1", pictured)?.path === "families/smith.jpg",
+      `a deacon with no picture of his own did not fall back to his family's: ${photoOf("p1", pictured)?.path}`,
+    );
+    ok(
+      photoOf("p4", pictured)?.path === "people/yuki.jpg",
+      "somebody's own picture was passed over for their family's",
+    );
+    ok(
+      photoOf("p6", pictured)?.path === null && photoOf("p6", pictured)?.initials === "RK",
+      "somebody in no family, with no picture, lost their initials",
+    );
+    // The family's own card is unmoved by any of it.
+    const asFamilies = resolveEntries(buildEntries(withPortraits), {
+      mode: "tags",
+      tagIds: ["t1"],
+      entries: [],
+    });
+    ok(
+      photoOf("h1", asFamilies)?.path === "families/smith.jpg",
+      "the family portrait stopped printing on the family's own card",
+    );
+
+    // And nobody who is not in the group reaches the page - the whole point.
     const printed = drawn(composeBook(people, settings, metrics)).join("\n");
     ok(printed.includes("Smith, John"), "the deacon is not in his own booklet");
     ok(!printed.includes("Mary"), "a wife printed in a booklet of the people in the group");

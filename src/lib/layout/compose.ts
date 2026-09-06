@@ -1,4 +1,4 @@
-import type { DirectoryEntry } from "../entries";
+import type { DirectoryEntry, PersonWithContext } from "../entries";
 import type { HouseholdRow, PersonRow } from "../database.types";
 import {
   addressLines,
@@ -275,6 +275,27 @@ function memberContact(
     ],
     " · ",
   );
+}
+
+/**
+ * The picture on a card that carries one person's name.
+ *
+ * Their own where there is one - it is their card - and their family's where
+ * there is not, which is nearly always: somebody in a family is offered the
+ * family portrait rather than an upload of their own, so a card each for the
+ * deacons would otherwise mean photographing half the congregation a second
+ * time to keep a booklet from printing a page of initials.
+ *
+ * It does mean a family portrait can appear over one person's name. That is
+ * the picture the office has of him, and the alternative is no picture at all.
+ * Initials still stand in when the family has none either.
+ *
+ * A different question from personPhotoPath, which answers whose face stands
+ * for somebody on screen: there the family portrait wins outright, because on
+ * screen they are shown as one of a family.
+ */
+function personCardPhoto(person: PersonWithContext): string | null {
+  return person.photo_path ?? person.household?.photo_path ?? null;
 }
 
 function personDates(person: PersonRow, settings: ProjectSettings): string[] {
@@ -555,7 +576,7 @@ function composeCard(
     }
 
     const photoPath =
-      entry.type === "household" ? entry.household.photo_path : entry.person.photo_path;
+      entry.type === "household" ? entry.household.photo_path : personCardPhoto(entry.person);
 
     photo = {
       box: { x: innerX, y: innerY + (innerH - photoH) / 2, w: photoW, h: photoH },
