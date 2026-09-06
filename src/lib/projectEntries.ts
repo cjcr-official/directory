@@ -19,10 +19,9 @@ export interface Selection {
  *
  * For the booklet that is a list of people rather than of families - the
  * deacons, the elders, the choristers - where printing the family card would
- * print everyone who lives with them. Their photograph is their own: a family
- * portrait on a card headed with one name would show the very people the
- * booklet was asked to leave out, and most members have no picture of their
- * own, so those cards carry initials unless photographs are switched off.
+ * print everyone who lives with them. They keep the address they share with
+ * the house, and the family's portrait stands in where they have no picture
+ * of their own, which is nearly always - see personCardPhoto.
  */
 function membersInGroups(
   entry: Extract<DirectoryEntry, { type: "household" }>,

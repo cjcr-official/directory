@@ -432,7 +432,7 @@ export function ProjectEditPage() {
                     <p className="hint">
                       {settings.groupWholeFamily
                         ? "A family is included when the family or any member carries one of these groups."
-                        : "Only the people in these groups print, each on their own record — a deacons' list without their families. Their own photograph prints, and most people in a family have none."}{" "}
+                        : "Only the people in these groups print, each on their own record — a deacons' list without their families. Their own photograph prints where they have one, and their family's where they do not."}{" "}
                       New people added to a group appear here automatically.
                     </p>
                   </>
