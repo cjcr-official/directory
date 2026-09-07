@@ -849,24 +849,22 @@ export function ProjectEditPage() {
                       }}
                     />
                   </Field>
-                </div>
 
-                <Field
-                  label="Church name"
-                  hint="Small, above the title — and along the top of every page inside."
-                  htmlFor="church_name"
-                >
-                  <input
-                    id="church_name"
-                    type="text"
-                    value={settings.churchName}
-                    placeholder="Fairhaven Community Church"
-                    disabled={!canEdit}
-                    onChange={(event) => set({ churchName: event.target.value })}
-                  />
-                </Field>
+                  <Field
+                    label="Church name"
+                    hint="Small, above the title — and along the top of every page inside."
+                    htmlFor="church_name"
+                  >
+                    <input
+                      id="church_name"
+                      type="text"
+                      value={settings.churchName}
+                      placeholder="Fairhaven Community Church"
+                      disabled={!canEdit}
+                      onChange={(event) => set({ churchName: event.target.value })}
+                    />
+                  </Field>
 
-                <div className="grid two">
                   <Field label="Title" hint="The big line." htmlFor="cover_title">
                     <input
                       id="cover_title"
@@ -887,39 +885,39 @@ export function ProjectEditPage() {
                       onChange={(event) => set({ coverSubtitle: event.target.value })}
                     />
                   </Field>
+
+                  <Field
+                    label="In your own words"
+                    hint="A vision, a welcome, a verse. Its own paragraph, under the photograph."
+                    htmlFor="cover_statement"
+                  >
+                    <textarea
+                      id="cover_statement"
+                      rows={4}
+                      value={settings.coverStatement}
+                      placeholder={"OUR MISSION\nTo know Christ, and to make him known."}
+                      disabled={!canEdit}
+                      onChange={(event) => set({ coverStatement: event.target.value })}
+                    />
+                  </Field>
+
+                  <Field
+                    label="How to reach the church"
+                    hint="The foot of the cover. One line here is one line there."
+                    htmlFor="cover_contact"
+                  >
+                    <textarea
+                      id="cover_contact"
+                      rows={5}
+                      value={settings.coverContact}
+                      placeholder={
+                        "123 Main Street\nPO Box 100\nFairhaven, OH 44092\n(216) 555-0142\noffice@example.org"
+                      }
+                      disabled={!canEdit}
+                      onChange={(event) => set({ coverContact: event.target.value })}
+                    />
+                  </Field>
                 </div>
-
-                <Field
-                  label="In your own words"
-                  hint="A vision, a welcome, a verse. Its own paragraph, under the photograph."
-                  htmlFor="cover_statement"
-                >
-                  <textarea
-                    id="cover_statement"
-                    rows={4}
-                    value={settings.coverStatement}
-                    placeholder={"OUR MISSION\nTo know Christ, and to make him known."}
-                    disabled={!canEdit}
-                    onChange={(event) => set({ coverStatement: event.target.value })}
-                  />
-                </Field>
-
-                <Field
-                  label="How to reach the church"
-                  hint="The foot of the cover. One line here is one line there."
-                  htmlFor="cover_contact"
-                >
-                  <textarea
-                    id="cover_contact"
-                    rows={5}
-                    value={settings.coverContact}
-                    placeholder={
-                      "123 Main Street\nPO Box 100\nFairhaven, OH 44092\n(216) 555-0142\noffice@example.org"
-                    }
-                    disabled={!canEdit}
-                    onChange={(event) => set({ coverContact: event.target.value })}
-                  />
-                </Field>
 
                 <Checkbox
                   label="Print a cover page"
