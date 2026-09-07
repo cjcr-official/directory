@@ -605,6 +605,18 @@ textarea {
   resize: vertical;
 }
 
+/* The one piece of text in the app still being coloured by the browser rather
+   than by us. Chrome's default comes to 4.61:1 on a white field - over the
+   line, but only just, and Safari and Firefox each pick their own lighter
+   grey, so how readable a placeholder is depended on which browser opened it.
+   --ink-3 is the token the rest of the hint text already uses, it is checked
+   by contrast:check against both backgrounds, and it is a shade darker here at
+   4.97:1. */
+::placeholder {
+  color: var(--ink-3);
+  opacity: 1;
+}
+
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
