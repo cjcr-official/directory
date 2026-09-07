@@ -381,8 +381,6 @@ p:last-child {
 .grid.two {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
-/* Cards keep their own height instead of being stretched to match whichever
-   neighbour has the most in it. */
 /* A head whose note is a sentence, not a word: it goes under the title
    instead of being squeezed beside it. */
 .card-head.column {
@@ -393,6 +391,8 @@ p:last-child {
   margin-top: 2px;
 }
 
+/* The opt-out, for a row whose cards should keep their own height rather
+   than stretching to match the tallest one beside them. */
 .grid.top {
   align-items: start;
 }

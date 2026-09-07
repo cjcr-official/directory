@@ -431,7 +431,7 @@ export function FamilyEditPage() {
       ) : null}
 
       <form onSubmit={save}>
-        <div className="grid two" style={{ alignItems: "start" }}>
+        <div className="grid two">
           <div className="card">
             <div className="card-head">
               <h2>The family</h2>
