@@ -433,7 +433,17 @@ export function ProjectEditPage() {
       {savedAt ? <Notice kind="ok">Saved. Open the preview to see it laid out.</Notice> : null}
 
       <form onSubmit={save}>
-        <div className="grid two" style={{ alignItems: "start", marginTop: 16 }}>
+        <div className="grid two" style={{ marginTop: 16 }}>
+          {/* Two columns of settings and the cover in the third. The three
+              panels that open are kept together and kept last in this column
+              on purpose: opening one then only lengthens the column it is in,
+              downwards, past everything already read. Split between the two
+              columns they would take turns being the longer one, and the page
+              would reshuffle itself every time somebody looked inside a panel.
+
+              It is also why the grid no longer holds its items to the top -
+              stretching them is what gives the sticky cover a column tall
+              enough to travel in. */}
           <div>
             <div className="card">
               <div className="card-head">
@@ -472,9 +482,7 @@ export function ProjectEditPage() {
                 </Field>
               </div>
             </div>
-          </div>
 
-          <div>
             <div className="card">
               <div className="card-head">
                 <h2>Who is in it</h2>
@@ -548,9 +556,7 @@ export function ProjectEditPage() {
                 ) : null}
               </div>
             </div>
-          </div>
 
-          <div>
             <Disclosure title="The page" summary={pageSummary}>
               <Field label="Paper" htmlFor="page_size">
                 <select
@@ -771,54 +777,15 @@ export function ProjectEditPage() {
               />
             </Disclosure>
           </div>
-        </div>
 
-        {/* The cover, across the whole width and below the three
-            columns rather than inside one of them. It is a tall
-            portrait page beside a handful of short cards, so in a
-            column it ran hundreds of pixels past its neighbours and
-            no arrangement of the other five evened that out. Across
-            the width it can stand beside the fields that fill it in,
-            which is the shape a cover editor wants anyway. */}
-        <div className="card">
-          <div className="card-head">
-            <h2>The cover</h2>
-          </div>
-          {/* In the order it prints, top of the cover to the bottom, so
-              filling the form in reads down the page it makes. */}
-          <div className="card-body">
-            <div className="cover-layout">
-              <div className="cover-stage">
-                {/* The cover itself, beside the fields that make it. Every one
-                    of them is described in words - "the big line", "the foot of
-                    the cover" - and words are a poor way to know whether a
-                    title has come out too long for its own page. */}
-                {coverPage ? (
-                  <figure className="cover-figure">
-                    <CoverCanvas
-                      page={coverPage.page}
-                      width={coverPage.width}
-                      height={coverPage.height}
-                      photoUrls={coverUrls}
-                      typeface={coverPage.typeface}
-                      maxHeight={520}
-                    />
-                    <figcaption className="hint">
-                      The cover as it will print, at {PAGE_SIZES[safeSettings.pageSize].label} and
-                      set in {safeSettings.typeface === "serif" ? "serif" : "sans serif"}. It
-                      redraws as you type.
-                    </figcaption>
-                  </figure>
-                ) : safeSettings.includeCover ? (
-                  <p className="hint cover-figure">Drawing the cover…</p>
-                ) : (
-                  <p className="hint cover-figure">
-                    This directory prints without a cover. Turn one on below to see it here.
-                  </p>
-                )}
+          <div>
+            <div className="card">
+              <div className="card-head">
+                <h2>The cover</h2>
               </div>
-
-              <div className="cover-controls">
+              {/* In the order it prints, top of the cover to the bottom, so
+                  filling the form in reads down the page it makes. */}
+              <div className="card-body">
                 <div className="grid two">
                   {/* One hint apiece: PhotoInput carries its own, so a hint on
                       the Field as well just stacks two paragraphs under every
@@ -936,6 +903,45 @@ export function ProjectEditPage() {
                   disabled={!canEdit}
                   onChange={(value) => set({ includeCover: value })}
                 />
+              </div>
+            </div>
+          </div>
+
+          {/* The cover in the last column, staying put while the settings
+              beside it scroll. Every field on this page is described in
+              words - "the big line", "the foot of the cover" - and words
+              are a poor way to know whether a title has come out too long
+              for its own page. */}
+          <div className="cover-stage">
+            <div className="card">
+              <div className="card-head">
+                <h2>As it will print</h2>
+              </div>
+              <div className="card-body">
+                {coverPage ? (
+                  <figure className="cover-figure">
+                    <CoverCanvas
+                      page={coverPage.page}
+                      width={coverPage.width}
+                      height={coverPage.height}
+                      photoUrls={coverUrls}
+                      typeface={coverPage.typeface}
+                      maxHeight={640}
+                    />
+                    <figcaption className="hint">
+                      {PAGE_SIZES[safeSettings.pageSize].label}, set in{" "}
+                      {safeSettings.typeface === "serif" ? "serif" : "sans serif"}. Redraws as you
+                      type.
+                    </figcaption>
+                  </figure>
+                ) : safeSettings.includeCover ? (
+                  <p className="hint cover-figure">Drawing the cover…</p>
+                ) : (
+                  <p className="hint cover-figure">
+                    This directory prints without a cover. Turn one on under The cover to see it
+                    here.
+                  </p>
+                )}
               </div>
             </div>
           </div>

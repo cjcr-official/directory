@@ -1761,30 +1761,18 @@ th.num {
  * a hairline and a hint of lift do.
  */
 /*
- * The cover beside the fields that fill it in.
+ * The cover holds the last column, and holds it while the settings beside it
+ * are scrolled: the point of drawing it on this page is that it can be watched
+ * while the fields that change it are being filled in, and a preview that has
+ * scrolled off the top is a preview you have to go and find.
  *
- * It used to sit in one of the three columns, and it could not: a cover is a
- * tall portrait page and the cards beside it are short, so its column ran
- * hundreds of pixels past the other two and no redistribution of the remaining
- * five cards evened that out - the shortfall was one large thing against five
- * small ones, not an ordering mistake. Across the whole width it has room to
- * stand next to its own controls, which is the shape this wanted all along.
- *
- * The paper column is bounded at both ends: enough to read a title at, never so
- * much that it takes the room the fields need.
+ * Sticky sits on the card, not on the column. A sticky box can only travel
+ * inside the box that contains it, and a grid item that is only as tall as its
+ * own contents contains nothing to travel through - so the column stretches to
+ * the row (which is why the grid no longer sets align-items: start) and the
+ * card moves within it.
  */
-.cover-layout {
-  display: grid;
-  gap: 24px;
-  grid-template-columns: 1fr;
-  align-items: start;
-}
-@media (min-width: 900px) {
-  .cover-layout {
-    grid-template-columns: minmax(240px, 340px) 1fr;
-  }
-}
-.cover-stage {
+.cover-stage > .card {
   position: sticky;
   top: 16px;
 }
