@@ -4,6 +4,9 @@ import { useDirectory } from "@/data/DirectoryContext";
 import { useAuth } from "@/auth/AuthProvider";
 import { ConfirmButton, EmptyState, Field, LoadingScreen, Notice } from "@/components/ui";
 import { createTag, deleteTag, updateTag } from "@/lib/queries";
+import { resolveEntries } from "@/lib/projectEntries";
+import { fileAsName, firstName, join, labelledHouseholdName } from "@/lib/format";
+import type { TagRow } from "@/lib/database.types";
 
 const PALETTE = [
   "#2f6d63",
@@ -18,15 +21,6 @@ const PALETTE = [
 ];
 
 /**
- * Characters wide, so the field is the size of the name it holds. The ceiling
- * only stops a pathological name from running the length of the card - a
- * narrow screen is handled by the field shrinking, not by this.
- */
-function nameSize(value: string): number {
-  return Math.min(Math.max(value.trim().length, 6), 34);
-}
-
-/**
  * Groups are plain labels, but they are the mechanism behind event booklets:
  * tag once here, then a project can select "everyone in the choir" without
  * anybody re-picking names.
@@ -38,6 +32,10 @@ export function GroupsPage() {
   const [color, setColor] = useState(PALETTE[0]);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  /** The one group whose people are on show, if any. */
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [renaming, setRenaming] = useState(false);
 
   /** How many printable records each group would pull in. */
   const counts = useMemo(() => {
@@ -48,7 +46,71 @@ export function GroupsPage() {
     return map;
   }, [entries]);
 
+  /**
+   * Who is in the group that is open.
+   *
+   * Worked out by the function the booklets already use, asked the way a list
+   * of people rather than of families asks it: a family that carries the group
+   * itself stays one record, because somebody put the household in, and a
+   * family pulled in on a member's behalf comes apart into the members who are
+   * actually in it. So this answers "who is in the choir" with exactly the
+   * names a choir booklet would print, rather than with a second opinion.
+   */
+  const inGroup = useMemo(
+    () =>
+      openId
+        ? resolveEntries(entries, {
+            mode: "tags",
+            tagIds: [openId],
+            entries: [],
+            wholeFamily: false,
+          })
+        : [],
+    [entries, openId],
+  );
+
   if (loading && !tags.length) return <LoadingScreen label="Loading groups…" />;
+
+  /** Opening a group also arms its name for renaming, which is the one edit it has. */
+  function toggle(tag: TagRow) {
+    setFormError(null);
+    if (openId === tag.id) {
+      setOpenId(null);
+      return;
+    }
+    setOpenId(tag.id);
+    setDraft(tag.name);
+  }
+
+  async function rename(tag: TagRow) {
+    const next = draft.trim();
+    if (!next || next === tag.name) return;
+
+    // Caught here rather than by the unique index, for the same reason the add
+    // form catches it: the answer names the group, and a group that differs
+    // only by capitals is refused too, which the index would allow.
+    const clash = tags.find(
+      (other) => other.id !== tag.id && other.name.toLowerCase() === next.toLowerCase(),
+    );
+    if (clash) {
+      setFormError(`There is already a group called “${clash.name}”.`);
+      return;
+    }
+
+    setRenaming(true);
+    setFormError(null);
+    try {
+      await updateTag(tag.id, { name: next });
+      await reload();
+    } catch (cause) {
+      // The stored name is still the old one, so the field goes back to saying
+      // so rather than showing a name nothing was saved under.
+      setDraft(tag.name);
+      setFormError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setRenaming(false);
+    }
+  }
 
   async function add(event: React.FormEvent) {
     event.preventDefault();
@@ -106,72 +168,132 @@ export function GroupsPage() {
             <ul className="group-list">
               {tags.map((tag) => {
                 const count = counts.get(tag.id) ?? 0;
+                const open = openId === tag.id;
+                const panelId = `group-people-${tag.id}`;
                 return (
                   <li key={tag.id} className="group-item">
-                    <span className="group-dot" style={{ background: tag.color }} />
-                    {canEdit ? (
-                      <input
-                        className="group-name"
-                        type="text"
-                        defaultValue={tag.name}
-                        // Sized to the word rather than to the column, so the
-                        // rule under it stops where the name does instead of
-                        // running on like a blank to be filled in.
-                        size={nameSize(tag.name)}
-                        aria-label={`Rename ${tag.name}`}
-                        onInput={(event) => {
-                          event.currentTarget.size = nameSize(event.currentTarget.value);
-                        }}
-                        onBlur={async (event) => {
-                          const field = event.target;
-                          const next = field.value.trim();
-                          if (!next || next === tag.name) {
-                            field.value = tag.name;
-                            field.size = nameSize(tag.name);
-                            return;
-                          }
-                          try {
-                            setFormError(null);
-                            await updateTag(tag.id, { name: next });
-                            await reload();
-                          } catch (cause) {
-                            // Group names are unique; a clash must not leave
-                            // the new name on screen and the old one stored.
-                            field.value = tag.name;
-                            field.size = nameSize(tag.name);
-                            setFormError(cause instanceof Error ? cause.message : String(cause));
-                          }
-                        }}
-                      />
-                    ) : (
-                      <span className="group-name-text">{tag.name}</span>
-                    )}
+                    <div className="group-row">
+                      <span className="group-dot" style={{ background: tag.color }} />
 
-                    <span className="group-count">
-                      {count === 0 ? "No records" : count === 1 ? "1 record" : `${count} records`}
-                    </span>
+                      {/* The name asks the question a name in a list is asked -
+                          who is in this? - rather than offering to be retyped,
+                          which is what it used to do the moment it was touched. */}
+                      <button
+                        type="button"
+                        className="group-name-button"
+                        aria-expanded={open}
+                        aria-controls={panelId}
+                        onClick={() => toggle(tag)}
+                      >
+                        <span className="group-name-label">{tag.name}</span>
+                        <span className="group-name-mark" aria-hidden>
+                          ⌄
+                        </span>
+                      </button>
 
-                    {canEdit ? (
-                      <span className="group-actions">
-                        <ConfirmButton
-                          subtle
-                          label="Delete"
-                          confirmLabel="Delete group"
-                          onConfirm={async () => {
-                            setFormError(null);
-                            try {
-                              await deleteTag(tag.id);
-                            } catch (cause) {
-                              // Shown at the top of the card, where the add
-                              // form's errors go, rather than as small print
-                              // beside a button in a row.
-                              setFormError(cause instanceof Error ? cause.message : String(cause));
-                              throw cause;
-                            }
-                            await reload();
-                          }}
-                        />
+                      <span className="group-count">
+                        {count === 0 ? "No records" : count === 1 ? "1 record" : `${count} records`}
                       </span>
+
+                      {canEdit ? (
+                        <span className="group-actions">
+                          <ConfirmButton
+                            subtle
+                            label="Delete"
+                            confirmLabel="Delete group"
+                            onConfirm={async () => {
+                              setFormError(null);
+                              try {
+                                await deleteTag(tag.id);
+                              } catch (cause) {
+                                // Shown at the top of the card, where the add
+                                // form's errors go, rather than as small print
+                                // beside a button in a row.
+                                setFormError(
+                                  cause instanceof Error ? cause.message : String(cause),
+                                );
+                                throw cause;
+                              }
+                              if (openId === tag.id) setOpenId(null);
+                              await reload();
+                            }}
+                          />
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {open ? (
+                      <div className="group-members" id={panelId}>
+                        {inGroup.length ? (
+                          <ul className="group-member-list">
+                            {inGroup.map((entry) =>
+                              entry.type === "household" ? (
+                                <li key={`household:${entry.id}`} className="group-member">
+                                  <Link
+                                    className="list-link group-member-name"
+                                    to={`/families/${entry.id}`}
+                                  >
+                                    {labelledHouseholdName(entry.household)}
+                                  </Link>
+                                  <span className="group-member-who">
+                                    {entry.household.members.length
+                                      ? `The whole family — ${join(
+                                          entry.household.members.map(firstName),
+                                          ", ",
+                                        )}`
+                                      : "The whole family — nobody is on its card yet"}
+                                  </span>
+                                </li>
+                              ) : (
+                                <li key={`person:${entry.id}`} className="group-member">
+                                  <Link
+                                    className="list-link group-member-name"
+                                    to={`/people/${entry.id}`}
+                                  >
+                                    {fileAsName(entry.person)}
+                                  </Link>
+                                  <span className="group-member-who">
+                                    {entry.person.household
+                                      ? labelledHouseholdName(entry.person.household)
+                                      : "On their own"}
+                                  </span>
+                                </li>
+                              ),
+                            )}
+                          </ul>
+                        ) : (
+                          <p className="hint" style={{ margin: 0 }}>
+                            Nobody is in this group yet. Open a family or a person and tick “
+                            {tag.name}” under Groups.
+                          </p>
+                        )}
+
+                        {canEdit ? (
+                          <form
+                            className="group-rename"
+                            onSubmit={(event) => {
+                              event.preventDefault();
+                              void rename(tag);
+                            }}
+                          >
+                            <Field label="Name" htmlFor={`group-name-${tag.id}`}>
+                              <input
+                                id={`group-name-${tag.id}`}
+                                type="text"
+                                value={draft}
+                                onChange={(event) => setDraft(event.target.value)}
+                              />
+                            </Field>
+                            <button
+                              type="submit"
+                              className="btn"
+                              disabled={renaming || !draft.trim() || draft.trim() === tag.name}
+                            >
+                              {renaming ? "Renaming…" : "Rename"}
+                            </button>
+                          </form>
+                        ) : null}
+                      </div>
                     ) : null}
                   </li>
                 );
