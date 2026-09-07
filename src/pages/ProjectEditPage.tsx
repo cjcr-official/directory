@@ -472,7 +472,9 @@ export function ProjectEditPage() {
                 </Field>
               </div>
             </div>
+          </div>
 
+          <div>
             <div className="card">
               <div className="card-head">
                 <h2>Who is in it</h2>
@@ -544,159 +546,6 @@ export function ProjectEditPage() {
                     Everyone marked “include in printed directories” prints, in alphabetical order.
                   </p>
                 ) : null}
-              </div>
-            </div>
-          </div>
-
-          {/* The cover stands in its own column. It is the one part of this
-              page you judge by looking rather than by reading, so it gets the
-              room to be looked at - and three columns is what fills a desk
-              monitor here, the same as the person and family forms. */}
-          <div>
-            <div className="card">
-              <div className="card-head">
-                <h2>The cover</h2>
-              </div>
-              {/* In the order it prints, top of the cover to the bottom, so
-                  filling the form in reads down the page it makes. */}
-              <div className="card-body">
-                {/* The cover itself, above the fields that make it. Everything
-                    below is described in words - "the big line", "the foot of
-                    the cover" - and words are a poor way to know whether a
-                    title has come out too long for its own page. */}
-                {coverPage ? (
-                  <figure className="cover-figure">
-                    <CoverCanvas
-                      page={coverPage.page}
-                      width={coverPage.width}
-                      height={coverPage.height}
-                      photoUrls={coverUrls}
-                      typeface={coverPage.typeface}
-                      maxHeight={520}
-                    />
-                    <figcaption className="hint">
-                      The cover as it will print, at {PAGE_SIZES[safeSettings.pageSize].label} and
-                      set in {safeSettings.typeface === "serif" ? "serif" : "sans serif"}. It
-                      redraws as you type.
-                    </figcaption>
-                  </figure>
-                ) : safeSettings.includeCover ? (
-                  <p className="hint cover-figure">Drawing the cover…</p>
-                ) : (
-                  <p className="hint cover-figure">
-                    This directory prints without a cover. Turn one on below to see it here.
-                  </p>
-                )}
-
-                <div className="grid two">
-                  {/* One hint apiece: PhotoInput carries its own, so a hint on
-                      the Field as well just stacks two paragraphs under every
-                      picture. */}
-                  <Field label="Logo">
-                    <PhotoInput
-                      path={coverRemoved.logo ? null : settings.coverLogoPath || null}
-                      initials=""
-                      shape="square"
-                      hint="Sits at the very top, any shape — fitted whole, never cropped."
-                      disabled={!canEdit}
-                      onChange={(blob, removed) => {
-                        setCoverBlobs((current) => ({ ...current, logo: blob }));
-                        setCoverRemoved((current) => ({ ...current, logo: removed }));
-                      }}
-                    />
-                  </Field>
-                  <Field label="Photograph">
-                    <PhotoInput
-                      path={coverRemoved.photo ? null : settings.coverPhotoPath || null}
-                      initials=""
-                      shape="wide"
-                      hint="Under the title — the building, or the sign. Landscape prints best, and large photos are shrunk automatically."
-                      disabled={!canEdit}
-                      onChange={(blob, removed) => {
-                        setCoverBlobs((current) => ({ ...current, photo: blob }));
-                        setCoverRemoved((current) => ({ ...current, photo: removed }));
-                      }}
-                    />
-                  </Field>
-                </div>
-
-                <Field
-                  label="Church name"
-                  hint="Small, above the title — and along the top of every page inside."
-                  htmlFor="church_name"
-                >
-                  <input
-                    id="church_name"
-                    type="text"
-                    value={settings.churchName}
-                    placeholder="Fairhaven Community Church"
-                    disabled={!canEdit}
-                    onChange={(event) => set({ churchName: event.target.value })}
-                  />
-                </Field>
-
-                <div className="grid two">
-                  <Field label="Title" hint="The big line." htmlFor="cover_title">
-                    <input
-                      id="cover_title"
-                      type="text"
-                      value={settings.coverTitle}
-                      placeholder="Church Directory"
-                      disabled={!canEdit}
-                      onChange={(event) => set({ coverTitle: event.target.value })}
-                    />
-                  </Field>
-                  <Field label="Subtitle" hint="A season or a year." htmlFor="cover_subtitle">
-                    <input
-                      id="cover_subtitle"
-                      type="text"
-                      value={settings.coverSubtitle}
-                      placeholder="Spring 2026"
-                      disabled={!canEdit}
-                      onChange={(event) => set({ coverSubtitle: event.target.value })}
-                    />
-                  </Field>
-                </div>
-
-                <Field
-                  label="In your own words"
-                  hint="A vision, a welcome, a verse. Its own paragraph, under the photograph."
-                  htmlFor="cover_statement"
-                >
-                  <textarea
-                    id="cover_statement"
-                    rows={4}
-                    value={settings.coverStatement}
-                    placeholder={"OUR MISSION\nTo know Christ, and to make him known."}
-                    disabled={!canEdit}
-                    onChange={(event) => set({ coverStatement: event.target.value })}
-                  />
-                </Field>
-
-                <Field
-                  label="How to reach the church"
-                  hint="The foot of the cover. One line here is one line there."
-                  htmlFor="cover_contact"
-                >
-                  <textarea
-                    id="cover_contact"
-                    rows={5}
-                    value={settings.coverContact}
-                    placeholder={
-                      "123 Main Street\nPO Box 100\nFairhaven, OH 44092\n(216) 555-0142\noffice@example.org"
-                    }
-                    disabled={!canEdit}
-                    onChange={(event) => set({ coverContact: event.target.value })}
-                  />
-                </Field>
-
-                <Checkbox
-                  label="Print a cover page"
-                  hint="Off prints the records straight away, with no cover."
-                  checked={settings.includeCover}
-                  disabled={!canEdit}
-                  onChange={(value) => set({ includeCover: value })}
-                />
               </div>
             </div>
           </div>
@@ -921,6 +770,166 @@ export function ProjectEditPage() {
                 onChange={(value) => set({ showPageNumbers: value })}
               />
             </Disclosure>
+          </div>
+        </div>
+
+        {/* The cover, across the whole width and below the three
+            columns rather than inside one of them. It is a tall
+            portrait page beside a handful of short cards, so in a
+            column it ran hundreds of pixels past its neighbours and
+            no arrangement of the other five evened that out. Across
+            the width it can stand beside the fields that fill it in,
+            which is the shape a cover editor wants anyway. */}
+        <div className="card">
+          <div className="card-head">
+            <h2>The cover</h2>
+          </div>
+          {/* In the order it prints, top of the cover to the bottom, so
+              filling the form in reads down the page it makes. */}
+          <div className="card-body">
+            <div className="cover-layout">
+              <div className="cover-stage">
+                {/* The cover itself, beside the fields that make it. Every one
+                    of them is described in words - "the big line", "the foot of
+                    the cover" - and words are a poor way to know whether a
+                    title has come out too long for its own page. */}
+                {coverPage ? (
+                  <figure className="cover-figure">
+                    <CoverCanvas
+                      page={coverPage.page}
+                      width={coverPage.width}
+                      height={coverPage.height}
+                      photoUrls={coverUrls}
+                      typeface={coverPage.typeface}
+                      maxHeight={520}
+                    />
+                    <figcaption className="hint">
+                      The cover as it will print, at {PAGE_SIZES[safeSettings.pageSize].label} and
+                      set in {safeSettings.typeface === "serif" ? "serif" : "sans serif"}. It
+                      redraws as you type.
+                    </figcaption>
+                  </figure>
+                ) : safeSettings.includeCover ? (
+                  <p className="hint cover-figure">Drawing the cover…</p>
+                ) : (
+                  <p className="hint cover-figure">
+                    This directory prints without a cover. Turn one on below to see it here.
+                  </p>
+                )}
+              </div>
+
+              <div className="cover-controls">
+                <div className="grid two">
+                  {/* One hint apiece: PhotoInput carries its own, so a hint on
+                      the Field as well just stacks two paragraphs under every
+                      picture. */}
+                  <Field label="Logo">
+                    <PhotoInput
+                      path={coverRemoved.logo ? null : settings.coverLogoPath || null}
+                      initials=""
+                      shape="square"
+                      hint="Sits at the very top, any shape — fitted whole, never cropped."
+                      disabled={!canEdit}
+                      onChange={(blob, removed) => {
+                        setCoverBlobs((current) => ({ ...current, logo: blob }));
+                        setCoverRemoved((current) => ({ ...current, logo: removed }));
+                      }}
+                    />
+                  </Field>
+                  <Field label="Photograph">
+                    <PhotoInput
+                      path={coverRemoved.photo ? null : settings.coverPhotoPath || null}
+                      initials=""
+                      shape="wide"
+                      hint="Under the title — the building, or the sign. Landscape prints best, and large photos are shrunk automatically."
+                      disabled={!canEdit}
+                      onChange={(blob, removed) => {
+                        setCoverBlobs((current) => ({ ...current, photo: blob }));
+                        setCoverRemoved((current) => ({ ...current, photo: removed }));
+                      }}
+                    />
+                  </Field>
+                </div>
+
+                <Field
+                  label="Church name"
+                  hint="Small, above the title — and along the top of every page inside."
+                  htmlFor="church_name"
+                >
+                  <input
+                    id="church_name"
+                    type="text"
+                    value={settings.churchName}
+                    placeholder="Fairhaven Community Church"
+                    disabled={!canEdit}
+                    onChange={(event) => set({ churchName: event.target.value })}
+                  />
+                </Field>
+
+                <div className="grid two">
+                  <Field label="Title" hint="The big line." htmlFor="cover_title">
+                    <input
+                      id="cover_title"
+                      type="text"
+                      value={settings.coverTitle}
+                      placeholder="Church Directory"
+                      disabled={!canEdit}
+                      onChange={(event) => set({ coverTitle: event.target.value })}
+                    />
+                  </Field>
+                  <Field label="Subtitle" hint="A season or a year." htmlFor="cover_subtitle">
+                    <input
+                      id="cover_subtitle"
+                      type="text"
+                      value={settings.coverSubtitle}
+                      placeholder="Spring 2026"
+                      disabled={!canEdit}
+                      onChange={(event) => set({ coverSubtitle: event.target.value })}
+                    />
+                  </Field>
+                </div>
+
+                <Field
+                  label="In your own words"
+                  hint="A vision, a welcome, a verse. Its own paragraph, under the photograph."
+                  htmlFor="cover_statement"
+                >
+                  <textarea
+                    id="cover_statement"
+                    rows={4}
+                    value={settings.coverStatement}
+                    placeholder={"OUR MISSION\nTo know Christ, and to make him known."}
+                    disabled={!canEdit}
+                    onChange={(event) => set({ coverStatement: event.target.value })}
+                  />
+                </Field>
+
+                <Field
+                  label="How to reach the church"
+                  hint="The foot of the cover. One line here is one line there."
+                  htmlFor="cover_contact"
+                >
+                  <textarea
+                    id="cover_contact"
+                    rows={5}
+                    value={settings.coverContact}
+                    placeholder={
+                      "123 Main Street\nPO Box 100\nFairhaven, OH 44092\n(216) 555-0142\noffice@example.org"
+                    }
+                    disabled={!canEdit}
+                    onChange={(event) => set({ coverContact: event.target.value })}
+                  />
+                </Field>
+
+                <Checkbox
+                  label="Print a cover page"
+                  hint="Off prints the records straight away, with no cover."
+                  checked={settings.includeCover}
+                  disabled={!canEdit}
+                  onChange={(value) => set({ includeCover: value })}
+                />
+              </div>
+            </div>
           </div>
         </div>
 
