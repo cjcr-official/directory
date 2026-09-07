@@ -834,10 +834,11 @@ td {
  * own title did not need headings, and the headings were what forced "Records"
  * to truncate on a phone; the count says what it is instead.
  *
- * The name is an input, because renaming a group is a thing you do in place.
- * It is sized to the word rather than to the column, so the rule under it
- * stops where the name does - stretched to a fixed width it read as a blank
- * waiting to be filled in rather than as a name that can be changed.
+ * The name is a button, because the question you have about a group in a list
+ * is who is in it, not how it is spelt. Pressing it opens the people underneath
+ * the row. Renaming is still here, but it is inside that panel: it is the rarer
+ * thing to want, and as a field in the row it was the only thing the name did -
+ * a tap put a cursor in it and the keyboard came up over the list.
  * -------------------------------------------------------------------------- */
 
 .group-list {
@@ -847,14 +848,19 @@ td {
 }
 
 .group-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 18px;
   border-top: 1px solid var(--line);
 }
 .group-item:first-child {
   border-top: none;
+}
+
+/* The row itself. Separate from the item now that the item also holds the
+   panel underneath - the two must not sit side by side. */
+.group-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 18px;
 }
 
 .group-dot {
@@ -864,39 +870,74 @@ td {
   border-radius: 50%;
 }
 
-.group-name-text {
-  font-weight: 560;
-}
-
-/* input.group-name, not .group-name: the shared field rule is written as
-   input[type="text"], which out-specifies a bare class and would box every
-   name in the list. */
-input.group-name {
-  width: auto;
+/* A rule under the word, not a box around it: the list reads as a list, and
+   the rule still says the name can be pressed - which a hover state alone
+   would never say on a phone. The padding does not change between the resting
+   and the hovered state on purpose; a name that grew by a few pixels under the
+   pointer moved the count and the Delete beside it every time. */
+.group-name-button {
+  display: inline-flex;
+  align-items: center;
+  /* Every number here is spent on the name. A phone gives this row about
+     360px, and the count and the Delete take 140 of them between them, so
+     "Sunday School" came a pixel and a half short of fitting and lost two
+     syllables to an ellipsis - with the space those two syllables needed
+     sitting unused on the same line. */
+  gap: 5px;
   flex: 0 1 auto;
   min-width: 0;
-  /* Sized by the name it holds, not by the form-row height: this one sits in a
-     list, not on a form row. */
-  height: auto;
-  font-weight: 560;
-  /* A rule under the name rather than a box around it: the list reads as a
-     list, and the rule still says the name can be typed over - which a hover
-     state alone would never say on a phone. */
+  /* Pulled back by its own padding, so the name still starts where the names
+     above and below it start rather than a few pixels in from them. */
+  margin-left: -5px;
+  padding: 4px 5px;
   border: 1px solid transparent;
   border-bottom-color: var(--line-strong);
   border-radius: 0;
   background: transparent;
-  padding: 4px 2px;
-  /* Sized to the word, but a narrow screen still wins: the field shrinks and
-     says so with an ellipsis rather than cutting the name mid-letter. */
-  text-overflow: ellipsis;
+  font: inherit;
+  font-weight: 560;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
 }
-input.group-name:hover:not(:disabled),
-input.group-name:focus {
+/* The box now means one thing: this is the group whose people are showing. */
+.group-name-button:focus-visible,
+.group-name-button[aria-expanded="true"] {
   border-color: var(--line-strong);
   border-radius: var(--radius-sm);
   background: var(--paper);
-  padding: 4px 7px;
+}
+/* Which is why hover is asked for rather than assumed. A phone leaves a tapped
+   button hovered until something else is touched, so a bare :hover left the
+   box sitting on a group that had just been shut - the box saying open and the
+   caret saying shut, about the same name. */
+@media (hover: hover) {
+  .group-name-button:hover {
+    border-color: var(--line-strong);
+    border-radius: var(--radius-sm);
+    background: var(--paper);
+  }
+}
+
+/* A narrow screen wins: the name shrinks and says so with an ellipsis rather
+   than pushing the count off the row. */
+.group-name-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Says the name opens something rather than going somewhere - the same mark,
+   turning the same way, as the disclosure cards use. */
+.group-name-mark {
+  flex: none;
+  font-size: 0.8rem;
+  line-height: 1;
+  color: var(--ink-3);
+  transition: transform 0.15s ease;
+}
+.group-name-button[aria-expanded="true"] .group-name-mark {
+  transform: rotate(180deg);
 }
 
 /* Pushed to the right, which is what closes the band of empty space that a
@@ -905,7 +946,7 @@ input.group-name:focus {
   margin-left: auto;
   /* Its own breathing room on top of the row gap, so a name long enough to be
      clipped still ends clear of the count rather than flush against it. */
-  padding-left: 8px;
+  padding-left: 6px;
   flex: none;
   color: var(--ink-3);
   font-size: 0.82rem;
@@ -927,6 +968,59 @@ input.group-name:focus {
   border-color: var(--line-strong);
   background: var(--paper);
   color: var(--danger);
+}
+
+/* The people in the open group, under the row they belong to and indented to
+   line up with its name: 18px of row padding, a 9px dot and the 10px gap. */
+.group-members {
+  padding: 2px 18px 14px 37px;
+}
+
+.group-member-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 9px;
+}
+
+.group-member {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+/* One line, whatever the name: a family filed under a long double-barrelled
+   surname must not widen the card on a phone. */
+.group-member-name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Which family they are in, or which of them the group actually pulled in.
+   This one is allowed to wrap - it is the line that names five children. */
+.group-member-who {
+  color: var(--ink-3);
+  font-size: 0.82rem;
+}
+
+/* Renaming, kept below the people and behind a rule, because it is the thing
+   you came here to do least often. */
+.group-rename {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.group-rename .field {
+  flex: 1 1 auto;
+  margin-bottom: 0;
+}
+.group-rename .btn {
+  flex: none;
 }
 
 /* --- the browse lists -------------------------------------------------------
