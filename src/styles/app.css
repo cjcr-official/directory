@@ -320,21 +320,14 @@ p:last-child {
   padding: 26px 36px 64px;
   /* A desk monitor is wider than a book. 1180 left a fifth of a 1920 screen
      empty beside a table that had columns squeezed into the rest; this uses
-     the room without letting a line of body text run to the horizon. */
-  max-width: 1560px;
+     the room without letting a line of body text run to the horizon. Every
+     page gets this same width - a form used to stop 320px short of a list, so
+     moving between two tabs moved the right-hand edge of the app. */
+  max-width: 1800px;
   width: 100%;
 }
 .page.wide {
   max-width: none;
-}
-/*
- * A form is not a table. Given the whole of a wide screen its two columns
- * reach 700px each, and a single-line field 700px wide is both awkward to fill
- * and ugly to look at - the label sits alone at one end of a great empty box.
- * Lists take the room; forms take a measure.
- */
-.page.form {
-  max-width: 1240px;
 }
 
 .page-head {
@@ -388,8 +381,39 @@ p:last-child {
   display: grid;
   gap: 16px;
 }
+/* auto-fit, so what a wide screen buys is another column rather than wider
+   fields. This is what lets a form have the whole width without a single-line
+   field reaching 800px - put a third card in the row and the three share it,
+   and each field stays about the measure it had when the page was capped
+   narrower. Below the track minimum they stack, which is the phone. */
 .grid.two {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+/*
+ * Once there is room for it, a form row is measured in columns rather than in
+ * stretch. The 280px track is right down the sizes a phone and a tablet come
+ * in at, but on a desk monitor it packs three columns into widths where three
+ * are cramped - 357px each at 1400, narrower than is comfortable to fill. From
+ * 1200 up the track asks for 420 before it will make another column, so three
+ * columns wait until there is room to fill them: 557px each at 1920, and two
+ * comfortable 543px ones on a 1400px laptop rather than three cramped ones.
+ *
+ * The maximum stays 1fr on purpose. A definite maximum here would be worse
+ * than useless - the repeat count is worked out from the maximum when it is
+ * definite, so minmax(420px, 640px) fits only two tracks on a wide screen and
+ * wraps the third card onto a second row.
+ */
+@media (min-width: 1200px) {
+  .page.form .grid.two {
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  }
+  /* A row with only two cards in it has no third column to spend the width on,
+     so 1fr would hand each of them 840px and put us back where we started. It
+     is the one place the definite maximum is right: two tracks is what we want
+     the count to come out at anyway. */
+  .page.form .grid.two:not(:has(> :nth-child(3))) {
+    grid-template-columns: repeat(auto-fit, minmax(420px, 640px));
+  }
 }
 /* A head whose note is a sentence, not a word: it goes under the title
    instead of being squeezed beside it. */

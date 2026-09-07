@@ -508,7 +508,17 @@ export function PersonEditPage() {
                   onChange={(event) => patch({ notes: event.target.value || null })}
                 />
               </Field>
+            </div>
+          </div>
 
+          {/* Its own card rather than the tail of the address one: a group and
+              whether the record prints are not part of where somebody lives,
+              and standing them apart gives the row its third column. */}
+          <div className="card">
+            <div className="card-head">
+              <h2>Groups &amp; printing</h2>
+            </div>
+            <div className="card-body">
               <fieldset>
                 <legend>Groups</legend>
                 <TagPicker

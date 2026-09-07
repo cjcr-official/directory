@@ -667,171 +667,173 @@ export function FamilyEditPage() {
               </div>
             </div>
           </div>
-        </div>
 
-        <div className="card" style={{ marginTop: 16 }}>
-          <div className="card-head">
-            <h2>Family members</h2>
-            <span className="muted small">Listed on the card in this order.</span>
-          </div>
-          <div className="card-body">
-            {isNew ? (
-              <p className="muted small" style={{ margin: 0 }}>
-                Create the family first. You can then put people into it — either ones already in
-                the directory, or new records made here.
-              </p>
-            ) : (
-              <>
-                {memberPeople.length ? (
-                  <ul className="member-list">
-                    {memberPeople.map(({ link, person }, index) => (
-                      <li key={link.id} className="member-row">
-                        <Avatar
-                          path={personPhotoPath(person!, form)}
-                          initials={`${person!.first_name[0] ?? ""}${person!.last_name[0] ?? ""}`}
-                        />
-                        <div className="member-name">
-                          <Link className="list-link" to={`/people/${person!.id}`}>
-                            {fullName(person!)}
-                          </Link>
-                          <div className="muted small">
-                            {[formatPhone(person!.phone), person!.email]
-                              .filter(Boolean)
-                              .join(" · ") || "No phone or email"}
+          <div className="card">
+            <div className="card-head">
+              <h2>Family members</h2>
+              <span className="muted small">Listed on the card in this order.</span>
+            </div>
+            <div className="card-body">
+              {isNew ? (
+                <p className="muted small" style={{ margin: 0 }}>
+                  Create the family first. You can then put people into it — either ones already in
+                  the directory, or new records made here.
+                </p>
+              ) : (
+                <>
+                  {memberPeople.length ? (
+                    <ul className="member-list">
+                      {memberPeople.map(({ link, person }, index) => (
+                        <li key={link.id} className="member-row">
+                          <Avatar
+                            path={personPhotoPath(person!, form)}
+                            initials={`${person!.first_name[0] ?? ""}${person!.last_name[0] ?? ""}`}
+                          />
+                          <div className="member-name">
+                            <Link className="list-link" to={`/people/${person!.id}`}>
+                              {fullName(person!)}
+                            </Link>
+                            <div className="muted small">
+                              {[formatPhone(person!.phone), person!.email]
+                                .filter(Boolean)
+                                .join(" · ") || "No phone or email"}
+                            </div>
                           </div>
-                        </div>
-                        <select
-                          aria-label={`${fullName(person!)} in the family`}
-                          className="member-role"
-                          disabled={!canEdit}
-                          value={link.role}
-                          onChange={(event) =>
-                            setRole(link.id, event.target.value as HouseholdRole)
-                          }
-                        >
-                          {ROLES.map((role) => (
-                            <option key={role.value} value={role.value}>
-                              {role.label}
-                            </option>
-                          ))}
-                        </select>
-                        {canEdit ? (
-                          <div className="row tight member-actions">
-                            <button
-                              type="button"
-                              className="btn ghost small"
-                              aria-label="Move up"
-                              disabled={index === 0}
-                              onClick={() => moveMember(index, -1)}
-                            >
-                              ↑
-                            </button>
-                            <button
-                              type="button"
-                              className="btn ghost small"
-                              aria-label="Move down"
-                              disabled={index === memberPeople.length - 1}
-                              onClick={() => moveMember(index, 1)}
-                            >
-                              ↓
-                            </button>
-                            <button
-                              type="button"
-                              className="btn ghost small"
-                              onClick={() =>
-                                setMembers((current) => current.filter((m) => m.id !== link.id))
-                              }
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="muted small" style={{ marginTop: 0 }}>
-                    Nobody in this family yet.
-                  </p>
-                )}
-
-                {canEdit ? (
-                  <div className="member-add">
-                    <Field
-                      label="Put someone in this family"
-                      hint="Search the directory. Adding someone moves them out of any family they are in now."
-                      htmlFor="member-search"
-                    >
-                      <input
-                        id="member-search"
-                        className="search"
-                        type="search"
-                        placeholder="Search by name or email…"
-                        value={memberQuery}
-                        onChange={(event) => setMemberQuery(event.target.value)}
-                      />
-                    </Field>
-
-                    {candidates.length ? (
-                      <ul className="member-list picker">
-                        {candidates.map((person) => {
-                          const current = person.household_id
-                            ? householdById.get(person.household_id)
-                            : null;
-                          return (
-                            <li key={person.id} className="member-row">
-                              <Avatar
-                                path={personPhotoPath(person, current)}
-                                initials={`${person.first_name[0] ?? ""}${person.last_name[0] ?? ""}`}
-                              />
-                              <div className="member-name">
-                                <div style={{ fontWeight: 600 }}>{fullName(person)}</div>
-                                <div className="muted small">
-                                  {current
-                                    ? `Currently in ${current.display_name}`
-                                    : "On their own"}
-                                </div>
-                              </div>
+                          <select
+                            aria-label={`${fullName(person!)} in the family`}
+                            className="member-role"
+                            disabled={!canEdit}
+                            value={link.role}
+                            onChange={(event) =>
+                              setRole(link.id, event.target.value as HouseholdRole)
+                            }
+                          >
+                            {ROLES.map((role) => (
+                              <option key={role.value} value={role.value}>
+                                {role.label}
+                              </option>
+                            ))}
+                          </select>
+                          {canEdit ? (
+                            <div className="row tight member-actions">
                               <button
                                 type="button"
-                                className="btn small"
-                                onClick={() => {
-                                  setMembers((c) => [
-                                    ...c,
-                                    { id: person.id, role: suggestRole(c) },
-                                  ]);
-                                  setMemberQuery("");
-                                }}
+                                className="btn ghost small"
+                                aria-label="Move up"
+                                disabled={index === 0}
+                                onClick={() => moveMember(index, -1)}
                               >
-                                Add
+                                ↑
                               </button>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    ) : (
-                      <p className="muted small">
-                        {memberQuery ? "Nobody matches." : "Everyone is already in a family here."}
-                      </p>
-                    )}
+                              <button
+                                type="button"
+                                className="btn ghost small"
+                                aria-label="Move down"
+                                disabled={index === memberPeople.length - 1}
+                                onClick={() => moveMember(index, 1)}
+                              >
+                                ↓
+                              </button>
+                              <button
+                                type="button"
+                                className="btn ghost small"
+                                onClick={() =>
+                                  setMembers((current) => current.filter((m) => m.id !== link.id))
+                                }
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="muted small" style={{ marginTop: 0 }}>
+                      Nobody in this family yet.
+                    </p>
+                  )}
 
-                    <div className="row tight" style={{ marginTop: 14 }}>
-                      <button
-                        type="button"
-                        className="btn"
-                        disabled={saving}
-                        onClick={() => void addNewPerson()}
+                  {canEdit ? (
+                    <div className="member-add">
+                      <Field
+                        label="Put someone in this family"
+                        hint="Search the directory. Adding someone moves them out of any family they are in now."
+                        htmlFor="member-search"
                       >
-                        + Create a new person
-                      </button>
-                      <span className="muted small">
-                        Saves this family, then opens a blank record already in it.
-                      </span>
+                        <input
+                          id="member-search"
+                          className="search"
+                          type="search"
+                          placeholder="Search by name or email…"
+                          value={memberQuery}
+                          onChange={(event) => setMemberQuery(event.target.value)}
+                        />
+                      </Field>
+
+                      {candidates.length ? (
+                        <ul className="member-list picker">
+                          {candidates.map((person) => {
+                            const current = person.household_id
+                              ? householdById.get(person.household_id)
+                              : null;
+                            return (
+                              <li key={person.id} className="member-row">
+                                <Avatar
+                                  path={personPhotoPath(person, current)}
+                                  initials={`${person.first_name[0] ?? ""}${person.last_name[0] ?? ""}`}
+                                />
+                                <div className="member-name">
+                                  <div style={{ fontWeight: 600 }}>{fullName(person)}</div>
+                                  <div className="muted small">
+                                    {current
+                                      ? `Currently in ${current.display_name}`
+                                      : "On their own"}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  className="btn small"
+                                  onClick={() => {
+                                    setMembers((c) => [
+                                      ...c,
+                                      { id: person.id, role: suggestRole(c) },
+                                    ]);
+                                    setMemberQuery("");
+                                  }}
+                                >
+                                  Add
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      ) : (
+                        <p className="muted small">
+                          {memberQuery
+                            ? "Nobody matches."
+                            : "Everyone is already in a family here."}
+                        </p>
+                      )}
+
+                      <div className="row tight" style={{ marginTop: 14 }}>
+                        <button
+                          type="button"
+                          className="btn"
+                          disabled={saving}
+                          onClick={() => void addNewPerson()}
+                        >
+                          + Create a new person
+                        </button>
+                        <span className="muted small">
+                          Saves this family, then opens a blank record already in it.
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ) : null}
-              </>
-            )}
+                  ) : null}
+                </>
+              )}
+            </div>
           </div>
         </div>
 
