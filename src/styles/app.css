@@ -27,6 +27,16 @@
 
   --radius: 10px;
   --radius-sm: 7px;
+
+  /* One height for every control on a form row. Left to themselves the four
+     kinds disagree: a text input came to 37.7px, a select to 37.2, a button to
+     36.7, and a date input to 39.7 - because Chrome sizes ::-webkit-datetime-
+     edit from its own metrics, which line-height does not reach. Three pixels
+     of spread between fields sitting next to each other reads as sloppiness
+     even when nobody can name it. In rem so it grows with the root font rather
+     than trapping the text it holds. */
+  --control-h: 2.375rem;
+  --control-h-sm: 1.875rem;
   --shadow: 0 1px 2px rgb(20 32 31 / 6%), 0 6px 20px -12px rgb(20 32 31 / 22%);
 
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -574,6 +584,22 @@ input[type="time"] {
   appearance: none;
 }
 
+/* Every single-line control to the one height, which is the only way the date
+   inputs agree with the rest: their extra two pixels come from inside the
+   control, so padding and line-height cannot reach them. Kept off textarea,
+   which is sized by its rows, and off the group-name field below, which is a
+   rule under a word rather than a box. */
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="password"],
+input[type="date"],
+input[type="search"],
+input[type="number"],
+select {
+  height: var(--control-h);
+}
+
 textarea {
   min-height: 72px;
   resize: vertical;
@@ -633,6 +659,10 @@ legend {
   font-size: 0.88rem;
   font-weight: 560;
   padding: 7px 14px;
+  /* The same height as the fields, so a button standing beside one lines up top
+     and bottom. min-height rather than height: the padding still wins if a
+     button is ever given something taller than a line of text to hold. */
+  min-height: var(--control-h);
   border-radius: var(--radius-sm);
   border: 1px solid var(--line-strong);
   background: var(--paper);
@@ -682,8 +712,11 @@ legend {
 .btn.ghost:hover:not(:disabled) {
   background: var(--canvas);
 }
+/* The second step on the scale, and it keeps its own height: pinning it to the
+   full one would flatten the distinction the class exists to make. */
 .btn.small {
   padding: 4px 9px;
+  min-height: var(--control-h-sm);
   font-size: 0.8rem;
 }
 .btn.danger-hover {
@@ -764,6 +797,9 @@ input.group-name {
   width: auto;
   flex: 0 1 auto;
   min-width: 0;
+  /* Sized by the name it holds, not by the form-row height: this one sits in a
+     list, not on a form row. */
+  height: auto;
   font-weight: 560;
   /* A rule under the name rather than a box around it: the list reads as a
      list, and the rule still says the name can be typed over - which a hover
@@ -2381,6 +2417,14 @@ th.num {
 /* --- touch devices ------------------------------------------------------- */
 
 @media (hover: none) and (pointer: coarse) {
+  /* The fields below go up to 16px here, and a 38px box cannot hold a 16px
+     line with the padding the design asks for - the text would be clipped
+     rather than merely tight. The row grows with them, which is the right way
+     round on a phone anyway. */
+  :root {
+    --control-h: 2.5rem;
+  }
+
   /* Safari on iOS zooms the page when a focused field is under 16px, which
      shunts the layout sideways mid-typing. */
   input[type="text"],
@@ -2395,8 +2439,11 @@ th.num {
     font-size: 16px;
   }
 
+  /* A pixel under what the taller row allows, so the height above governs and
+     a button here comes out level with the field beside it rather than a
+     pixel proud of it. */
   .btn {
-    padding: 9px 15px;
+    padding: 8px 15px;
   }
 }
 
