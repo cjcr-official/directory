@@ -394,14 +394,14 @@ export function FamilyEditPage() {
     <div className="page form">
       <div className="page-head">
         <div className="grow">
+          <Link className="btn ghost small page-back" to="/families">
+            ← Back to families
+          </Link>
           <h1>{isNew ? "Add a family" : form.display_name || "Family"}</h1>
           <div className="sub">
             Everything here prints on one card. Only the surname is required — the rest is optional.
           </div>
         </div>
-        <Link className="btn ghost" to="/families">
-          Back
-        </Link>
       </div>
 
       {error ? (

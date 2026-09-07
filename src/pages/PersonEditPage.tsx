@@ -230,6 +230,9 @@ export function PersonEditPage() {
     <div className="page form">
       <div className="page-head">
         <div className="grow">
+          <Link className="btn ghost small page-back" to="/people">
+            ← Back to people
+          </Link>
           <h1>
             {isNew ? "Add a person" : `${form.first_name} ${form.last_name}`.trim() || "Person"}
           </h1>
@@ -244,9 +247,6 @@ export function PersonEditPage() {
             )}
           </div>
         </div>
-        <Link className="btn ghost" to="/people">
-          Back
-        </Link>
       </div>
 
       {error ? (

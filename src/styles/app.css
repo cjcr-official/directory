@@ -347,6 +347,16 @@ p:last-child {
   margin-top: 3px;
 }
 
+/* Back belongs beside the thing it goes back from. Held in the top right of a
+   page-head it drifts with the page width, and now that a page runs to 1800px
+   that put it about 1640px from the title on a wide screen - present, but far
+   enough out of the corner of the eye to read as missing. Above the heading it
+   sits in the same place at every width, and it names where it goes rather
+   than only saying that it leaves. */
+.page-back {
+  margin-bottom: 10px;
+}
+
 /* --- surfaces ------------------------------------------------------------ */
 
 .card {
