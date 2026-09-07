@@ -82,8 +82,15 @@ const PAIRS: Pair[] = [
   { what: "links and accents on the canvas", fg: "--accent", bg: "--canvas" },
   { what: "a primary button's label", fg: "--accent-ink", bg: "--accent" },
   { what: "error text on a card", fg: "--danger", bg: "--paper" },
-  { what: "error text on its own notice", fg: "--danger", bg: "--danger-soft" },
-  { what: "warning text on its own notice", fg: "--ink", bg: "--warn-soft" },
+  // These three named the wrong foreground for years. A notice does not print
+  // its text in --danger or --ink; it prints it in the deeper shade the rule
+  // actually sets, which used to be a hex written into the stylesheet where no
+  // token existed and so nothing here could reach it. The pass was green and
+  // measuring a colour the app never put on screen.
+  { what: "error text on its own notice", fg: "--danger-deep", bg: "--danger-soft" },
+  { what: "warning text on its own notice", fg: "--warn-deep", bg: "--warn-soft" },
+  { what: "confirmation text on its own notice", fg: "--accent-deep", bg: "--accent-soft" },
+  { what: "a warning pill's label", fg: "--warn-deep", bg: "--warn-soft" },
   { what: "accent text on the soft accent", fg: "--accent", bg: "--accent-soft" },
 ];
 

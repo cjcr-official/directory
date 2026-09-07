@@ -501,7 +501,7 @@ export function FamilyEditPage() {
                           ? "one other family"
                           : `${nameClashes.length} other families`}
                         , told apart here as <strong>{form.office_label?.trim()}</strong>. That is
-                        for your lists only - both cards still print under the same heading.
+                        for your lists only — both cards still print under the same heading.
                       </>
                     ) : (
                       <>

@@ -471,7 +471,7 @@ export function ProjectEditPage() {
                       path={coverRemoved.logo ? null : settings.coverLogoPath || null}
                       initials=""
                       shape="square"
-                      hint="Sits at the very top, any shape - fitted whole, never cropped"
+                      hint="Sits at the very top, any shape — fitted whole, never cropped."
                       disabled={!canEdit}
                       onChange={(blob, removed) => {
                         setCoverBlobs((current) => ({ ...current, logo: blob }));
@@ -484,7 +484,7 @@ export function ProjectEditPage() {
                       path={coverRemoved.photo ? null : settings.coverPhotoPath || null}
                       initials=""
                       shape="wide"
-                      hint="Under the title - the building, or the sign. Landscape prints best, and large photos are shrunk automatically"
+                      hint="Under the title — the building, or the sign. Landscape prints best, and large photos are shrunk automatically."
                       disabled={!canEdit}
                       onChange={(blob, removed) => {
                         setCoverBlobs((current) => ({ ...current, photo: blob }));
@@ -496,7 +496,7 @@ export function ProjectEditPage() {
 
                 <Field
                   label="Church name"
-                  hint="Small, above the title - and along the top of every page inside."
+                  hint="Small, above the title — and along the top of every page inside."
                   htmlFor="church_name"
                 >
                   <input
