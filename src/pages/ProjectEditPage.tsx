@@ -454,7 +454,13 @@ export function ProjectEditPage() {
                 ) : null}
               </div>
             </div>
+          </div>
 
+          {/* The cover stands in its own column. It is the one part of this
+              page you judge by looking rather than by reading, so it gets the
+              room to be looked at - and three columns is what fills a desk
+              monitor here, the same as the person and family forms. */}
+          <div>
             <div className="card">
               <div className="card-head">
                 <h2>The cover</h2>
