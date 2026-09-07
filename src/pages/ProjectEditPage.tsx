@@ -849,7 +849,13 @@ export function ProjectEditPage() {
                       }}
                     />
                   </Field>
+                </div>
 
+                {/* The three short lines across the top of the cover: a
+                    name, a title, a season. Three across because there
+                    are three of them and none is longer than a few
+                    words - a row of the thing being described. */}
+                <div className="grid three">
                   <Field
                     label="Church name"
                     hint="Small, above the title — and along the top of every page inside."
@@ -885,7 +891,11 @@ export function ProjectEditPage() {
                       onChange={(event) => set({ coverSubtitle: event.target.value })}
                     />
                   </Field>
+                </div>
 
+                {/* The two paragraphs, which want the room the short
+                    lines above do not. */}
+                <div className="grid two">
                   <Field
                     label="In your own words"
                     hint="A vision, a welcome, a verse. Its own paragraph, under the photograph."
