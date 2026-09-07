@@ -27,8 +27,21 @@ import {
 } from "@/lib/layout/settings";
 import { resolveEntries, type Selection } from "@/lib/projectEntries";
 import { labelledHouseholdName } from "@/lib/format";
-import { removePhoto, uploadPhoto } from "@/lib/photos";
+import { getPhotoUrls, removePhoto, uploadPhoto } from "@/lib/photos";
+import { CoverCanvas } from "@/components/BookPreview";
+import { composeCoverPage } from "@/lib/layout/compose";
+import { loadMetrics, type Metrics } from "@/lib/layout/metrics";
 import { PhotoInput } from "@/components/PhotoInput";
+
+/*
+ * Stand-in storage paths for a picture that has been chosen but not yet
+ * uploaded. The composer draws a photograph by its path, and a Blob picked a
+ * second ago does not have one, so these carry it as far as the canvas. They
+ * never reach the database: Save uploads the Blob and writes the real path.
+ * Prefixed so they cannot collide with anything storage would hand back.
+ */
+const PENDING_LOGO = "pending:cover-logo";
+const PENDING_PHOTO = "pending:cover-photo";
 
 export function ProjectEditPage() {
   const { id } = useParams();
@@ -131,6 +144,85 @@ export function ProjectEditPage() {
   // store "0 records to a sheet".
   const safeSettings = useMemo(() => normalizeSettings(settings), [settings]);
   const sheets = Math.ceil(included.length / recordsPerSheet(safeSettings));
+
+  // --- the cover, drawn ------------------------------------------------------
+
+  /**
+   * Font metrics for the typeface the book is set in. The composer needs them
+   * to break a line where the PDF will break it - without them the canvas would
+   * be a drawing of a cover rather than a proof of one - and they are fetched,
+   * so the canvas appears a moment after the card does.
+   */
+  const [metrics, setMetrics] = useState<Metrics | null>(null);
+  useEffect(() => {
+    let active = true;
+    void loadMetrics(safeSettings.typeface).then((loaded) => {
+      if (active) setMetrics(loaded);
+    });
+    return () => {
+      active = false;
+    };
+  }, [safeSettings.typeface]);
+
+  /**
+   * A photograph chosen a moment ago has been read into a Blob and not yet
+   * uploaded, so it has no storage path to be drawn by. These stand in as one
+   * until Save gives it a real one, which is what lets a logo appear on the
+   * canvas when it is picked rather than only after the record is written.
+   */
+  const pendingCoverUrls = useMemo(() => {
+    const urls = new Map<string, string>();
+    if (coverBlobs.logo) urls.set(PENDING_LOGO, URL.createObjectURL(coverBlobs.logo));
+    if (coverBlobs.photo) urls.set(PENDING_PHOTO, URL.createObjectURL(coverBlobs.photo));
+    return urls;
+  }, [coverBlobs]);
+  useEffect(
+    () => () => pendingCoverUrls.forEach((url) => URL.revokeObjectURL(url)),
+    [pendingCoverUrls],
+  );
+
+  /** What the cover would be if it were saved and printed exactly now. */
+  const coverPage = useMemo(() => {
+    if (!metrics || !safeSettings.includeCover) return null;
+    return composeCoverPage(
+      {
+        ...safeSettings,
+        coverLogoPath: coverRemoved.logo
+          ? ""
+          : coverBlobs.logo
+            ? PENDING_LOGO
+            : safeSettings.coverLogoPath,
+        coverPhotoPath: coverRemoved.photo
+          ? ""
+          : coverBlobs.photo
+            ? PENDING_PHOTO
+            : safeSettings.coverPhotoPath,
+      },
+      metrics,
+    );
+  }, [metrics, safeSettings, coverBlobs, coverRemoved]);
+
+  // Saved photographs, fetched once per set of paths rather than per keystroke.
+  const [savedCoverUrls, setSavedCoverUrls] = useState<Map<string, string>>(new Map());
+  const storedCoverPaths = [safeSettings.coverLogoPath, safeSettings.coverPhotoPath]
+    .filter(Boolean)
+    .join("|");
+  useEffect(() => {
+    const paths = storedCoverPaths.split("|").filter(Boolean);
+    if (!paths.length) return;
+    let active = true;
+    void getPhotoUrls(paths).then((urls) => {
+      if (active) setSavedCoverUrls(urls);
+    });
+    return () => {
+      active = false;
+    };
+  }, [storedCoverPaths]);
+
+  const coverUrls = useMemo(
+    () => new Map([...savedCoverUrls, ...pendingCoverUrls]),
+    [savedCoverUrls, pendingCoverUrls],
+  );
 
   // What the three panels below come to, said in a few words so they are worth
   // reading shut. A list of what is on beats a count of how many.
@@ -468,6 +560,33 @@ export function ProjectEditPage() {
               {/* In the order it prints, top of the cover to the bottom, so
                   filling the form in reads down the page it makes. */}
               <div className="card-body">
+                {/* The cover itself, above the fields that make it. Everything
+                    below is described in words - "the big line", "the foot of
+                    the cover" - and words are a poor way to know whether a
+                    title has come out too long for its own page. */}
+                {coverPage ? (
+                  <figure className="cover-figure">
+                    <CoverCanvas
+                      page={coverPage.page}
+                      width={coverPage.width}
+                      height={coverPage.height}
+                      photoUrls={coverUrls}
+                      typeface={coverPage.typeface}
+                    />
+                    <figcaption className="hint">
+                      The cover as it will print, at {PAGE_SIZES[safeSettings.pageSize].label} and
+                      set in {safeSettings.typeface === "serif" ? "serif" : "sans serif"}. It
+                      redraws as you type.
+                    </figcaption>
+                  </figure>
+                ) : safeSettings.includeCover ? (
+                  <p className="hint cover-figure">Drawing the cover…</p>
+                ) : (
+                  <p className="hint cover-figure">
+                    This directory prints without a cover. Turn one on below to see it here.
+                  </p>
+                )}
+
                 <div className="grid two">
                   {/* One hint apiece: PhotoInput carries its own, so a hint on
                       the Field as well just stacks two paragraphs under every

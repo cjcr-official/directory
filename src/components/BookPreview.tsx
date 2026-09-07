@@ -1,4 +1,4 @@
-import { Fragment, memo } from "react";
+import { Fragment, memo, useEffect, useRef, useState } from "react";
 import { COLORS, type BookModel, type BookPage, type TextRun } from "@/lib/layout/compose";
 import { CSS_FONT_STACKS, type Typeface } from "@/lib/layout/metrics";
 
@@ -261,6 +261,81 @@ export function BookPreview({
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+/** CSS pixels per PostScript point. */
+const PX_PER_PT = 96 / 72;
+
+/**
+ * One page, drawn on its own, sized to whatever width it is given.
+ *
+ * The book preview draws sheets - a whole piece of paper, six records on it,
+ * fold lines down the middle, captioned "Sheet 1 of 4". That is the right
+ * picture for checking an imposition and the wrong one for setting a cover,
+ * where the question is only ever "what does this one page look like".
+ *
+ * It draws through the same `Page` the sheets use, off the same composed model
+ * the PDF writer consumes, so it is a proof of the print rather than an
+ * impression of it: if the title wraps to two lines here it wraps to two lines
+ * on paper.
+ */
+export function CoverCanvas({
+  page,
+  width,
+  height,
+  photoUrls,
+  typeface,
+}: {
+  page: BookPage;
+  width: number;
+  height: number;
+  photoUrls: Map<string, string>;
+  typeface: Typeface;
+}) {
+  const holder = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.5);
+  const fontStack = CSS_FONT_STACKS[typeface] ?? CSS_FONT_STACKS.sans;
+
+  /*
+   * Measured, not assumed. This sits in a column that is three across on a desk
+   * monitor, two on a laptop and one on a phone, so the width it is given is
+   * not knowable here - only askable. The holder is a full-width block, so its
+   * own width never depends on the page inside it and this cannot chase itself.
+   */
+  useEffect(() => {
+    const measure = () => {
+      const available = holder.current?.clientWidth ?? 0;
+      if (available <= 0) return;
+      setScale(Math.min(1, available / (width * PX_PER_PT)));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [width]);
+
+  return (
+    <div ref={holder} className="cover-canvas">
+      <div
+        className="cover-canvas-paper"
+        style={{
+          width: `${width * PX_PER_PT * scale}px`,
+          height: `${height * PX_PER_PT * scale}px`,
+        }}
+      >
+        <div
+          className="sheet"
+          style={{
+            width: `${width}pt`,
+            height: `${height}pt`,
+            transform: `scale(${scale})`,
+            transformOrigin: "top left",
+          }}
+        >
+          <Page page={page} photoUrls={photoUrls} fontStack={fontStack} />
+        </div>
+      </div>
     </div>
   );
 }

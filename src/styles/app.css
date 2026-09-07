@@ -1742,6 +1742,32 @@ th.num {
   border-left: 1px dashed rgb(20 32 31 / 26%);
 }
 
+/* --- the cover, on the page that edits it -------------------------------- */
+
+/*
+ * The same paper as the preview screen, lit differently. That shadow is built
+ * for a sheet lying on a near-black canvas and would be a bruise on a white
+ * card; here the paper only has to be told apart from the card behind it, which
+ * a hairline and a hint of lift do.
+ */
+.cover-figure {
+  margin: 0 0 16px;
+}
+.cover-canvas {
+  width: 100%;
+}
+.cover-canvas-paper {
+  position: relative;
+  overflow: hidden;
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  box-shadow: 0 1px 3px rgb(20 32 31 / 10%);
+}
+.cover-figure figcaption {
+  margin-top: 8px;
+}
+
 @media (max-width: 820px) {
   /* Two rows: what this is, then what you can do to it. One row of six
      controls is what turned this screen into a heap. */

@@ -1307,3 +1307,40 @@ export function composeBook(
     settings,
   };
 }
+
+/**
+ * The cover on its own, in page coordinates.
+ *
+ * Editing a cover used to mean filling in five fields and going somewhere else
+ * to find out what they did. This is the same `composeCover` the book is built
+ * from, taken before `translate` puts the page in its place on a sheet - which
+ * is what leaves the coordinates starting at the corner of the cover instead of
+ * somewhere out on a piece of paper - so the editor can draw the real thing
+ * beside the fields that fill it in.
+ *
+ * Composing a cover is not composing a book: no records to paginate, no index
+ * to number, no sheets to impose. It is cheap enough to run on a keystroke.
+ */
+export function composeCoverPage(
+  settings: ProjectSettings,
+  metrics: Metrics,
+): {
+  page: BookPage;
+  width: number;
+  height: number;
+  photoPaths: string[];
+  typeface: Typeface;
+} {
+  const geo = computeGeometry(settings);
+  const page = composeCover(settings, geo, typeScale(settings), metrics);
+  const photoPaths = [
+    ...new Set(page.photos.map((slot) => slot.path).filter((path): path is string => !!path)),
+  ];
+  return {
+    page,
+    width: geo.pageWidth,
+    height: geo.pageHeight,
+    photoPaths,
+    typeface: settings.typeface,
+  };
+}
