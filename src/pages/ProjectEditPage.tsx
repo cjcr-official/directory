@@ -572,6 +572,7 @@ export function ProjectEditPage() {
                       height={coverPage.height}
                       photoUrls={coverUrls}
                       typeface={coverPage.typeface}
+                      maxHeight={520}
                     />
                     <figcaption className="hint">
                       The cover as it will print, at {PAGE_SIZES[safeSettings.pageSize].label} and

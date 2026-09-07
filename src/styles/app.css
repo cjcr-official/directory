@@ -1386,9 +1386,19 @@ th.num {
   min-width: 0;
 }
 
+/* The heading of a card, because that is what it is. A panel that opens is
+   still a card in the row beside cards that do not, and this was set a tenth of
+   a rem smaller and ten units lighter than the h2 next to it - 1rem against
+   1.15, 640 against 650 - with the heading tracking left off. Near-misses, all
+   three, which is what made a row of six cards read as two sets of three. It
+   stays a span rather than becoming an h2: it labels a disclosure, and putting
+   a heading inside a summary buys an outline entry at the cost of how the
+   control is announced. */
 .disclosure-title {
-  font-size: 1rem;
-  font-weight: 640;
+  font-size: 1.15rem;
+  font-weight: 650;
+  letter-spacing: -0.011em;
+  line-height: 1.25;
   color: var(--ink);
 }
 
@@ -1753,8 +1763,13 @@ th.num {
 .cover-figure {
   margin: 0 0 16px;
 }
+/* Full width so the measurement inside can never chase its own content, and the
+   paper centred within it for when the height is what limits the scale and the
+   sheet comes out narrower than the column holding it. */
 .cover-canvas {
   width: 100%;
+  display: flex;
+  justify-content: center;
 }
 .cover-canvas-paper {
   position: relative;

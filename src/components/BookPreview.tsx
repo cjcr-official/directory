@@ -287,12 +287,21 @@ export function CoverCanvas({
   height,
   photoUrls,
   typeface,
+  maxHeight,
 }: {
   page: BookPage;
   width: number;
   height: number;
   photoUrls: Map<string, string>;
   typeface: Typeface;
+  /**
+   * A ceiling in CSS pixels. A cover is a tall portrait page, so filling the
+   * width of the column it sits in makes it about 740px of paper - taller than
+   * everything else on the page put together, and enough to push its own column
+   * a long way past the ones beside it. Whichever of width and this is the
+   * tighter constraint decides the scale.
+   */
+  maxHeight?: number;
 }) {
   const holder = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.5);
@@ -308,12 +317,18 @@ export function CoverCanvas({
     const measure = () => {
       const available = holder.current?.clientWidth ?? 0;
       if (available <= 0) return;
-      setScale(Math.min(1, available / (width * PX_PER_PT)));
+      setScale(
+        Math.min(
+          1,
+          available / (width * PX_PER_PT),
+          maxHeight ? maxHeight / (height * PX_PER_PT) : Infinity,
+        ),
+      );
     };
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [width]);
+  }, [width, height, maxHeight]);
 
   return (
     <div ref={holder} className="cover-canvas">
