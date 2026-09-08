@@ -5,7 +5,15 @@ import { useAuth } from "@/auth/AuthProvider";
 import { AddressFields } from "@/components/AddressFields";
 import { PhotoInput } from "@/components/PhotoInput";
 import { TagPicker } from "@/components/TagPicker";
-import { Avatar, Checkbox, ConfirmButton, Field, LoadingScreen, Notice } from "@/components/ui";
+import {
+  Avatar,
+  ChangedNote,
+  Checkbox,
+  ConfirmButton,
+  Field,
+  LoadingScreen,
+  Notice,
+} from "@/components/ui";
 import type { HouseholdRole, PersonRow } from "@/lib/database.types";
 import { removePhoto, uploadPhoto } from "@/lib/photos";
 import { createPerson, deletePerson, isStaleWrite, setTags, updatePerson } from "@/lib/queries";
@@ -54,6 +62,7 @@ export function PersonEditPage() {
     membersOf,
     tags,
     tagsOfPerson,
+    authorName,
     reload,
     loading,
   } = useDirectory();
@@ -246,6 +255,9 @@ export function PersonEditPage() {
               "Not in a family, so they get their own record in the book."
             )}
           </div>
+          {existing ? (
+            <ChangedNote updatedAt={existing.updated_at} author={authorName(existing.updated_by)} />
+          ) : null}
         </div>
       </div>
 

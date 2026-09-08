@@ -5,7 +5,15 @@ import { useAuth } from "@/auth/AuthProvider";
 import { AddressFields } from "@/components/AddressFields";
 import { PhotoInput } from "@/components/PhotoInput";
 import { TagPicker } from "@/components/TagPicker";
-import { Avatar, Checkbox, ConfirmButton, Field, LoadingScreen, Notice } from "@/components/ui";
+import {
+  Avatar,
+  ChangedNote,
+  Checkbox,
+  ConfirmButton,
+  Field,
+  LoadingScreen,
+  Notice,
+} from "@/components/ui";
 import type { HouseholdRole, HouseholdRow, PersonRow } from "@/lib/database.types";
 import { removePhoto, uploadPhoto } from "@/lib/photos";
 import {
@@ -83,6 +91,7 @@ export function FamilyEditPage() {
     membersOf,
     tags,
     tagsOfHousehold,
+    authorName,
     reload,
     loading,
   } = useDirectory();
@@ -401,6 +410,9 @@ export function FamilyEditPage() {
           <div className="sub">
             Everything here prints on one card. Only the surname is required — the rest is optional.
           </div>
+          {existing ? (
+            <ChangedNote updatedAt={existing.updated_at} author={authorName(existing.updated_by)} />
+          ) : null}
         </div>
       </div>
 

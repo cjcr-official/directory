@@ -369,3 +369,64 @@ export function join(parts: (string | null | undefined)[], separator = " · "): 
     .filter(Boolean)
     .join(separator);
 }
+
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/** Midnight local, so "yesterday" means the day before, not 24 hours ago. */
+function startOfDay(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+/**
+ * When a record was last written, as the office would say it.
+ *
+ * "today", "yesterday", "on Tuesday" inside the last week, and a date after
+ * that - which is how somebody actually answers "when did this change?". A
+ * weekday is only useful while there is one of it in recent memory, so it
+ * stops at six days; beyond that it would be ambiguous between this Tuesday
+ * and last.
+ *
+ * The year is added only when it is not this one. "on 3 March" is what you
+ * want nine times in ten, and "on 3 March 2025" is the tenth, where leaving
+ * the year off would quietly claim the change was recent.
+ *
+ * Local time throughout, deliberately - unlike the birthday helpers above,
+ * which parse a bare YYYY-MM-DD and must not let a timezone move the day.
+ * This is a real instant, and the day it happened is the day it was in the
+ * room where somebody typed it.
+ */
+export function describeWhen(iso: string | null | undefined, now = new Date()): string {
+  if (!iso) return "";
+  const when = new Date(iso);
+  if (Number.isNaN(when.getTime())) return "";
+
+  const days = Math.round((startOfDay(now) - startOfDay(when)) / 86_400_000);
+  if (days === 0) return "today";
+  if (days === 1) return "yesterday";
+  // A clock that is behind can date a change tomorrow. Saying "on Thursday"
+  // for it would be a guess; the date is at least what was recorded.
+  if (days > 1 && days < 7) return `on ${WEEKDAYS[when.getDay()]}`;
+
+  const day = `${when.getDate()} ${MONTHS[when.getMonth()]}`;
+  return when.getFullYear() === now.getFullYear() ? `on ${day}` : `on ${day} ${when.getFullYear()}`;
+}
+
+/**
+ * The whole line: when a record was last written and by whom.
+ *
+ * Every piece of it is allowed to be missing, and each absence means something
+ * different. No timestamp at all is a record that has never been saved through
+ * this app. A timestamp with no name is a row older than migration 0005, or
+ * one written by a service-role tool where there was no person to name - so it
+ * says when and stops, rather than inventing an "unknown" nobody asked about.
+ */
+export function describeChange(
+  updatedAt: string | null | undefined,
+  author: string | null | undefined,
+  now = new Date(),
+): string {
+  const when = describeWhen(updatedAt, now);
+  if (!when) return "";
+  const who = author?.trim();
+  return who ? `Changed ${when} by ${who}` : `Changed ${when}`;
+}

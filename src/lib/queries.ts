@@ -101,7 +101,26 @@ export async function fetchDirectory(): Promise<DirectoryData> {
 // Households
 // ---------------------------------------------------------------------------
 
-export type HouseholdInput = Omit<HouseholdRow, "id" | "created_at" | "updated_at">;
+export type HouseholdInput = Omit<HouseholdRow, "id" | "created_at" | "updated_at" | "updated_by">;
+
+/**
+ * Takes the author column back out of anything on its way to the database.
+ *
+ * 0005 stamps updated_by from a trigger, so a value sent from here is
+ * discarded anyway - but sending one is not harmless. A form seeds itself with
+ * `{ ...existing }`, which carries every column the row came back with, and a
+ * database that has not run 0005 answers a write naming a column it has not
+ * got with PGRST204 and refuses the whole save. That is the office_label
+ * failure again, and this is the cheaper half of the fix: never mention the
+ * column rather than notice afterwards that it was not there.
+ *
+ * Applied at the write itself rather than trusted to each caller, so a new
+ * screen cannot reintroduce it by spreading a row it just read.
+ */
+export function withoutAuthor<T extends object>(patch: T): Omit<T, "updated_by"> {
+  const { updated_by: _stamped, ...rest } = patch as T & { updated_by?: unknown };
+  return rest as Omit<T, "updated_by">;
+}
 
 /**
  * PostgREST was asked to write a column the table has not got.
@@ -145,11 +164,12 @@ export function withoutOfficeLabel<T extends { office_label?: string | null }>(
 }
 
 export async function createHousehold(input: HouseholdInput): Promise<HouseholdRow> {
-  const first = await supabase.from("households").insert(input).select().single();
-  if (first.error && "office_label" in input && missingColumn(first.error)) {
+  const body = withoutAuthor(input);
+  const first = await supabase.from("households").insert(body).select().single();
+  if (first.error && "office_label" in body && missingColumn(first.error)) {
     noteOfficeLabelMissing();
     return unwrap(
-      await supabase.from("households").insert(withoutOfficeLabel(input)).select().single(),
+      await supabase.from("households").insert(withoutOfficeLabel(body)).select().single(),
     );
   }
   return unwrap(first);
@@ -215,12 +235,13 @@ export async function updateHousehold(
     return query.select();
   };
 
-  let result = await write(patch);
+  const body = withoutAuthor(patch);
+  let result = await write(body);
   // The retry keeps expectedUpdatedAt, so a save that races somebody else is
   // still refused rather than quietly let through by the second attempt.
-  if (result.error && "office_label" in patch && missingColumn(result.error)) {
+  if (result.error && "office_label" in body && missingColumn(result.error)) {
     noteOfficeLabelMissing();
-    result = await write(withoutOfficeLabel(patch));
+    result = await write(withoutOfficeLabel(body));
   }
 
   const rows = unwrap(result) as HouseholdRow[];
@@ -236,10 +257,10 @@ export async function deleteHousehold(id: string): Promise<void> {
 // People
 // ---------------------------------------------------------------------------
 
-export type PersonInput = Omit<PersonRow, "id" | "created_at" | "updated_at">;
+export type PersonInput = Omit<PersonRow, "id" | "created_at" | "updated_at" | "updated_by">;
 
 export async function createPerson(input: PersonInput): Promise<PersonRow> {
-  return unwrap(await supabase.from("people").insert(input).select().single());
+  return unwrap(await supabase.from("people").insert(withoutAuthor(input)).select().single());
 }
 
 /** As updateHousehold, guarded the same way and for the same reason. */
@@ -248,7 +269,7 @@ export async function updatePerson(
   patch: Partial<PersonInput>,
   expectedUpdatedAt?: string | null,
 ): Promise<PersonRow> {
-  let query = supabase.from("people").update(patch).eq("id", id);
+  let query = supabase.from("people").update(withoutAuthor(patch)).eq("id", id);
   if (expectedUpdatedAt) query = query.eq("updated_at", expectedUpdatedAt);
 
   const rows = unwrap(await query.select()) as PersonRow[];

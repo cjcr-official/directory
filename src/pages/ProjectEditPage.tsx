@@ -2,7 +2,15 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDirectory } from "@/data/DirectoryContext";
 import { useAuth } from "@/auth/AuthProvider";
-import { Checkbox, ConfirmButton, Disclosure, Field, LoadingScreen, Notice } from "@/components/ui";
+import {
+  ChangedNote,
+  Checkbox,
+  ConfirmButton,
+  Disclosure,
+  Field,
+  LoadingScreen,
+  Notice,
+} from "@/components/ui";
 import { TagPicker } from "@/components/TagPicker";
 import {
   createProject,
@@ -47,7 +55,7 @@ export function ProjectEditPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { canEdit } = useAuth();
-  const { entries, tags, reload } = useDirectory();
+  const { entries, tags, authorName, reload } = useDirectory();
   const isNew = !id;
 
   const [name, setName] = useState("Church Directory");
@@ -80,6 +88,18 @@ export function ProjectEditPage() {
    */
   const [openedAt, setOpenedAt] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
+  /**
+   * When this directory was last written and by whom.
+   *
+   * Held apart from openedAt, which is a fingerprint for the save and must go
+   * on naming the version the editing started from. This pair is only ever
+   * read, and follows whatever the last write actually returned.
+   *
+   * A directory is loaded straight from the database on this screen rather
+   * than read out of the shared context, so it carries its own copy where the
+   * family and person forms can use the row the context already holds.
+   */
+  const [changed, setChanged] = useState<{ at: string; by: string | null } | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -96,6 +116,7 @@ export function ProjectEditPage() {
         setPicked(loaded.entries.map((row) => `${row.entry_type}:${row.ref_id}`));
         setSettings(normalizeSettings(loaded.project.settings));
         setOpenedAt(loaded.project.updated_at);
+        setChanged({ at: loaded.project.updated_at, by: loaded.project.updated_by ?? null });
         setStale(false);
       })
       .catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)))
@@ -292,6 +313,7 @@ export function ProjectEditPage() {
       setPicked(loaded.entries.map((row) => `${row.entry_type}:${row.ref_id}`));
       setSettings(normalizeSettings(loaded.project.settings));
       setOpenedAt(loaded.project.updated_at);
+      setChanged({ at: loaded.project.updated_at, by: loaded.project.updated_by ?? null });
       setStale(false);
       setError(null);
     } catch (cause) {
@@ -364,6 +386,7 @@ export function ProjectEditPage() {
       setCoverBlobs({});
       setCoverRemoved({});
       setOpenedAt(project.updated_at);
+      setChanged({ at: project.updated_at, by: project.updated_by ?? null });
       setStale(false);
       setSavedAt(Date.now());
       if (!id) navigate(`/projects/${project.id}`, { replace: true });
@@ -385,6 +408,7 @@ export function ProjectEditPage() {
             {recordsPerSheet(safeSettings)} to a sheet · about {sheets} sheet
             {sheets === 1 ? "" : "s"} of paper
           </div>
+          {changed ? <ChangedNote updatedAt={changed.at} author={authorName(changed.by)} /> : null}
         </div>
         <div className="row tight">
           {!isNew ? (

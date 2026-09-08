@@ -486,5 +486,85 @@ select assert(
   (select role = 'viewer' and is_active from public.profiles where id = :'viewer_id'),
   'and is still a viewer after every attempt');
 
+-- --------------------------------------------------------------------------
+-- Who touched it last (0005)
+--
+-- The whole value of this column is that the line on screen can be believed.
+-- An editor sends whatever they like in a write body, so if the column took
+-- what it was given, "changed by Anne" would be a claim anybody could make
+-- about anybody - and worse than no line at all, because an office would act
+-- on it. The trigger reads auth.uid() instead, which is the request's own
+-- identity and not part of the payload.
+--
+-- So the question here is not "does it get set" but "is what the caller sent
+-- thrown away", and the writes below deliberately send the wrong person.
+-- --------------------------------------------------------------------------
+
+select assert(
+  rows_written(:'editor_id',
+    $q$insert into public.households (display_name, sort_name)
+       values ('The Stamped Family', 'Stamped')$q$) = 1,
+  'an editor writes a family');
+
+select assert(
+  (select updated_by = :'editor_id' from public.households where sort_name = 'Stamped'),
+  'and the row records the editor who wrote it');
+
+-- The forgery. The editor names the owner as the author; the trigger replaces
+-- it with the editor, who is who actually wrote the row.
+select assert(
+  rows_written(:'editor_id',
+    format($q$update public.households set phone = '(216) 555-0111', updated_by = '%s'
+             where sort_name = 'Stamped'$q$, :'owner_id')) = 1,
+  'an editor writes a family naming somebody else as the author');
+
+select assert(
+  (select updated_by = :'editor_id' from public.households where sort_name = 'Stamped'),
+  'and the author sent from the browser is discarded');
+
+select assert(
+  rows_written(:'owner_id',
+    format($q$update public.households set phone = '(216) 555-0222', updated_by = '%s'
+             where sort_name = 'Stamped'$q$, :'editor_id')) = 1,
+  'the owner writes it next, naming the editor');
+
+select assert(
+  (select updated_by = :'owner_id' from public.households where sort_name = 'Stamped'),
+  'and it moves to the owner, who really did write it');
+
+-- People and directories carry the same column and the same trigger, so they
+-- are asked the same question rather than assumed to follow.
+select assert(
+  rows_written(:'editor_id',
+    format($q$update public.people set notes = 'stamped', updated_by = '%s'$q$, :'owner_id')) >= 1,
+  'an editor writes a person naming somebody else');
+
+select assert(
+  (select bool_and(updated_by = :'editor_id') from public.people where notes = 'stamped'),
+  'and the person records the editor');
+
+select assert(
+  rows_written(:'editor_id',
+    format($q$update public.projects set description = 'stamped', updated_by = '%s'$q$,
+           :'owner_id')) >= 1,
+  'an editor writes a directory naming somebody else');
+
+select assert(
+  (select bool_and(updated_by = :'editor_id') from public.projects where description = 'stamped'),
+  'and the directory records the editor');
+
+-- A viewer cannot write at all, so there is nothing to stamp - the point being
+-- that 0005 hands nobody a way past the policies in 0001. The refusal, not the
+-- column, is what is being checked.
+select assert(
+  rows_written(:'viewer_id',
+    format($q$update public.households set updated_by = '%s' where sort_name = 'Stamped'$q$,
+           :'viewer_id')) <= 0,
+  'a viewer cannot write the author column either');
+
+select assert(
+  (select updated_by = :'owner_id' from public.households where sort_name = 'Stamped'),
+  'and the family still names the owner who last wrote it');
+
 \echo ''
 \echo 'All row level security checks passed.'

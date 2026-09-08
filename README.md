@@ -56,10 +56,12 @@ addresses. What follows is the short form.
 ### 1. The database (Supabase)
 
 1. Create a free project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor** and run the two files in `supabase/migrations/`, in
-   order:
+2. Open **SQL Editor** and run the files in `supabase/migrations/`, in order:
    - `0001_initial_schema.sql` — tables, roles and row level security
    - `0002_storage.sql` — the private photo bucket and its policies
+   - `0003_atomic_link_writes.sql` — group changes in one statement
+   - `0004_office_label.sql` — telling two same-named families apart
+   - `0005_updated_by.sql` — who last changed a record
 3. From **Project Settings → API**, copy the **Project URL** and the
    **anon public** key.
 
