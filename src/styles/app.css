@@ -359,6 +359,14 @@ p:last-child {
   font-size: 0.9rem;
   margin-top: 3px;
 }
+/* Who last changed the record, under the line describing what the record is.
+   Set apart from it: the description explains the screen and this is a fact
+   about one row, and at the same 3px the two ran together as one paragraph -
+   which read as though the directory was claiming Anne wrote the sentence
+   above it. */
+.page-head .changed-note {
+  margin-top: 9px;
+}
 
 /* Back belongs beside the thing it goes back from. Held in the top right of a
    page-head it drifts with the page width, and now that a page runs to 1800px

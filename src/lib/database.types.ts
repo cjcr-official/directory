@@ -46,6 +46,16 @@ export type HouseholdRow = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  /**
+   * Who wrote this row last, as an account id. Stamped by a trigger from
+   * auth.uid(), never sent by the browser - see migration 0005.
+   *
+   * Optional for the same reason office_label is: a database that has not run
+   * 0005 returns rows without the key at all. Null is separately meaningful -
+   * the row predates the migration, or a service-role tool wrote it and there
+   * was no signed-in person to name.
+   */
+  updated_by?: string | null;
 };
 
 export type PersonRow = {
@@ -72,6 +82,8 @@ export type PersonRow = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  /** As on households. Stamped by a trigger; absent before 0005. */
+  updated_by?: string | null;
 };
 
 export type TagRow = {
@@ -91,6 +103,8 @@ export type ProjectRow = {
   settings: Record<string, unknown>;
   created_at: string;
   updated_at: string;
+  /** As on households. Stamped by a trigger; absent before 0005. */
+  updated_by?: string | null;
 };
 
 export type ProjectEntryRow = {

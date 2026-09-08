@@ -1,6 +1,11 @@
 import { PHOTO_BUCKET, supabase } from "./supabase";
 import { readBackup, selectRows } from "./restorePlan";
-import { missingColumn, noteOfficeLabelMissing, withoutOfficeLabel } from "./queries";
+import {
+  missingColumn,
+  noteOfficeLabelMissing,
+  withoutAuthor,
+  withoutOfficeLabel,
+} from "./queries";
 import type {
   LiveDirectory,
   RestoreMode,
@@ -43,6 +48,12 @@ export async function readBackupFile(file: File, live: LiveDirectory): Promise<R
 /**
  * Each table gets its own writer.
  *
+ * The three that carry updated_by drop it on the way in. A backup taken after
+ * 0005 holds the column, the project being restored into may not have run 0005
+ * yet, and naming a column the database has not got fails the whole batch. It
+ * would be discarded by the trigger regardless: whoever is pressing Restore is
+ * the person writing these rows now, and that is what the column should say.
+ *
  * A single generic one would need the table name as a variable, and the
  * generated types collapse the moment `from()` is given anything but a literal
  * - which is the whole reason database.types.ts exists. Spelled out, every
@@ -53,7 +64,7 @@ function fail(what: string, message: string): never {
 }
 
 async function insertHouseholds(rows: HouseholdRow[]): Promise<void> {
-  for (const batch of chunked(rows)) {
+  for (const batch of chunked(rows.map(withoutAuthor))) {
     const { error } = await supabase.from("households").insert(batch);
     if (!error) continue;
     // A backup taken after 0004 can be restored into a database that has not
@@ -70,7 +81,7 @@ async function insertHouseholds(rows: HouseholdRow[]): Promise<void> {
 }
 
 async function insertPeople(rows: PersonRow[]): Promise<void> {
-  for (const batch of chunked(rows)) {
+  for (const batch of chunked(rows.map(withoutAuthor))) {
     const { error } = await supabase.from("people").insert(batch);
     if (error) fail("people", error.message);
   }
@@ -100,7 +111,7 @@ async function insertPersonTags(rows: { person_id: string; tag_id: string }[]): 
 }
 
 async function insertProjects(rows: ProjectRow[]): Promise<void> {
-  for (const batch of chunked(rows)) {
+  for (const batch of chunked(rows.map(withoutAuthor))) {
     const { error } = await supabase.from("projects").insert(batch);
     if (error) fail("directories", error.message);
   }

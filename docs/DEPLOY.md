@@ -20,11 +20,12 @@ database exists.
 5. New query again. Paste `supabase/migrations/0002_storage.sql` and run it.
 6. Once more for `supabase/migrations/0003_atomic_link_writes.sql`.
 7. And once more for `supabase/migrations/0004_office_label.sql`.
+8. Last one: `supabase/migrations/0005_updated_by.sql`.
 
-All four files are safe to run twice, so if you are unsure whether one took,
+All five files are safe to run twice, so if you are unsure whether one took,
 run it again.
 
-An existing directory needs steps 6 and 7 too.
+An existing directory needs steps 6, 7 and 8 too.
 
 **6.** Setting a record's groups used to be a delete and an insert sent
 separately, with a moment in between where the record had none — and a
@@ -40,6 +41,17 @@ nothing to choose between them. 0004 adds a short label the office writes for
 itself — `2`, `Tim & Sue`, `Elm St` — shown in those three places and nowhere
 else. It is never printed and never in the index. Until the file is run, the
 field simply does not appear and every other save carries on as normal.
+
+**8.** The directory already remembered _when_ a record changed. 0005 adds who,
+and shows it under the heading of each family, person and directory —
+"Changed on Tuesday by Anne Whitfield". Where three people share the work,
+that is the difference between "the Alvarez address is wrong again" and knowing
+who to ask. The column is filled in by the database from the signed-in account,
+not by the browser, so it cannot be typed by somebody wanting it to say
+something else. Records that changed before this file was run have no author
+and simply show the date on its own; so does anything written by `npm run seed`,
+which signs in as nobody. Until the file is run, no line appears at all and
+every save carries on as normal.
 
 > **What these do.** The first creates the tables and — more importantly — the
 > row level security policies that stop anyone reading the directory without an

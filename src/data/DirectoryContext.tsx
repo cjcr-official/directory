@@ -1,7 +1,7 @@
 import { createContext, use, useCallback, useEffect, useMemo, useState } from "react";
-import { fetchDirectory } from "@/lib/queries";
+import { fetchDirectory, fetchProfiles } from "@/lib/queries";
 import { buildEntries, sortMembers, type DirectoryData, type DirectoryEntry } from "@/lib/entries";
-import type { HouseholdRow, PersonRow, TagRow } from "@/lib/database.types";
+import type { HouseholdRow, PersonRow, ProfileRow, TagRow } from "@/lib/database.types";
 import { sortByKey, sortKey } from "@/lib/format";
 
 interface DirectoryState {
@@ -29,6 +29,15 @@ interface DirectoryState {
   membersOf(householdId: string): PersonRow[];
   tagsOfHousehold(householdId: string): string[];
   tagsOfPerson(personId: string): string[];
+  /**
+   * The name behind an updated_by id, or null when there is nothing to show.
+   *
+   * Null covers three ordinary cases and they all want the same silence: the
+   * row predates migration 0005, a service-role tool wrote it, or the account
+   * that did has since been deleted. A record with no author says when it
+   * changed and leaves it there.
+   */
+  authorName(id: string | null | undefined): string | null;
   reload(): Promise<void>;
 }
 
@@ -51,6 +60,7 @@ const EMPTY: DirectoryData = {
  */
 export function DirectoryProvider({ children }: { children: React.ReactNode }) {
   const [data, setData] = useState<DirectoryData>(EMPTY);
+  const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +69,17 @@ export function DirectoryProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      setData(await fetchDirectory());
+      // The roster comes along because updated_by is an account id and every
+      // form wants a name. It is a handful of rows next to the congregation,
+      // and fetching it here keeps "who changed this" from costing a request
+      // per screen. A directory that loads while the roster fails is still a
+      // working directory, so its failure is swallowed rather than shown.
+      const [directory, roster] = await Promise.all([
+        fetchDirectory(),
+        fetchProfiles().catch(() => [] as ProfileRow[]),
+      ]);
+      setProfiles(roster);
+      setData(directory);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -128,9 +148,19 @@ export function DirectoryProvider({ children }: { children: React.ReactNode }) {
     };
   }, [data]);
 
+  /**
+   * Kept out of `derived` on purpose: that memo re-sorts the congregation and
+   * rebuilds every entry, and a roster that arrives a moment later - or an
+   * administrator being renamed - is no reason to do any of it again.
+   */
+  const authorName = useMemo(() => {
+    const names = new Map(profiles.map((row) => [row.id, row.full_name.trim() || row.email]));
+    return (id: string | null | undefined) => (id ? (names.get(id) ?? null) : null);
+  }, [profiles]);
+
   const value = useMemo<DirectoryState>(
-    () => ({ ...derived, loading, ready, error, reload }),
-    [derived, loading, ready, error, reload],
+    () => ({ ...derived, authorName, loading, ready, error, reload }),
+    [derived, authorName, loading, ready, error, reload],
   );
 
   return <DirectoryContext value={value}>{children}</DirectoryContext>;

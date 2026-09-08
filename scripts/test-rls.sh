@@ -7,7 +7,9 @@
 # The app ships its Supabase anon key inside the browser bundle, so these
 # policies are the whole boundary between a stranger and the congregation's
 # addresses. This applies the real migration files - not a copy - and then tries
-# to break in as an anonymous visitor, a self-signed-up stranger, and an editor.
+# to break in as an anonymous visitor, a self-signed-up stranger, an editor and
+# a viewer, and checks that the author stamped on a row is the account that
+# actually wrote it rather than the one the caller asked for.
 set -euo pipefail
 
 DB_URL="${DATABASE_URL:-postgres://postgres:postgres@127.0.0.1:5432/postgres}"
@@ -24,6 +26,8 @@ echo "Applying migrations…"
 run migrations/0001_initial_schema.sql
 run migrations/0002_storage.sql
 run migrations/0003_atomic_link_writes.sql
+run migrations/0004_office_label.sql
+run migrations/0005_updated_by.sql
 run tests/01_grants.sql
 
 echo "Running row level security tests…"

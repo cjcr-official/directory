@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { getPhotoUrl } from "@/lib/photos";
+import { describeChange } from "@/lib/format";
 
 export function Spinner({ label }: { label?: string }) {
   return (
@@ -254,6 +255,26 @@ export function ConfirmButton({
       </button>
     </span>
   );
+}
+
+/**
+ * "Changed on Tuesday by Anne Whitfield", under the heading of a record.
+ *
+ * Renders nothing at all when there is nothing to say - a record being created,
+ * or a database that has not run migration 0005 - rather than a row of dashes
+ * explaining its own absence. Three people sharing the work is the case this
+ * is for; one person editing their own directory never needs to read it.
+ */
+export function ChangedNote({
+  updatedAt,
+  author,
+}: {
+  updatedAt: string | null | undefined;
+  author: string | null | undefined;
+}) {
+  const text = describeChange(updatedAt, author);
+  if (!text) return null;
+  return <div className="muted small changed-note">{text}</div>;
 }
 
 export function TagPill({ name, color }: { name: string; color: string }) {
