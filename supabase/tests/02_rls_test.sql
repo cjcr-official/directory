@@ -66,7 +66,7 @@ begin
 end $$;
 
 -- --------------------------------------------------------------------------
--- Three accounts, created the way the app creates them: through auth.users,
+-- Four accounts, created the way the app creates them: through auth.users,
 -- letting the sign-up trigger assign the role.
 -- --------------------------------------------------------------------------
 
@@ -79,12 +79,21 @@ values ('stranger@example.test', '{"full_name":"Passing Stranger"}'::jsonb);
 insert into auth.users (email, raw_user_meta_data)
 values ('editor@example.test', '{"full_name":"Church Office"}'::jsonb);
 
+insert into auth.users (email, raw_user_meta_data)
+values ('viewer@example.test', '{"full_name":"Sunday Volunteer"}'::jsonb);
+
 select id as owner_id from public.profiles where email = 'owner@example.test' \gset
 select id as stranger_id from public.profiles where email = 'stranger@example.test' \gset
 select id as editor_id from public.profiles where email = 'editor@example.test' \gset
+select id as viewer_id from public.profiles where email = 'viewer@example.test' \gset
 
 -- The office account is promoted by the owner; the stranger is left alone.
 update public.profiles set role = 'editor', is_active = true where id = :'editor_id';
+
+-- And the volunteer is let in as a viewer, which is exactly what the
+-- Administrators screen writes when an owner picks that role: the role named
+-- and the account switched on, in one patch.
+update public.profiles set role = 'viewer', is_active = true where id = :'viewer_id';
 
 -- Some directory data to try to steal.
 insert into public.households (display_name, sort_name, address_line1, phone)
@@ -263,6 +272,219 @@ select assert(
   (select count(*) from public.household_tags
      where household_id = 'dddddddd-0000-0000-0000-00000000000d') = 1,
   'and the group the editor set is there');
+
+-- --------------------------------------------------------------------------
+-- The viewer
+--
+-- The role the README tells a church to hand out most freely - "browse and
+-- print, no changes" - and until now the only one whose half of that sentence
+-- was never asked. Every read policy is satisfied by is_member(), and a viewer
+-- is a member, so the reading half is deliberate. The writing half rests
+-- entirely on is_editor() appearing in the other policy of every pair, and a
+-- pair that lost its second half would look exactly like a working directory
+-- until the day a volunteer deleted a family.
+--
+-- So this asks both halves: that a viewer really can read the congregation,
+-- and that every door out of that - the tables, the link functions, the photo
+-- bucket, and their own row - is shut.
+-- --------------------------------------------------------------------------
+
+-- A directory to read and to aim the project functions at. The other fixtures
+-- are already here: families, a person, a group, a photograph, and the group
+-- link an editor set above.
+insert into public.projects (id, name)
+  values ('ffffffff-0000-0000-0000-00000000000f', 'Spring Directory')
+  on conflict do nothing;
+
+select id as person_id from public.people where email = 'miriam@example.test' \gset
+
+select assert(
+  (select role = 'viewer' and is_active from public.profiles where id = :'viewer_id'),
+  'the volunteer is an active viewer');
+
+-- Non-empty, or every "sees what an owner sees" below would pass by comparing
+-- nothing with nothing.
+select assert(
+  count_as(:'owner_id', 'select * from public.households') > 0
+    and count_as(:'owner_id', 'select * from public.people') > 0
+    and count_as(:'owner_id', 'select * from public.tags') > 0
+    and count_as(:'owner_id', 'select * from public.projects') > 0,
+  'there is something in the directory for a viewer to read');
+
+-- Compared against the owner rather than against a number: the counts then
+-- cannot drift out of step with the fixtures above, and the property being
+-- asserted is the real one - a viewer is shown the whole congregation.
+select assert(
+  count_as(:'viewer_id', 'select * from public.households')
+    = count_as(:'owner_id', 'select * from public.households'),
+  'a viewer reads every family an owner reads');
+
+select assert(
+  count_as(:'viewer_id', 'select * from public.people')
+    = count_as(:'owner_id', 'select * from public.people'),
+  'a viewer reads every person an owner reads');
+
+select assert(
+  count_as(:'viewer_id', 'select * from public.tags')
+    = count_as(:'owner_id', 'select * from public.tags'),
+  'a viewer reads every group an owner reads');
+
+select assert(
+  count_as(:'viewer_id', 'select * from public.projects')
+    = count_as(:'owner_id', 'select * from public.projects'),
+  'a viewer reads every directory an owner reads');
+
+select assert(
+  count_as(:'viewer_id', $q$select * from storage.objects$q$)
+    = count_as(:'owner_id', $q$select * from storage.objects$q$),
+  'a viewer can see the photographs, which is what printing needs');
+
+-- --------------------------------------------------------------------------
+-- ...and cannot change a single row of it
+-- --------------------------------------------------------------------------
+
+select assert(
+  rows_written(:'viewer_id',
+    $q$insert into public.households (display_name, sort_name) values ('Sneaked', 'Sneaked')$q$) <= 0,
+  'a viewer cannot add a family');
+
+select assert(
+  rows_written(:'viewer_id',
+    $q$update public.households set phone = '(000) 000-0000'$q$) <= 0,
+  'a viewer cannot edit a family');
+
+select assert(
+  rows_written(:'viewer_id', $q$delete from public.households$q$) <= 0,
+  'a viewer cannot delete families');
+
+select assert(
+  rows_written(:'viewer_id',
+    $q$insert into public.people (first_name, last_name) values ('Sneaked', 'Person')$q$) <= 0,
+  'a viewer cannot add a person');
+
+select assert(
+  rows_written(:'viewer_id',
+    $q$update public.people set email = 'redirected@example.test'$q$) <= 0,
+  'a viewer cannot edit a person');
+
+select assert(
+  rows_written(:'viewer_id', $q$delete from public.people$q$) <= 0,
+  'a viewer cannot delete people');
+
+select assert(
+  rows_written(:'viewer_id',
+    $q$insert into public.tags (name, color) values ('Sneaked group', '#000000')$q$) <= 0,
+  'a viewer cannot add a group');
+
+select assert(
+  rows_written(:'viewer_id', $q$delete from public.tags$q$) <= 0,
+  'a viewer cannot delete groups');
+
+select assert(
+  rows_written(:'viewer_id',
+    $q$insert into public.projects (name) values ('Sneaked directory')$q$) <= 0,
+  'a viewer cannot add a directory');
+
+select assert(
+  rows_written(:'viewer_id',
+    $q$update public.projects set settings = '{"showAddress":false}'::jsonb$q$) <= 0,
+  'a viewer cannot change how a directory prints');
+
+-- --------------------------------------------------------------------------
+-- The link functions, which are the second door into those same tables
+--
+-- The stranger above already asks these, and catches a `security definer`
+-- slipped into 0003. What it cannot catch is the link tables' own policy
+-- drifting from is_editor() to is_member(): a stranger is not a member, so
+-- they stay out either way and the assertion goes on passing. A viewer is a
+-- member, which is what makes them the actor this door has to be tried by.
+--
+-- Each is asked with a non-empty array, so the refusal comes from the insert
+-- half rather than from a delete that quietly matched nothing.
+-- --------------------------------------------------------------------------
+
+select assert(
+  rows_written(:'viewer_id',
+    $q$select public.set_household_tags(
+         'dddddddd-0000-0000-0000-00000000000d',
+         array['eeeeeeee-0000-0000-0000-00000000000e']::uuid[])$q$) <= 0,
+  'a viewer is refused by set_household_tags');
+
+select assert(
+  rows_written(:'viewer_id',
+    format($q$select public.set_person_tags(
+         '%s', array['eeeeeeee-0000-0000-0000-00000000000e']::uuid[])$q$, :'person_id')) <= 0,
+  'a viewer is refused by set_person_tags');
+
+select assert(
+  rows_written(:'viewer_id',
+    $q$select public.set_project_tags(
+         'ffffffff-0000-0000-0000-00000000000f',
+         array['eeeeeeee-0000-0000-0000-00000000000e']::uuid[])$q$) <= 0,
+  'a viewer is refused by set_project_tags');
+
+select assert(
+  rows_written(:'viewer_id',
+    $q$select public.set_project_entries(
+         'ffffffff-0000-0000-0000-00000000000f',
+         '[{"entry_type":"household","ref_id":"dddddddd-0000-0000-0000-00000000000d"}]'::jsonb)$q$) <= 0,
+  'a viewer is refused by set_project_entries');
+
+-- Each call above ends in a refused insert, and a refused insert takes the
+-- delete that preceded it down with it - so the link surviving those proves
+-- nothing about the delete half on its own.
+--
+-- This is the probe that does: an empty array is what the app sends when the
+-- last group is unticked, and it runs the delete and then stops. Nothing
+-- raises, so nothing is rolled back, and the link is still here only if the
+-- policy filtered the delete away.
+select rows_written(:'viewer_id',
+  $q$select public.set_household_tags(
+       'dddddddd-0000-0000-0000-00000000000d', array[]::uuid[])$q$);
+
+select assert(
+  (select count(*) from public.household_tags
+     where household_id = 'dddddddd-0000-0000-0000-00000000000d') = 1,
+  'a viewer cannot clear a family''s groups either');
+
+-- --------------------------------------------------------------------------
+-- Photographs, and their own row
+-- --------------------------------------------------------------------------
+
+select assert(
+  rows_written(:'viewer_id',
+    $q$insert into storage.objects (bucket_id, name) values ('directory-photos', 'viewer.jpg')$q$) <= 0,
+  'a viewer cannot upload a photograph');
+
+select assert(
+  rows_written(:'viewer_id', $q$delete from storage.objects$q$) <= 0,
+  'a viewer cannot remove a photograph');
+
+select assert(
+  rows_written(:'viewer_id',
+    format($q$update public.profiles set role = 'editor' where id = '%s'$q$, :'viewer_id')) <= 0,
+  'a viewer cannot promote themselves to editor');
+
+select assert(
+  rows_written(:'viewer_id',
+    format($q$update public.profiles set role = 'owner' where id = '%s'$q$, :'viewer_id')) <= 0,
+  'a viewer cannot promote themselves to owner');
+
+select assert(
+  rows_written(:'viewer_id',
+    format($q$update public.profiles set is_active = true where id = '%s'$q$, :'stranger_id')) <= 0,
+  'a viewer cannot grant access to somebody else');
+
+-- The one write a viewer may make, so the refusals above are about the policy
+-- rather than about the account being broken.
+select assert(
+  rows_written(:'viewer_id',
+    format($q$update public.profiles set full_name = 'Renamed' where id = '%s'$q$, :'viewer_id')) = 1,
+  'a viewer can still fix their own name');
+
+select assert(
+  (select role = 'viewer' and is_active from public.profiles where id = :'viewer_id'),
+  'and is still a viewer after every attempt');
 
 \echo ''
 \echo 'All row level security checks passed.'
