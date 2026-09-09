@@ -566,5 +566,196 @@ select assert(
   (select updated_by = :'owner_id' from public.households where sort_name = 'Stamped'),
   'and the family still names the owner who last wrote it');
 
+-- --------------------------------------------------------------------------
+-- Two-step sign-in (0006)
+--
+-- The second step is a screen in the app, and a screen is worth nothing on its
+-- own: the anon key ships inside the browser bundle, so anybody holding a
+-- stolen password can talk to the API directly and never see one. What makes
+-- it real is that the database refuses the same session - which is what these
+-- ask, table by table, in both directions.
+--
+-- "Both directions" matters as much as the refusal. A policy that locked
+-- everybody out would pass every refusal below and be a broken directory, so
+-- each account is asked again with the code typed, and an account with no
+-- authenticator at all is asked whether anything changed for it. Nothing
+-- should have.
+-- --------------------------------------------------------------------------
+
+-- The same two helpers as at the top of this file, with the assurance level of
+-- the session spelled out rather than left at its default. aal1 is a password
+-- and nothing else; aal2 is a session that has also answered an authenticator.
+-- Every test above runs at aal1, which is what an account without a second
+-- factor always is, and why none of them changed.
+create or replace function count_as_at(actor uuid, aal text, query text)
+returns integer language plpgsql as $$
+declare
+  total integer;
+begin
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', actor, 'aal', aal)::text, true);
+  execute format('select count(*) from (%s) t', query) into total;
+  reset role;
+  return total;
+end $$;
+
+create or replace function rows_written_at(actor uuid, aal text, statement text)
+returns integer language plpgsql as $$
+declare
+  written integer;
+begin
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', actor, 'aal', aal)::text, true);
+  begin
+    execute statement;
+    get diagnostics written = row_count;
+  exception when insufficient_privilege or check_violation then
+    reset role;
+    return -1;
+  end;
+  reset role;
+  return written;
+end $$;
+
+-- The office sets up an authenticator app on the editor's account.
+insert into auth.mfa_factors (user_id, friendly_name, status)
+values (:'editor_id', 'Office phone', 'verified');
+
+select assert(count_as(:'editor_id', 'select * from public.households') = 0,
+  'a password alone reads no families once the account has an authenticator');
+
+select assert(count_as(:'editor_id', 'select * from public.people') = 0,
+  'and no people');
+
+select assert(count_as(:'editor_id', $q$select * from storage.objects$q$) = 0,
+  'and no photographs');
+
+select assert(
+  rows_written(:'editor_id',
+    $q$insert into public.households (display_name, sort_name) values ('Half In', 'Half In')$q$) <= 0,
+  'and cannot write a thing');
+
+-- The one read deliberately left open. The code screen says who is signing in,
+-- which it can only do by reading that account's own row - so profiles_select
+-- keeps its "or id = auth.uid()" branch, and this is the assertion that says
+-- so on purpose rather than by accident.
+select assert(
+  count_as(:'editor_id',
+    format($q$select * from public.profiles where id = '%s'$q$, :'editor_id')) = 1,
+  'but can still read its own row, which is what the code screen shows');
+
+select assert(
+  count_as_at(:'editor_id', 'aal2', 'select * from public.households')
+    = count_as(:'owner_id', 'select * from public.households'),
+  'and reads the whole congregation once the code has been typed');
+
+select assert(
+  rows_written_at(:'editor_id', 'aal2',
+    $q$insert into public.households (display_name, sort_name) values ('The Verified Family', 'Verified')$q$) = 1,
+  'and can write again');
+
+-- Nobody else is touched by any of it.
+select assert(count_as(:'viewer_id', 'select * from public.households') > 0,
+  'an account with no authenticator is not asked for one');
+
+-- An enrolment that was started and abandoned leaves an unverified factor
+-- behind. Counting it would lock somebody out of their own directory over a QR
+-- code they closed the tab on.
+insert into auth.mfa_factors (user_id, friendly_name, status)
+values (:'viewer_id', 'Never finished', 'unverified');
+
+select assert(count_as(:'viewer_id', 'select * from public.households') > 0,
+  'and an enrolment that was never finished protects nothing and blocks nobody');
+
+delete from auth.mfa_factors;
+
+-- --------------------------------------------------------------------------
+-- Deleting an account (0007)
+--
+-- The one action with no undo. It is owner-only and it is never your own
+-- account, and both of those live inside a security definer function - which
+-- runs as its creator and past every policy in this file, so the checks at the
+-- top of that function are the entire boundary. Hence a case for each actor
+-- rather than one for the owner.
+--
+-- What it must not take with it is anything the account wrote. A church office
+-- deleting a volunteer's sign-in is doing housekeeping, not withdrawing the
+-- records that volunteer typed - and the photographs they uploaded belong to
+-- the congregation, not to whoever happened to be at the keyboard.
+-- --------------------------------------------------------------------------
+
+insert into auth.users (email, raw_user_meta_data)
+values ('spare@example.test', '{"full_name":"Duplicate Signup"}'::jsonb);
+
+select id as spare_id from public.profiles where email = 'spare@example.test' \gset
+
+-- A photograph they uploaded, which has to outlive them.
+insert into storage.objects (bucket_id, name, owner)
+values ('directory-photos', 'people/spare.jpg', :'spare_id');
+
+select assert(
+  rows_written(:'stranger_id',
+    format($q$select public.delete_account('%s')$q$, :'spare_id')) <= 0,
+  'a stranger cannot delete an account');
+
+select assert(
+  rows_written(:'viewer_id',
+    format($q$select public.delete_account('%s')$q$, :'spare_id')) <= 0,
+  'a viewer cannot delete an account');
+
+select assert(
+  rows_written(:'editor_id',
+    format($q$select public.delete_account('%s')$q$, :'spare_id')) <= 0,
+  'an editor cannot delete an account');
+
+select assert(
+  (select exists (select 1 from auth.users where id = :'spare_id')),
+  'and the account is still there after all three tried');
+
+select assert(
+  rows_written(:'owner_id',
+    format($q$select public.delete_account('%s')$q$, :'owner_id')) <= 0,
+  'an owner cannot delete their own account');
+
+select assert(
+  (select exists (select 1 from public.profiles where id = :'owner_id' and role = 'owner' and is_active)),
+  'and is still there, which is what keeps somebody able to manage the directory');
+
+-- The second step reaches this door too. is_owner() is what the function asks,
+-- so an owner who has only typed a password is not an owner as far as this is
+-- concerned.
+insert into auth.mfa_factors (user_id, friendly_name, status)
+values (:'owner_id', 'Owner phone', 'verified');
+
+select assert(
+  rows_written(:'owner_id',
+    format($q$select public.delete_account('%s')$q$, :'spare_id')) <= 0,
+  'an owner who has not typed their code cannot delete an account either');
+
+select assert(
+  rows_written_at(:'owner_id', 'aal2',
+    format($q$select public.delete_account('%s')$q$, :'spare_id')) >= 1,
+  'and can once they have');
+
+delete from auth.mfa_factors;
+
+select assert(
+  not exists (select 1 from auth.users where id = :'spare_id'),
+  'the account itself is gone, not just its row on the roster');
+
+select assert(
+  not exists (select 1 from public.profiles where id = :'spare_id'),
+  'and the roster row went with it');
+
+select assert(
+  (select exists (select 1 from storage.objects where name = 'people/spare.jpg')),
+  'the photograph they uploaded is still in the bucket');
+
+select assert(
+  (select owner is null from storage.objects where name = 'people/spare.jpg'),
+  'with nobody named as its owner');
+
 \echo ''
 \echo 'All row level security checks passed.'

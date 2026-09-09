@@ -111,27 +111,79 @@ const scrim = all.find(
 const scrimGround = scrim?.body.match(/background:\s*rgb\(\s*(\d+)\s+(\d+)\s+(\d+)\s*\/\s*(\d+)%/);
 check("the scrim paints a translucent ink", Boolean(scrimGround), scrimGround?.[0] ?? "not found");
 
-const canvas = clean.match(/--canvas:\s*(#[0-9a-f]{6})/i)?.[1];
-check("the canvas it is drawn over is named", Boolean(canvas), canvas ?? "not found");
-
-const stripSelectors =
-  "html:has(.scrim), html.drawer-open, html:has(.scrim) body, html.drawer-open body";
-const stripRule = clean.match(
-  new RegExp(
-    stripSelectors
-      .split(", ")
-      .map((one) => one.replace(/[.()]/g, "\\$&"))
-      .join(",\\s*") + "\\s*\\{([^}]*)\\}",
-  ),
-);
-const strip = stripRule?.[1].match(/background:\s*(rgb\([^)]*\)|#[0-9a-f]{6})/i)?.[1];
+/*
+ * Twice over, because there are two canvases now. The scrim is one colour and
+ * what shows through it is not: composited over the light canvas it comes to a
+ * pale grey, and over the dark one to something near black. A dark app whose
+ * drawer left the pale strip in place would be the original bug again, and
+ * more obvious than it ever was in the light theme - a white bar across the
+ * bottom of a phone at night.
+ *
+ * The canvases are read in source order: the light palette declares --canvas
+ * first, the dark block second.
+ */
+const canvases = [...clean.matchAll(/--canvas:\s*(#[0-9a-f]{6})/gi)].map((m) => m[1]);
+check("the canvas it is drawn over is named", canvases.length > 0, canvases.join(", "));
 check(
-  "the strip is keyed to the drawer on both elements, both ways",
-  Boolean(stripRule),
-  stripRule
-    ? ""
-    : `needs ${stripSelectors} - the strip is filled by one of html and body, and which one is not observable from here`,
+  "and so is the canvas after dark",
+  canvases.length >= 2,
+  canvases.length >= 2 ? "" : "only one --canvas in the sheet - is the dark palette still there?",
 );
+
+const DARK = ':root[data-theme="dark"]';
+const STRIPS = [
+  {
+    theme: "light",
+    selectors: "html:has(.scrim), html.drawer-open, html:has(.scrim) body, html.drawer-open body",
+    canvas: canvases[0],
+  },
+  {
+    theme: "dark",
+    selectors: [
+      `${DARK}:has(.scrim)`,
+      `${DARK}.drawer-open`,
+      `${DARK}:has(.scrim) body`,
+      `${DARK}.drawer-open body`,
+    ].join(", "),
+    canvas: canvases[1],
+  },
+];
+
+const quote = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+for (const { theme, selectors, canvas } of STRIPS) {
+  const stripRule = clean.match(
+    new RegExp(selectors.split(", ").map(quote).join(",\\s*") + "\\s*\\{([^}]*)\\}"),
+  );
+  const strip = stripRule?.[1].match(/background:\s*(rgb\([^)]*\)|#[0-9a-f]{6})/i)?.[1];
+  check(
+    `${theme}: the strip is keyed to the drawer on both elements, both ways`,
+    Boolean(stripRule),
+    stripRule
+      ? ""
+      : `needs ${selectors} - the strip is filled by one of html and body, and which one is not observable from here`,
+  );
+
+  check(
+    `${theme}: the strip is painted a plain colour`,
+    Boolean(strip) && !/color-mix|var\(/.test(strip ?? ""),
+    strip ?? "no background for it - iOS will end the drawer on a band of the page behind",
+  );
+
+  if (scrimGround && canvas && strip) {
+    const [, ...ink] = scrimGround;
+    const alpha = Number(ink.pop()) / 100;
+    const over = channels(canvas);
+    const want = ink.map((n, i) => Number(n) * alpha + over[i] * (1 - alpha));
+    const got = channels(strip);
+    const drift = Math.max(...want.map((n, i) => Math.abs(n - got[i])));
+    check(
+      `${theme}: and it is the scrim composited over that canvas`,
+      drift <= 1,
+      `wanted ${want.map((n) => n.toFixed(1)).join(", ")}, painted ${got.join(", ")}`,
+    );
+  }
+}
 
 /*
  * And the half that cannot fail to match only works while something actually
@@ -144,26 +196,6 @@ check(
   toggles,
   toggles ? "" : "needs AppShell to toggle drawer-open on documentElement",
 );
-
-check(
-  "the strip is painted a plain colour",
-  Boolean(strip) && !/color-mix|var\(/.test(strip ?? ""),
-  strip ?? "no html:has(.scrim) background - iOS will end the drawer on a band of the page behind",
-);
-
-if (scrimGround && canvas && strip) {
-  const [, ...ink] = scrimGround;
-  const alpha = Number(ink.pop()) / 100;
-  const over = channels(canvas);
-  const want = ink.map((n, i) => Number(n) * alpha + over[i] * (1 - alpha));
-  const got = channels(strip);
-  const drift = Math.max(...want.map((n, i) => Math.abs(n - got[i])));
-  check(
-    "and it is the scrim composited over that canvas",
-    drift <= 1,
-    `wanted ${want.map((n) => n.toFixed(1)).join(", ")}, painted ${got.join(", ")}`,
-  );
-}
 
 /*
  * And the other way a thing fails to reach the bottom of the phone, which is

@@ -62,10 +62,12 @@ addresses. What follows is the short form.
    - `0003_atomic_link_writes.sql` — group changes in one statement
    - `0004_office_label.sql` — telling two same-named families apart
    - `0005_updated_by.sql` — who last changed a record
+   - `0006_two_step_signin.sql` — an authenticator app, enforced by the database
+   - `0007_account_deletion.sql` — letting an owner remove an account outright
 3. From **Project Settings → API**, copy the **Project URL** and the
    **anon public** key.
 
-Both files are safe to run twice, so re-running after a change is fine.
+Every one of them is safe to run twice, so re-running after a change is fine.
 
 ### 2. The app (locally)
 
@@ -158,12 +160,42 @@ allows scripts only from the app itself and network calls only to Supabase, and
 
 Three roles:
 
-| Role          | Can do                                                   |
-| ------------- | -------------------------------------------------------- |
-| **Owner**     | Everything, including adding and removing administrators |
-| **Editor**    | Add and edit people, families, groups and directories    |
-| **Viewer**    | Browse and print; no changes                             |
-| _(no access)_ | A new sign-up, until an owner turns it on                |
+| Role          | Can do                                                             |
+| ------------- | ------------------------------------------------------------------ |
+| **Owner**     | Everything, including adding, removing and deleting administrators |
+| **Editor**    | Add and edit people, families, groups and directories              |
+| **Viewer**    | Browse and print; no changes                                       |
+| _(no access)_ | A new sign-up, until an owner turns it on                          |
+
+**No access** is the everyday answer for somebody who has stopped helping: it is
+reversible, the name stays on the roster, and the role comes back when they do.
+**Deleting** an account is for the one that should not exist at all — a stranger
+who signed themselves up, a misspelt address, somebody locked out of their own
+authenticator app — and only an owner can do it, never to their own account, so
+a directory can never be left with nobody able to hand out a role. It removes
+the sign-in and nothing else: every family, person and directory that account
+entered stays exactly where it is, and so does every photograph it uploaded.
+
+### Signing in with a code as well as a password
+
+Any administrator can add an authenticator app to their own account under
+**Settings** — Google Authenticator, Microsoft Authenticator, 1Password, Authy,
+whichever they already have — and is then asked for a six-digit code each time
+they sign in. It is per account and not per church: one editor can protect their
+own sign-in without every Sunday volunteer needing a smartphone.
+
+What makes it worth having is that it is not a screen. The anon key ships in the
+browser bundle, so a stolen password can be used against the API directly and
+never meet one; `0006_two_step_signin.sql` puts the check inside `is_member()`,
+`is_editor()` and `is_owner()` instead, which is where every policy in the
+database already asks its question. A session that has only been through a
+password reads nothing at all — not a name, not a photograph — on an account
+that has an authenticator. An account without one is completely unaffected.
+
+Nobody can lift it for somebody who has lost the phone: taking a factor off
+another account needs the service role key, and no browser here ever holds one.
+The way back is for an owner to delete the account and for the person to sign up
+again.
 
 ---
 
@@ -208,6 +240,8 @@ src/
     photos.ts          resize in the browser, upload, signed URLs
     queries.ts         every database read and write
     demo.ts            the invented congregation used by /sample
+    mfa.ts             enrolling and answering an authenticator app
+    theme.ts           light, dark, or whatever the device asked for
     version.ts         what build this is, and what build is being served
     zoom.ts            holds the app at 1x - no pinch, no double-tap zoom
   components/          shared UI, and the preview renderer
@@ -293,6 +327,30 @@ version behind beats a reload loop.
 
 The running build is printed at the bottom of the sidebar, so "which version
 are you on?" has an answer.
+
+### Light and dark
+
+**Settings** offers three answers, not two: light, dark, or whatever the device
+is set to — which is the one most people want, because a phone that turns itself
+dark in the evening should take the app with it. The choice is kept on the
+device rather than on the account, since the sign-in screen is drawn before
+anybody knows who is looking, and the phone in a pocket and the office desktop
+are entitled to different answers.
+
+There is one dark palette in `src/styles/app.css`, keyed to a `data-theme`
+attribute, and `src/lib/theme.ts` resolves the three-way preference into one of
+two answers before React renders anything. A stylesheet can read
+`prefers-color-scheme` perfectly well, but only by carrying the whole palette
+twice — once for the people who chose dark and once for the people who chose
+nothing — and two copies of thirty colours are two copies that drift.
+`npm run contrast:check` measures every pair against both palettes, so a green
+lifted far enough to look right on a near-black card cannot quietly be too pale
+to read on it.
+
+The printed page is the exception, and deliberately: the preview, the cover and
+the QR code that sets up an authenticator keep their white ground in both
+themes. A proof is a picture of a sheet of paper, and paper does not have a dark
+mode.
 
 The important idea is in `src/lib/layout/`. `compose.ts` turns records into a
 page model — every box and every line of text placed to the point — and then

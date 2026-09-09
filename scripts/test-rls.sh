@@ -8,8 +8,10 @@
 # policies are the whole boundary between a stranger and the congregation's
 # addresses. This applies the real migration files - not a copy - and then tries
 # to break in as an anonymous visitor, a self-signed-up stranger, an editor and
-# a viewer, and checks that the author stamped on a row is the account that
-# actually wrote it rather than the one the caller asked for.
+# a viewer, checks that the author stamped on a row is the account that
+# actually wrote it rather than the one the caller asked for, and then tries the
+# two doors 0006 and 0007 added: a password on an account that also has an
+# authenticator app, and deleting somebody else's account.
 set -euo pipefail
 
 DB_URL="${DATABASE_URL:-postgres://postgres:postgres@127.0.0.1:5432/postgres}"
@@ -28,6 +30,8 @@ run migrations/0002_storage.sql
 run migrations/0003_atomic_link_writes.sql
 run migrations/0004_office_label.sql
 run migrations/0005_updated_by.sql
+run migrations/0006_two_step_signin.sql
+run migrations/0007_account_deletion.sql
 run tests/01_grants.sql
 
 echo "Running row level security tests…"

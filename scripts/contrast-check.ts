@@ -14,6 +14,12 @@
  * milliseconds and CI needs nothing installed. Add a pair when you introduce
  * one.
  *
+ * Every pair is asked twice, once of each theme. Dark is where this matters
+ * most and where it is least likely to be noticed: the palette was written in
+ * one sitting by somebody looking at a bright screen, and a green lifted far
+ * enough to be pretty on a near-black card is very easily not lifted far
+ * enough to be read on it.
+ *
  * Run with: npm run contrast:check
  */
 
@@ -25,18 +31,30 @@ const AA_LARGE = 3;
 
 const css = readFileSync("src/styles/app.css", "utf8");
 
-/** The custom properties declared on bare :root. */
-function tokens(): Map<string, string> {
-  const root = css.slice(css.indexOf(":root {"), css.indexOf("}", css.indexOf(":root {")));
+/** The colour custom properties declared by one rule, given its selector. */
+function tokens(selector: string): Map<string, string> {
+  const at = css.indexOf(`${selector} {`);
+  if (at === -1) throw new Error(`${selector} is not in the stylesheet any more`);
+  const block = css.slice(at, css.indexOf("}", at));
   const found = new Map<string, string>();
-  for (const line of root.split("\n")) {
+  for (const line of block.split("\n")) {
     const match = /^\s*(--[\w-]+):\s*(#[0-9a-fA-F]{3,8})\s*;/.exec(line);
     if (match) found.set(match[1], match[2]);
   }
   return found;
 }
 
-const palette = tokens();
+const light = tokens(":root");
+
+/**
+ * Dark is the light palette with the dark block laid over it, which is what a
+ * browser does with the same two rules. Writing it that way here is not a
+ * convenience: a token the dark block does not name is then checked at the
+ * value the app really uses after dark - the light one - rather than being
+ * skipped for being absent, which is how a colour left out of the dark block
+ * by accident gets caught.
+ */
+const dark = new Map([...light, ...tokens(':root[data-theme="dark"]')]);
 
 function channel(value: number): number {
   return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
@@ -54,9 +72,9 @@ function contrast(a: string, b: string): number {
   return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
 }
 
-function colour(name: string): string {
+function colour(palette: Map<string, string>, name: string): string {
   const value = palette.get(name);
-  if (!value) throw new Error(`${name} is not declared on :root any more`);
+  if (!value) throw new Error(`${name} is not declared by either palette any more`);
   return value;
 }
 
@@ -70,18 +88,24 @@ interface Pair {
 
 /** Combinations the app actually puts on screen. */
 const PAIRS: Pair[] = [
-  { what: "body text on a card", fg: "--ink", bg: "--paper" },
+  // A card is --raised and a field is --paper. They are one colour in the
+  // light theme, which is why one of them stood in for both here for as long
+  // as there was only a light theme; dark sets a card, a field and the page to
+  // three different grounds, so both have to be asked.
+  { what: "body text on a card", fg: "--ink", bg: "--raised" },
+  { what: "body text in a field", fg: "--ink", bg: "--paper" },
   { what: "body text on the canvas", fg: "--ink", bg: "--canvas" },
-  { what: "secondary text on a card", fg: "--ink-2", bg: "--paper" },
+  { what: "secondary text on a card", fg: "--ink-2", bg: "--raised" },
   { what: "secondary text on the canvas", fg: "--ink-2", bg: "--canvas" },
   // The one that was failing: hints, muted figures, table detail columns.
-  { what: "hints and muted text on a card", fg: "--ink-3", bg: "--paper" },
+  { what: "hints and muted text on a card", fg: "--ink-3", bg: "--raised" },
+  { what: "a placeholder in a field", fg: "--ink-3", bg: "--paper" },
   { what: "hints and muted text on the canvas", fg: "--ink-3", bg: "--canvas" },
   { what: "avatar initials on the soft accent", fg: "--ink-2", bg: "--accent-soft" },
-  { what: "links and accents on a card", fg: "--accent", bg: "--paper" },
+  { what: "links and accents on a card", fg: "--accent", bg: "--raised" },
   { what: "links and accents on the canvas", fg: "--accent", bg: "--canvas" },
   { what: "a primary button's label", fg: "--accent-ink", bg: "--accent" },
-  { what: "error text on a card", fg: "--danger", bg: "--paper" },
+  { what: "error text on a card", fg: "--danger", bg: "--raised" },
   // These three named the wrong foreground for years. A notice does not print
   // its text in --danger or --ink; it prints it in the deeper shade the rule
   // actually sets, which used to be a hex written into the stylesheet where no
@@ -96,19 +120,27 @@ const PAIRS: Pair[] = [
 
 let failures = 0;
 
-console.log(`\nreading ${palette.size} colour tokens from src/styles/app.css\n`);
+console.log(
+  `\nreading ${light.size} colour tokens and ${dark.size} after dark ` + `from src/styles/app.css`,
+);
 
-for (const pair of PAIRS) {
-  const need = pair.large ? AA_LARGE : AA_TEXT;
-  const fg = colour(pair.fg);
-  const bg = colour(pair.bg);
-  const got = contrast(fg, bg);
-  const passes = got >= need;
-  if (!passes) failures += 1;
-  console.log(
-    `  ${passes ? "ok  " : "FAIL"} ${got.toFixed(2).padStart(5)}:1  (needs ${need})  ` +
-      `${pair.what}  ${fg} on ${bg}`,
-  );
+for (const [theme, palette] of [
+  ["light", light],
+  ["dark", dark],
+] as const) {
+  console.log(`\n  ${theme}\n`);
+  for (const pair of PAIRS) {
+    const need = pair.large ? AA_LARGE : AA_TEXT;
+    const fg = colour(palette, pair.fg);
+    const bg = colour(palette, pair.bg);
+    const got = contrast(fg, bg);
+    const passes = got >= need;
+    if (!passes) failures += 1;
+    console.log(
+      `  ${passes ? "ok  " : "FAIL"} ${got.toFixed(2).padStart(5)}:1  (needs ${need})  ` +
+        `${pair.what}  ${fg} on ${bg}`,
+    );
+  }
 }
 
 console.log(

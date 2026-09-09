@@ -59,6 +59,86 @@
 
   --brand-dark: #10211e;
   --brand-dark-2: #17332c;
+
+  /* The printed page, on screen. Not --paper: a proof is a picture of a sheet
+     of paper lying on a table, and paper does not turn dark because the app
+     did. It is the one surface in the sheet that is the same colour in both
+     themes, so it is the one that needs a token of its own. */
+  --sheet: #ffffff;
+
+  /* What the browser should draw the things the sheet cannot reach with - the
+     scrollbars, the date picker, the wash over an autofilled field. lib/theme
+     sets this on the element too, from the theme it resolves; this is the
+     value for a document that never gets that far. */
+  color-scheme: light;
+}
+
+/* ---------------------------------------------------------------------------
+   Dark
+   ---------------------------------------------------------------------------
+
+   The same app after dark, not a different one: every hue above kept, the
+   ladder from ink to hairline turned over, and the greens lifted until they
+   carry on a near-black ground the way the originals carry on white.
+
+   One block, keyed to an attribute, and no prefers-color-scheme anywhere in
+   the sheet. The device's own preference is a perfectly good thing for CSS to
+   read, but reading it here means carrying this list twice - once for the
+   people who chose dark and once for the people who chose nothing - and two
+   copies of thirty colours are two copies that drift. lib/theme.ts resolves
+   the three-way preference into one of two answers before React renders and
+   writes it onto <html>, so there is one list and it is this one.
+
+   Every pair in scripts/contrast-check.ts is measured against this palette as
+   well as against the light one, which is what stops a colour being nudged
+   here into something that cannot be read.
+   --------------------------------------------------------------------------- */
+:root[data-theme="dark"] {
+  --ink: #e6eeec;
+  --ink-2: #c2d0cd;
+  --ink-3: #94a7a4;
+  --line: #293734;
+  --line-strong: #3c4c49;
+  /* Three grounds, not two. A card lifts off the page, a field is set into the
+     card, and on white those two are told apart by a border alone - which is
+     all the difference light needs. Dark has the room to say it with the
+     surfaces themselves, so it does. */
+  --paper: #16211f;
+  --canvas: #0e1817;
+  --raised: #1b2725;
+
+  /* The accent is the one colour that cannot simply be reused: #2f6d63 is a
+     deep green that reads on white and disappears into a near-black ground.
+     Lifted to where it clears 4.5:1 on the card, the canvas and its own soft
+     tint, and the label on a primary button goes dark to match. */
+  --accent: #6cc0b1;
+  --accent-ink: #06201c;
+  --accent-soft: #1a3733;
+  --accent-line: #2e544c;
+
+  --danger: #f0938a;
+  --danger-soft: #361c19;
+  --warn-soft: #332a14;
+
+  --danger-deep: #f3b2aa;
+  --danger-line: #58302c;
+  --warn-deep: #e8c88a;
+  --warn-line: #55461f;
+  --accent-deep: #a5ddd2;
+
+  /* A shadow is an absence of light, and there is none to take away from a
+     near-black card: the light theme's soft grey-green lift is invisible here.
+     Black, and deeper, so a card still sits above the page. */
+  --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 8px 22px -14px rgb(0 0 0 / 70%);
+
+  color-scheme: dark;
+}
+
+/* The band the logo sits on is near-black by design, which on a near-black
+   sidebar leaves it floating. A hairline is all it needs to read as a band
+   again. */
+:root[data-theme="dark"] .brand {
+  border-bottom: 1px solid var(--line);
 }
 
 * {
@@ -1835,7 +1915,7 @@ th.num {
 .sheet-frame {
   position: relative;
   overflow: hidden;
-  background: #fff;
+  background: var(--sheet);
   border-radius: 3px;
   box-shadow:
     0 1px 2px rgb(0 0 0 / 34%),
@@ -1893,7 +1973,7 @@ th.num {
 .cover-canvas-paper {
   position: relative;
   overflow: hidden;
-  background: var(--paper);
+  background: var(--sheet);
   border: 1px solid var(--line-strong);
   border-radius: 3px;
   box-shadow: 0 1px 3px rgb(20 32 31 / 10%);
@@ -2225,6 +2305,17 @@ th.num {
     background: rgb(136 143 141);
   }
 
+  /* The same sum with the dark canvas underneath: rgb(10 20 18 / 46%) over
+     #0e1817. Left off, the strip keeps the pale grey above - which is the
+     original bug exactly, and worse on a dark screen at night. strip-check
+     does this arithmetic for both themes. */
+  :root[data-theme="dark"]:has(.scrim),
+  :root[data-theme="dark"].drawer-open,
+  :root[data-theme="dark"]:has(.scrim) body,
+  :root[data-theme="dark"].drawer-open body {
+    background: rgb(12 22 21);
+  }
+
   #root {
     background: var(--canvas);
   }
@@ -2515,6 +2606,23 @@ th.num {
     justify-self: end;
   }
 
+  /* An owner's table carries a Delete on every row, and at 393px it will not
+     fit beside the role menu - so it takes a line of its own. Scoped with
+     :has() to a table that actually has that column: an empty grid row is
+     still a grid row, and the gap above it would leave a viewer's rows with a
+     band of dead space under every one of them. */
+  .admins-table:has(td:nth-child(5)) tr {
+    grid-template-areas:
+      "who who"
+      "email email"
+      "role access"
+      "remove remove";
+  }
+  .admins-table td:nth-child(5) {
+    grid-area: remove;
+    justify-self: end;
+  }
+
   .role-key {
     grid-template-columns: minmax(0, 1fr);
     gap: 14px;
@@ -2650,6 +2758,126 @@ th.num {
   font-size: 0.78rem;
   line-height: 1.45;
   color: var(--ink-3);
+}
+
+/* --- settings ------------------------------------------------------------ */
+
+/*
+ * Three exclusive answers, each needing a sentence to explain it: too much for
+ * a select, and not enough to be a screen of its own. Radios inside labels, so
+ * the arrow keys, the grouping and the announcement come from the browser
+ * rather than being rebuilt out of divs and aria attributes.
+ */
+.choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.choice {
+  flex: 1 1 170px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 11px 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  cursor: pointer;
+}
+.choice:hover {
+  border-color: var(--accent-line);
+}
+/* The chosen one is said with the border rather than with a tint. A tinted
+   tile would put the explanation underneath on --accent-soft, where --ink-3
+   comes to 4.18:1 - under what small text needs, on the one tile a person is
+   most likely to read. Doubling the line costs nothing and moves nothing: the
+   ring is a shadow, so the tile does not grow by a pixel when it is picked. */
+.choice.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.choice:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.choice-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.choice-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.choice-hint {
+  color: var(--ink-3);
+  font-size: 0.78rem;
+}
+
+/* The steps of setting up an authenticator: scan, or type it in, then prove
+   it arrived. Numbered because they are done in order. */
+.steps {
+  margin: 6px 0 16px;
+  padding-left: 20px;
+  display: grid;
+  gap: 14px;
+  font-size: 0.9rem;
+}
+
+/*
+ * The QR code keeps its own white ground in both themes. It is artwork a
+ * camera has to read, the contrast between the squares and what is behind
+ * them is the whole of how that works, and a dark card behind a black-on-
+ * transparent code leaves nothing to read at all.
+ */
+.qr {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 10px;
+  background: var(--sheet);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+.qr img {
+  display: block;
+  width: 168px;
+  height: 168px;
+}
+
+/* The same secret in letters, for a phone that cannot photograph this screen -
+   the second device is often the one being set up. Selectable in one gesture,
+   because it is going to be copied. */
+.secret {
+  margin-top: 8px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--canvas);
+  word-break: break-all;
+  user-select: all;
+}
+
+/* Six digits, read off one screen and typed onto another. Spaced out and set
+   in the monospace face so a 0 and an O are not the same shape, and given the
+   room to be that size. */
+.code-input {
+  font-family: var(--mono);
+  font-size: 1.3rem;
+  letter-spacing: 0.3em;
+  text-align: center;
+  /* Tracking is added after the last glyph as well, which pushes the whole
+     line left of centre; half of it back as an indent puts it right. */
+  text-indent: 0.3em;
+  height: calc(var(--control-h) + 8px);
+}
+
+.factor {
+  margin-top: 12px;
+}
+.factor-when {
+  display: block;
 }
 
 /* --- reduced motion ------------------------------------------------------ */

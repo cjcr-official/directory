@@ -544,3 +544,39 @@ export async function fetchProfiles(): Promise<ProfileRow[]> {
 export async function updateProfile(id: string, patch: Partial<ProfileRow>): Promise<ProfileRow> {
   return unwrap(await supabase.from("profiles").update(patch).eq("id", id).select().single());
 }
+
+/**
+ * Removes the sign-in account itself, not just its row on the roster.
+ *
+ * Deleting the profile alone would leave the account behind: the person could
+ * still sign in, land on "your account is not set up", and never be able to
+ * register that email address again. So this goes through the function added
+ * by migration 0007, which deletes from auth.users and lets the profile follow.
+ *
+ * Who may do it is decided there and not here - owners only, never their own
+ * account - because a rule enforced in the browser is a rule enforced for
+ * whoever has not opened the network tab. The page hides the button; the
+ * database is what refuses.
+ *
+ * The message is passed through as the database wrote it. The usual rewriting
+ * of Postgres's wording is for constraint names nobody should have to read;
+ * these refusals are already sentences, and better ones than a generic line
+ * about permissions.
+ *
+ * The one exception is the function not being there at all, which is not a
+ * refusal but a directory whose database has not caught up with its app. The
+ * app is deployed by a push and the migrations are run by hand, so that gap is
+ * ordinary rather than exotic - and PostgREST describes it as a missing schema
+ * cache entry, which tells the person reading it nothing about what to do.
+ */
+export async function deleteAccount(id: string): Promise<void> {
+  const { error } = await supabase.rpc("delete_account", { p_user_id: id });
+  if (!error) return;
+  if (error.code === "PGRST202" || /delete_account/.test(error.message)) {
+    throw new Error(
+      "This database has not run supabase/migrations/0007_account_deletion.sql yet, " +
+        "so accounts cannot be deleted from here. Run it in the Supabase SQL editor.",
+    );
+  }
+  throw new Error(error.message);
+}

@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { LoginPage } from "@/auth/LoginPage";
+import { SecondStepPage } from "@/auth/SecondStepPage";
 import { AccountNotReady } from "@/auth/AccountNotReady";
 import { AppShell } from "@/components/AppShell";
 import { UpdateGate } from "@/components/UpdateGate";
@@ -20,6 +21,7 @@ import { ProjectEditPage } from "@/pages/ProjectEditPage";
 import { ProjectPreviewPage } from "@/pages/ProjectPreviewPage";
 import { AdministratorsPage } from "@/pages/AdministratorsPage";
 import { BackupPage } from "@/pages/BackupPage";
+import { SettingsPage } from "@/pages/SettingsPage";
 
 /**
  * One label for the whole cold start.
@@ -44,12 +46,19 @@ function DirectoryGate({ children }: { children: React.ReactNode }) {
 }
 
 function Protected() {
-  const { session, profile, profileLoaded, ready, role, signOut } = useAuth();
+  const { session, profile, profileLoaded, ready, role, signOut, awaitingSecondStep } = useAuth();
 
   if (!ready) return <LoadingScreen label={LOADING} />;
   if (!session) return <LoginPage />;
 
   if (!profileLoaded) return <LoadingScreen label={LOADING} />;
+
+  // Past the password, on an account that also has an authenticator app. Ahead
+  // of every screen below it, because the database is ahead of it too: until
+  // the code is typed, migration 0006 has every policy treat this session as a
+  // stranger, and the pages below would draw an empty directory rather than a
+  // refusal.
+  if (awaitingSecondStep) return <SecondStepPage />;
 
   // Signed in, but nothing behind it. Never a spinner: that state has causes a
   // person can actually fix, so say which one it is.
@@ -95,6 +104,7 @@ function Protected() {
             <Route path="projects" element={<ProjectsPage />} />
             <Route path="projects/new" element={<ProjectEditPage />} />
             <Route path="projects/:id" element={<ProjectEditPage />} />
+            <Route path="settings" element={<SettingsPage />} />
             <Route path="backup" element={<BackupPage />} />
             <Route path="administrators" element={<AdministratorsPage />} />
           </Route>
