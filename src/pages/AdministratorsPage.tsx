@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { LoadingScreen, Notice } from "@/components/ui";
-import { fetchProfiles, updateProfile } from "@/lib/queries";
+import { ConfirmButton, LoadingScreen, Notice } from "@/components/ui";
+import { deleteAccount, fetchProfiles, updateProfile } from "@/lib/queries";
 import type { AppRole, ProfileRow } from "@/lib/database.types";
 
 const ROLES: { value: AppRole; label: string; blurb: string }[] = [
@@ -60,6 +60,18 @@ export function AdministratorsPage() {
     }
   }
 
+  /**
+   * Thrown rather than caught, unlike every other failure on this page: the
+   * button that asked for it shows the reason where the finger already is,
+   * which for a refusal from the database - the last owner, somebody else's
+   * turn - is where it is actually read.
+   */
+  async function remove(id: string) {
+    setError(null);
+    await deleteAccount(id);
+    await load();
+  }
+
   if (!profiles && !error) return <LoadingScreen label="Loading administrators…" />;
 
   const owners = profiles?.filter((row) => row.role === "owner" && row.is_active).length ?? 0;
@@ -85,6 +97,20 @@ export function AdministratorsPage() {
         details private.
       </Notice>
 
+      {isOwner ? (
+        <div style={{ marginTop: 12 }}>
+          <Notice kind="warn">
+            <strong>No access</strong> is the everyday answer, and the reversible one — the name
+            stays on this list and the role comes back when they return. <strong>Delete</strong> is
+            for the account that should not exist at all: a stranger who signed themselves up, a
+            misspelt address, or somebody locked out of their own two-step sign-in who needs to
+            start again. It removes the sign-in itself and cannot be undone. Nothing they entered
+            goes with it — the families, people and directories they typed are the congregation's
+            records and stay exactly where they are.
+          </Notice>
+        </div>
+      ) : null}
+
       <div className="card" style={{ marginTop: 16 }}>
         <table className="admins-table">
           <thead>
@@ -93,6 +119,7 @@ export function AdministratorsPage() {
               <th>Email</th>
               <th>Role</th>
               <th>Access</th>
+              {isOwner ? <th>Remove</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -136,6 +163,25 @@ export function AdministratorsPage() {
                   <td>
                     <span className="muted small">{row.is_active ? "Active" : "No access"}</span>
                   </td>
+                  {isOwner ? (
+                    <td>
+                      {/* Never on your own row. An owner deleting themselves is
+                          how a directory ends up with nobody who can grant a
+                          role, and it is the one deletion the database refuses
+                          outright - so the button is not offered either. */}
+                      {isMe ? (
+                        <span className="muted small">—</span>
+                      ) : (
+                        <ConfirmButton
+                          label="Delete"
+                          confirmLabel="Delete this account"
+                          subtle
+                          disabled={busy === row.id}
+                          onConfirm={() => remove(row.id)}
+                        />
+                      )}
+                    </td>
+                  ) : null}
                 </tr>
               );
             })}

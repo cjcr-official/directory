@@ -2,6 +2,7 @@ import { createContext, use, useCallback, useEffect, useMemo, useRef, useState }
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { forgetPhotoUrls } from "@/lib/photos";
+import { needsSecondStep } from "@/lib/mfa";
 import type { AppRole, ProfileRow } from "@/lib/database.types";
 
 interface AuthState {
@@ -14,6 +15,13 @@ interface AuthState {
   loading: boolean;
   /** True once we know whether someone is signed in. */
   ready: boolean;
+  /**
+   * Signed in with a password, on an account that also has an authenticator
+   * app. Nothing here is a matter of politeness: migration 0006 has the
+   * database refuse every row to a session in this state, so the app shows the
+   * code screen rather than a directory that would come back empty.
+   */
+  awaitingSecondStep: boolean;
   role: AppRole | null;
   canEdit: boolean;
   isOwner: boolean;
@@ -34,6 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [awaitingSecondStep, setAwaitingSecondStep] = useState(false);
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -59,10 +68,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!current()) return;
       setProfile(null);
       setProfileError(null);
+      setAwaitingSecondStep(false);
       setProfileLoaded(true);
       return;
     }
 
+    // Asked here rather than on its own, so that one wait decides what screen
+    // comes up. It reads the token the browser already holds, so it costs no
+    // request; asking it on every auth event is what eventually moves a
+    // session left open on another device onto the code screen, at the next
+    // token refresh, when an authenticator is set up somewhere else.
+    const secondStep = await needsSecondStep();
+    if (!current()) return;
+    setAwaitingSecondStep(secondStep);
+
+    // Their own row, and only their own: until the second step is done every
+    // policy in the database treats this session as a stranger, and the one
+    // read still open to it is the one that lets the app say who is signing in.
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
@@ -111,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profileError,
       ready,
       loading,
+      awaitingSecondStep,
       role,
       canEdit: role === "owner" || role === "editor",
       isOwner: role === "owner",
@@ -147,13 +170,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         forgetPhotoUrls();
         setProfile(null);
         setProfileError(null);
+        setAwaitingSecondStep(false);
       },
 
       async refreshProfile() {
         await loadProfile(session?.user.id);
       },
     };
-  }, [session, profile, profileLoaded, profileError, ready, loading, loadProfile]);
+  }, [
+    session,
+    profile,
+    profileLoaded,
+    profileError,
+    ready,
+    loading,
+    awaitingSecondStep,
+    loadProfile,
+  ]);
 
   return <AuthContext value={value}>{children}</AuthContext>;
 }

@@ -20,12 +20,14 @@ database exists.
 5. New query again. Paste `supabase/migrations/0002_storage.sql` and run it.
 6. Once more for `supabase/migrations/0003_atomic_link_writes.sql`.
 7. And once more for `supabase/migrations/0004_office_label.sql`.
-8. Last one: `supabase/migrations/0005_updated_by.sql`.
+8. And again for `supabase/migrations/0005_updated_by.sql`.
+9. Then `supabase/migrations/0006_two_step_signin.sql`.
+10. Last one: `supabase/migrations/0007_account_deletion.sql`.
 
-All five files are safe to run twice, so if you are unsure whether one took,
+All seven files are safe to run twice, so if you are unsure whether one took,
 run it again.
 
-An existing directory needs steps 6, 7 and 8 too.
+An existing directory needs steps 6 to 10 too.
 
 **6.** Setting a record's groups used to be a delete and an insert sent
 separately, with a moment in between where the record had none — and a
@@ -52,6 +54,25 @@ something else. Records that changed before this file was run have no author
 and simply show the date on its own; so does anything written by `npm run seed`,
 which signs in as nobody. Until the file is run, no line appears at all and
 every save carries on as normal.
+
+**9.** Two-step sign-in. An administrator can add an authenticator app to their
+own account under _Settings_, and is then asked for a six-digit code as well as
+a password. 0006 is the half that makes that worth doing: the anon key ships
+inside the browser bundle, so anybody with a stolen password can reach the API
+without ever seeing a screen — and this file has the database refuse every row
+to a session that has not been through the code. It changes nothing for an
+account that has not set one up, so it can be run long before anybody uses it.
+If it fails with _relation auth.mfa\_factors does not exist_, the project
+predates multi-factor authentication in Supabase; nothing is half-applied, and
+the app carries on without the second step.
+
+**10.** Deleting an account. Until now an account could be switched off but
+never removed, which leaves a roster collecting strangers who signed themselves
+up, misspelt addresses, and anyone locked out of their own authenticator app.
+0007 adds the deletion, and confines it to owners and never to their own
+account. It removes the sign-in itself, and nothing that account entered: the
+families, people and directories they typed are the congregation's records and
+stay where they are, and so do the photographs they uploaded.
 
 > **What these do.** The first creates the tables and — more importantly — the
 > row level security policies that stop anyone reading the directory without an

@@ -94,6 +94,7 @@ export function AppShell() {
         <Item to="/projects" label="Directories" />
 
         <div className="nav-section">Settings</div>
+        <Item to="/settings" label="Settings" />
         <Item to="/backup" label="Backup" />
         {isOwner ? <Item to="/administrators" label="Administrators" /> : null}
 

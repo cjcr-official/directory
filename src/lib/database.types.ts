@@ -160,6 +160,16 @@ export interface Database {
         };
         Returns: undefined;
       };
+      /**
+       * Added by 0007. Deletes an administrator account outright - the row in
+       * auth.users, with public.profiles following through its foreign key.
+       * Owners only, and never their own; the function decides that, not the
+       * caller.
+       */
+      delete_account: {
+        Args: { p_user_id: string };
+        Returns: undefined;
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
