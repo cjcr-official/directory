@@ -373,10 +373,15 @@ computer telling the next person to sign in that their news has been read.
 On a phone the panel is the whole screen rather than a card laid over the
 page: hung off the bell it left the directory showing above it, below it and
 around it, and two lists of the same people a few pixels apart read as
-neither. Full bleed, with the title, the count and the way out in a header of
-its own, and the list the only thing that scrolls. Covering the glass means it
-owns the strip behind the home indicator too, so the document background is
-keyed to it the way the drawer's is — `npm run strip:check` holds that pairing.
+neither. It wears the app's own dark band as its header — the
+title, the count and the way out in it — because every other screen on a phone
+starts with that band, and because the status bar is set to draw white on it:
+a white header hid the clock. The rows under it are the rows the People list
+draws, to the pixel: the same 46px column for the portrait, the same 12px
+beside it, the same hairline under it. The list is the only thing that
+scrolls. Covering the glass means it owns the strip behind the home indicator
+too, so the document background is keyed to it the way the drawer's is —
+`npm run strip:check` holds that pairing.
 
 The congregation is fetched once, so a second administrator's afternoon used
 to be invisible until somebody reloaded the page — and added to the Home
