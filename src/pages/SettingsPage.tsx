@@ -11,6 +11,7 @@ import {
   type Enrolment,
   type TotpFactor,
 } from "@/lib/mfa";
+import { formatSetupKey } from "@/lib/qr";
 import {
   getTheme,
   getThemeChoice,
@@ -100,6 +101,12 @@ function TwoStep() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  // Offered only where it works. A Copy button that silently does nothing is
+  // worse than no Copy button, and the clipboard is missing from an insecure
+  // context and from some browsers in private mode.
+  const canCopy = typeof navigator !== "undefined" && Boolean(navigator.clipboard?.writeText);
 
   async function load() {
     try {
@@ -121,10 +128,28 @@ function TwoStep() {
     try {
       setEnrolment(await beginEnrolment(profile?.email || "Authenticator app"));
       setCode("");
+      setCopied(false);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setBusy(false);
+    }
+  }
+
+  /**
+   * Copies the key without its spaces. What is on screen is grouped in fours
+   * so it can be read across to a second device; what goes to the clipboard is
+   * the key itself, because it is going straight into a field that was never
+   * asked to be forgiving.
+   */
+  async function copyKey(secret: string) {
+    try {
+      await navigator.clipboard.writeText(secret);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Refused - the key is on screen and selectable, which is all the button
+      // was ever a shortcut for.
     }
   }
 
@@ -200,19 +225,35 @@ function TwoStep() {
           <form onSubmit={finish}>
             <ol className="steps">
               <li>
-                Open an authenticator app — Google Authenticator, Microsoft Authenticator, 1Password
-                and Authy all do this — and scan the square below.
-                <div className="qr">
-                  <img src={enrolment.qr} alt="" width={168} height={168} />
+                <strong>Scan this with an authenticator app.</strong> Google Authenticator,
+                Microsoft Authenticator, 1Password and Authy all do this.
+                <figure className="qr">
+                  <img
+                    src={enrolment.qr}
+                    alt="A QR code holding the setup key for this account"
+                    width={176}
+                    height={176}
+                  />
+                </figure>
+              </li>
+              <li>
+                <strong>Or type the key</strong>, if the phone cannot photograph this screen.
+                <div className="setup-key">
+                  <code className="mono">{formatSetupKey(enrolment.secret)}</code>
+                  {canCopy ? (
+                    <button
+                      type="button"
+                      className="btn ghost small"
+                      onClick={() => void copyKey(enrolment.secret)}
+                    >
+                      {copied ? "Copied" : "Copy"}
+                    </button>
+                  ) : null}
                 </div>
               </li>
               <li>
-                Cannot scan it? Type this into the app instead:
-                <div className="secret mono">{enrolment.secret}</div>
-              </li>
-              <li>
-                Then type the six-digit code the app is showing, to prove it arrived.
-                <div className="field" style={{ maxWidth: 200, marginTop: 8 }}>
+                <strong>Then type the six-digit code it shows</strong>, to prove it arrived.
+                <div className="field code-field">
                   <label htmlFor="enrol-code">Code</label>
                   <input
                     id="enrol-code"
@@ -233,7 +274,7 @@ function TwoStep() {
               </li>
             </ol>
 
-            <div className="row">
+            <div className="row enrol-actions">
               <button
                 type="submit"
                 className="btn primary"
