@@ -44,6 +44,43 @@
 --
 -- Safe to run more than once.
 
+-- Releasing the photographs, in a function of its own.
+--
+-- This has to catch its own exceptions, and a plpgsql block that catches is a
+-- begin ... end nested inside the body it sits in. Nested inside
+-- delete_account, that pairing defeats the Supabase SQL editor: its statement
+-- splitter matches the outer begin to the inner end, decides the function has
+-- finished there, and sends a CREATE FUNCTION cut off before its closing
+-- delimiter, which Postgres rejects as an unterminated dollar-quoted string. Nothing was
+-- wrong with the SQL; it never arrived whole. Out here the block is the entire
+-- body, and every function in this project is once again one begin to one end.
+--
+-- Photographs are uploaded by whoever was at the keyboard, and storage records
+-- that person on the object. Letting the delete reach them would mean losing
+-- every portrait an editor uploaded on the day their account was tidied away -
+-- so the ownership is released first and the files stay exactly where the
+-- directory expects to find them. Storage has spelled that column differently
+-- over the years and has not always let anyone but its own role write it, so a
+-- project where this cannot be done is allowed to carry on: releasing the
+-- photographs is a kindness, and removing an account that should not exist is
+-- the job.
+create or replace function public.release_storage_owner(p_user_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update storage.objects set owner = null where owner = p_user_id;
+exception when insufficient_privilege or undefined_table or undefined_column then
+  null;
+end;
+$$;
+
+-- Only ever called from inside delete_account, which is security definer and
+-- so calls it as its own owner. Nobody else has any business with it.
+revoke all on function public.release_storage_owner(uuid) from public;
+
 create or replace function public.delete_account(p_user_id uuid)
 returns void
 language plpgsql
@@ -66,20 +103,7 @@ begin
       using errcode = 'no_data_found';
   end if;
 
-  -- Photographs are uploaded by whoever was at the keyboard, and storage
-  -- records that person on the object. Letting the delete reach them would
-  -- mean losing every portrait an editor uploaded on the day their account was
-  -- tidied away - so the ownership is released first and the files stay
-  -- exactly where the directory expects to find them. Storage has spelled that
-  -- column differently over the years and has not always let anyone but its
-  -- own role write it, so a project where this cannot be done is allowed to
-  -- carry on: releasing the photographs is a kindness, and removing an account
-  -- that should not exist is the job.
-  begin
-    update storage.objects set owner = null where owner = p_user_id;
-  exception when insufficient_privilege or undefined_table or undefined_column then
-    null;
-  end;
+  perform public.release_storage_owner(p_user_id);
 
   delete from auth.users where id = p_user_id;
 end;
