@@ -521,7 +521,6 @@ p:last-child {
   top: 0;
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
   gap: 10px;
   padding: 12px 14px 10px;
   border-bottom: 1px solid var(--line);
@@ -529,6 +528,16 @@ p:last-child {
 }
 .tray-title {
   font-weight: 600;
+}
+/* Takes the room between the title and the way out, wherever there is one. */
+.tray-state {
+  margin-left: auto;
+}
+/* A panel this size is dismissed by looking away from it - clicking anywhere
+   else, or Escape. The button is for the phone, where the panel is the whole
+   screen and there is no anywhere else. */
+.tray-close {
+  display: none;
 }
 
 .tray-list {
@@ -2693,14 +2702,95 @@ th.num {
     line-height: 15px;
   }
 
-  /* The width of the phone rather than the width of a panel: 330px hung off
-     the bell would leave a strip of page down one side and nothing in it. */
+  /*
+   * A screen of its own rather than a card laid over the page.
+   *
+   * Hung off the bell it left the directory showing above it, below it and
+   * around it, and two lists of the same people a few pixels apart is a page
+   * that reads as neither. Full bleed, its own header with the way out in it,
+   * and the list the only thing that scrolls.
+   *
+   * The background is stated again here because this rule is the one that
+   * covers the phone, and the strip behind the home indicator is paired to it
+   * below - see strip-check, which holds that pairing.
+   */
   .tray-panel {
-    left: max(10px, env(safe-area-inset-left));
-    right: max(10px, env(safe-area-inset-right));
+    /* Restated, and not only for the reader: strip-check looks for a rule
+       that is fixed to every edge and paints its own ground, and that is the
+       rule it should be asking about here. */
+    position: fixed;
+    inset: 0;
     width: auto;
     max-width: none;
-    max-height: min(70dvh, calc(100dvh - var(--tray-top, 60px) - 14px));
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: var(--raised);
+    overflow: hidden;
+  }
+
+  /* Under the status bar, as the top bar it replaces is. */
+  .tray-head {
+    padding: calc(12px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) 12px
+      calc(14px + env(safe-area-inset-left));
+  }
+  .tray-title {
+    font-size: 1.05rem;
+  }
+
+  .tray-close {
+    display: grid;
+    place-items: center;
+    align-self: center;
+    width: 34px;
+    height: 34px;
+    flex: none;
+    margin: -4px -6px -4px 0;
+    padding: 0;
+    border: none;
+    border-radius: 9px;
+    background: none;
+    color: var(--ink-2);
+    cursor: pointer;
+  }
+  .tray-close:active {
+    background: var(--canvas);
+  }
+  .tray-close svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  /* The head and the foot stay put and the list moves between them, which is
+     what makes it a screen rather than a long card. */
+  .tray-list,
+  .tray-empty {
+    flex: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: env(safe-area-inset-right);
+    padding-left: env(safe-area-inset-left);
+  }
+  .tray-link {
+    padding: 10px;
+  }
+  .tray-foot {
+    padding: 12px calc(14px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom))
+      calc(14px + env(safe-area-inset-left));
+  }
+
+  /* The sheet covers the glass, so the strip behind the home indicator is its
+     ground and not the page's. One rule for both themes: unlike the drawer's,
+     this is a plain surface rather than a scrim composited over the canvas,
+     so the token says it and the dark palette redefines it. As with the
+     drawer, the class the component sets is the half that cannot fail to
+     match on a browser without :has(). */
+  html:has(.tray-panel),
+  html.tray-open,
+  html:has(.tray-panel) body,
+  html.tray-open body {
+    background: var(--raised);
   }
 
   .menu-btn {

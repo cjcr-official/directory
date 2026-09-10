@@ -41,8 +41,9 @@ month, and again before a print run.
 work lands in the same alphabetical list where it looks like everything else in
 it. The bell — in the sidebar on a desk, on the bar on a phone — carries the
 number of people who have been added since you last looked, and opens on who
-they are, when they arrived and who added them. Your own typing is not counted
-back at you.
+they are, when they arrived and who added them. On a desk that is a panel
+beside the bell; on a phone it is a screen of its own. Your own typing is not
+counted back at you.
 
 **Printing.** A preview that matches the PDF line for line, then either a
 downloaded PDF or a straight browser print. Optional cover page, alphabetical
@@ -368,6 +369,14 @@ Three decisions in `src/lib/notifications.ts` are worth knowing about, and
 Kept on the device, in `localStorage`, like the theme and the column choices.
 Two devices are told twice, which is a smaller wrong than a shared office
 computer telling the next person to sign in that their news has been read.
+
+On a phone the panel is the whole screen rather than a card laid over the
+page: hung off the bell it left the directory showing above it, below it and
+around it, and two lists of the same people a few pixels apart read as
+neither. Full bleed, with the title, the count and the way out in a header of
+its own, and the list the only thing that scrolls. Covering the glass means it
+owns the strip behind the home indicator too, so the document background is
+keyed to it the way the drawer's is — `npm run strip:check` holds that pairing.
 
 The congregation is fetched once, so a second administrator's afternoon used
 to be invisible until somebody reloaded the page — and added to the Home
