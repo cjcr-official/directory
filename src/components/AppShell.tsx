@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { Logo } from "@/components/Logo";
+import { NotificationTray } from "@/components/NotificationTray";
 import { useAuth } from "@/auth/AuthProvider";
 import { useDirectory } from "@/data/DirectoryContext";
 import { APP_VERSION } from "@/lib/version";
@@ -72,6 +73,10 @@ export function AppShell() {
         </button>
         <Logo className="topbar-logo" />
         <span className="spacer" />
+        {/* Twice in this file, and never twice on screen: the top bar is the
+            phone's, the sidebar is the desk's, and the stylesheet shows
+            whichever of the two that screen is using. */}
+        <NotificationTray />
         <span className="pill role">{role ?? "no access"}</span>
       </header>
 
@@ -84,6 +89,7 @@ export function AppShell() {
         </div>
 
         <Item to="/" label="Overview" />
+        <NotificationTray />
 
         <div className="nav-section">Congregation</div>
         <Item to="/families" label="Families" count={households.length} />

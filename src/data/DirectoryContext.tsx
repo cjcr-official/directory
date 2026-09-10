@@ -1,8 +1,9 @@
-import { createContext, use, useCallback, useEffect, useMemo, useState } from "react";
-import { fetchDirectory, fetchProfiles } from "@/lib/queries";
+import { createContext, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { anyPersonAddedSince, fetchDirectory, fetchProfiles } from "@/lib/queries";
 import { buildEntries, sortMembers, type DirectoryData, type DirectoryEntry } from "@/lib/entries";
 import type { HouseholdRow, PersonRow, ProfileRow, TagRow } from "@/lib/database.types";
 import { message, sortByKey, sortKey } from "@/lib/format";
+import { newestArrival } from "@/lib/notifications";
 
 interface DirectoryState {
   loading: boolean;
@@ -42,6 +43,15 @@ interface DirectoryState {
 }
 
 const DirectoryContext = createContext<DirectoryState | null>(null);
+
+/**
+ * How often the app asks whether anybody has been added, while it is in front
+ * of somebody. As UpdateGate's version check, and rarer: it is one row.
+ */
+const LOOK_INTERVAL_MS = 5 * 60 * 1000;
+
+/** Before any record: what "has anybody been added since?" means on an empty directory. */
+const EPOCH = "1970-01-01T00:00:00Z";
 
 const EMPTY: DirectoryData = {
   households: [],
@@ -90,6 +100,59 @@ export function DirectoryProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     void reload();
+  }, [reload]);
+
+  /**
+   * Notices people somebody else has added, and pulls the rows in again.
+   *
+   * The congregation is fetched once, which is what makes every screen
+   * instant - and also what made a second administrator's afternoon invisible
+   * until somebody reloaded the page. Added to the Home Screen that page can
+   * be a week old. So while the app is in front of somebody it asks the one
+   * cheap question that can be asked here - has anybody been added since the
+   * newest row we hold - and only when the answer is yes does it fetch
+   * anything.
+   *
+   * The whole directory comes back rather than the new rows alone: half an
+   * arrival is worse than none, and the tray links to a record every other
+   * screen would have to know about too.
+   *
+   * The reply is not needed anywhere in particular, so a failure is dropped.
+   * A directory that cannot be refreshed is the one already on screen, and
+   * the screens that ask for something say so themselves.
+   */
+  const newest = useMemo(() => newestArrival(data.people), [data.people]);
+  /* Held in a ref so that a new arrival does not tear the timer below down and
+     start it again: the question changes, the schedule it is asked on does not. */
+  const asking = useRef<string | null>(newest);
+  useEffect(() => {
+    asking.current = newest;
+  }, [newest]);
+
+  useEffect(() => {
+    let looking = false;
+    const look = () => {
+      if (document.visibilityState !== "visible" || looking) return;
+      looking = true;
+      void anyPersonAddedSince(asking.current ?? EPOCH)
+        .then((arrived) => (arrived ? reload() : undefined))
+        .catch(() => undefined)
+        .finally(() => {
+          looking = false;
+        });
+    };
+
+    const interval = window.setInterval(look, LOOK_INTERVAL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") look();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", look);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", look);
+    };
   }, [reload]);
 
   /**

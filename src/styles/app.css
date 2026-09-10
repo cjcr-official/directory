@@ -409,6 +409,200 @@ p:last-child {
   flex-direction: column;
 }
 
+/* --- what's new -----------------------------------------------------------
+ *
+ * The bell, and the panel of people who have arrived behind it. It sits in
+ * two places and has to look like a local in each: a row among the nav links
+ * on a desk, an icon on the dark top bar of a phone. Only ever one of the two
+ * is on screen - the mobile block near the bottom of this file hides the
+ * sidebar's and dresses the bar's.
+ *
+ * The panel is fixed to the viewport rather than positioned inside either of
+ * them, because the sidebar scrolls and a panel hung inside it would be cut
+ * off at that edge. The component measures the bell and hands the corner over
+ * as --tray-top and --tray-left, which leaves the phone free to override both
+ * with an ordinary rule and stretch the panel across the screen.
+ * -------------------------------------------------------------------------- */
+
+/* A nav link that happens to be a button: same box, same weight, same hover,
+   because it is standing in a list of them. */
+.tray-btn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 9px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.tray-btn:hover {
+  background: var(--canvas);
+  color: var(--ink);
+}
+.tray-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.tray-btn svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+}
+/* Something waiting is worth a shade more than the links around it. */
+.tray-btn.unread {
+  color: var(--ink);
+}
+
+.tray-count {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 19px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Invisible, and only there to catch the click that closes the panel before
+   the nav link or the record underneath it takes it. */
+.tray-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 44;
+}
+
+.tray-panel {
+  position: fixed;
+  /* Where the bell is. The fallbacks are only ever used by a panel opened
+     before anything could be measured, which the component does not do. */
+  top: var(--tray-top, 60px);
+  left: var(--tray-left, 20px);
+  /* Over the top bar (40) and the update bar (35). Under the drawer (50),
+     which cannot be open at the same time - its scrim covers the bell. */
+  z-index: 46;
+  display: flex;
+  flex-direction: column;
+  width: 330px;
+  max-width: calc(100vw - 24px);
+  /* Whichever is smaller: two thirds of the window, or what is left below the
+     bell. A panel that runs off the bottom of a laptop screen is a panel with
+     its last arrivals in it. */
+  max-height: min(66vh, calc(100dvh - var(--tray-top, 60px) - 16px));
+  overflow-y: auto;
+  /* A list scrolled to its end must not hand the rest of the gesture to the
+     page behind it: on a phone that scrolls the directory under the panel,
+     and takes the address bar with it. */
+  overscroll-behavior: contain;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--raised);
+  /* Stated rather than inherited: on a phone this panel hangs off the top
+     bar, which sets white text for the logo beside it - and a title with no
+     colour of its own came out white on a white card, which is to say not at
+     all. */
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+/* Sticky, so a long list scrolls under the title and the way out stays put. */
+.tray-head {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--line);
+  background: var(--raised);
+}
+.tray-title {
+  font-weight: 600;
+}
+
+.tray-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+}
+
+.tray-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  text-decoration: none;
+}
+.tray-link:hover {
+  background: var(--canvas);
+}
+.tray-link .avatar {
+  width: 30px;
+  height: 37px;
+}
+
+/* min-width on a flex child, or a long name pushes the panel wider than the
+   panel. */
+.tray-who {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.tray-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+/* Not a dot: a dot needs a legend, and there is nowhere to put one. */
+.tray-new {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tray-empty {
+  margin: 0;
+  padding: 16px 14px;
+}
+
+.tray-foot {
+  position: sticky;
+  bottom: 0;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+  background: var(--raised);
+  color: var(--accent);
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.tray-foot:hover {
+  text-decoration: underline;
+}
+
 .page {
   padding: 26px 36px 64px;
   /* A desk monitor is wider than a book. 1180 left a fifth of a 1920 screen
@@ -2453,6 +2647,60 @@ th.num {
     background: rgb(255 255 255 / 12%);
     border-color: rgb(255 255 255 / 18%);
     color: rgb(255 255 255 / 82%);
+  }
+
+  /* One bell per screen. Down here it is the bar's, so the drawer's - which
+     is the same component in the other place it is rendered - stays shut. */
+  .sidebar .tray {
+    display: none;
+  }
+
+  /* On the bar it is an icon the size of the menu button opposite it, with
+     the label dropped: there is no room for words between a logo and a role,
+     and the button carries its name in aria-label either way. */
+  .topbar .tray-btn {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border-radius: 9px;
+    color: #fff;
+  }
+  .topbar .tray-btn:hover,
+  .topbar .tray-btn:active {
+    background: rgb(255 255 255 / 12%);
+  }
+  .topbar .tray-btn svg {
+    width: 21px;
+    height: 21px;
+  }
+  .topbar .tray-btn-label {
+    display: none;
+  }
+  /* Over the bell's shoulder, and ringed in the bar's own colour so it reads
+     as a badge on top rather than as part of the drawing. */
+  .topbar .tray-count {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    min-width: 17px;
+    margin-left: 0;
+    padding: 0 4px;
+    border: 1.5px solid var(--brand-dark);
+    font-size: 0.64rem;
+    line-height: 15px;
+  }
+
+  /* The width of the phone rather than the width of a panel: 330px hung off
+     the bell would leave a strip of page down one side and nothing in it. */
+  .tray-panel {
+    left: max(10px, env(safe-area-inset-left));
+    right: max(10px, env(safe-area-inset-right));
+    width: auto;
+    max-width: none;
+    max-height: min(70dvh, calc(100dvh - var(--tray-top, 60px) - 14px));
   }
 
   .menu-btn {

@@ -37,6 +37,13 @@ CSVs that open in any spreadsheet, every photograph as an ordinary JPEG, and a
 there is no undo, so this is what turns a bad click into an annoyance. Once a
 month, and again before a print run.
 
+**What's new.** A directory is kept by more than one person, and everybody's
+work lands in the same alphabetical list where it looks like everything else in
+it. The bell — in the sidebar on a desk, on the bar on a phone — carries the
+number of people who have been added since you last looked, and opens on who
+they are, when they arrived and who added them. Your own typing is not counted
+back at you.
+
 **Printing.** A preview that matches the PDF line for line, then either a
 downloaded PDF or a straight browser print. Optional cover page, alphabetical
 index, A–Z letter tabs, page numbers, and booklet page ordering for folding and
@@ -238,6 +245,7 @@ src/
       pdf.ts           draws the composed pages with pdf-lib
     entries.ts         families + individuals -> one alphabetical list
     format.ts          names, phones, dates, addresses, sort keys
+    notifications.ts   who has arrived since a reader last looked
     photos.ts          resize in the browser, upload, signed URLs
     queries.ts         every database read and write
     demo.ts            the invented congregation used by /sample
@@ -328,6 +336,45 @@ version behind beats a reload loop.
 
 The running build is printed at the bottom of the sidebar, so "which version
 are you on?" has an answer.
+
+### What's new
+
+Two or three people keep a directory between them and rarely at the same desk
+on the same afternoon. Somebody typed in on Tuesday used to be four names that
+had not been there before, in the middle of four hundred that had — the office
+found out at the print run, or when the same person was typed in twice.
+
+What counts as new is a fact about a reader rather than about a row, so each
+browser keeps a marker per account: the moment through which that person has
+been shown everything. The tray is the difference between the marker and the
+rows the app is already holding, which is why none of it costs a request.
+
+Three decisions in `src/lib/notifications.ts` are worth knowing about, and
+`npm run notifications:check` holds each of them down:
+
+- **The marker is a `created_at` the database wrote**, never a reading from
+  the browser's clock. A phone running four minutes fast would otherwise write
+  a marker into the future and mark the next four minutes of arrivals read.
+- **A first sight is not an unread pile.** A browser with no marker is seeded
+  with the newest record there is, so a new phone opens on an empty tray
+  rather than on a badge counting the whole congregation.
+- **Your own additions are not news.** There is no `created_by` column, so the
+  author is read off `updated_by` — which names the person who added a record
+  only while nobody has written it since, and `created_at` still matching
+  `updated_at` is what says so. A record you added and somebody else has since
+  corrected is announced to you as well, which is the harmless direction to be
+  wrong in.
+
+Kept on the device, in `localStorage`, like the theme and the column choices.
+Two devices are told twice, which is a smaller wrong than a shared office
+computer telling the next person to sign in that their news has been read.
+
+The congregation is fetched once, so a second administrator's afternoon used
+to be invisible until somebody reloaded the page — and added to the Home
+Screen that page can be a week old. While the app is in front of somebody,
+`DirectoryContext` asks the one cheap question there is to ask — has anybody
+been added since the newest row we hold — and pulls the whole directory in
+again only when the answer is yes.
 
 ### Light and dark
 

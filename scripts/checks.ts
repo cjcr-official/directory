@@ -25,3 +25,4 @@ import "./strip-check";
 import "./qr-check";
 import "./changed-check";
 import "./columns-check";
+import "./notifications-check";
