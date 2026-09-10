@@ -1,5 +1,7 @@
 /**
- * That a form field cannot grow wider than the card it sits in.
+ * Layout rules only WebKit breaks, held as facts about the stylesheet.
+ *
+ * First: that a form field cannot grow wider than the card it sits in.
  *
  * iOS keeps its own sizing for the date-family controls while the platform
  * appearance is on, and that sizing ignores box-sizing: the field comes out
@@ -88,3 +90,20 @@ for (const type of relevant) {
 // field's own content and drags the page wider than the phone.
 const fieldRule = css.slice(css.indexOf(".field {"), css.indexOf("}", css.indexOf(".field {")));
 check(".field can shrink to its track", /min-width:\s*0/.test(fieldRule));
+
+// And that no table row is asked to be a containing block.
+//
+// A row-wide link used to be a stretched ::after, which needs its <tr> to be
+// one - and position: relative on a table row is undefined in CSS 2.1, so WebKit
+// ignores it. Under 820px the row is display: grid and it worked. Above that the
+// row is a real table-row, so every row's overlay escaped to the same ancestor,
+// they stacked, and the last one took every click in the table: on a Mac, every
+// click on People or Families opened the bottom record. Chromium honours it, so
+// it looked right everywhere it was tested.
+const rowRule = /\.list-table tbody tr \{[^}]*\}/.exec(css)?.[0] ?? "";
+check(
+  "no table row is asked to be a containing block",
+  !/position:\s*relative/.test(rowRule),
+  rowRule.replace(/\s+/g, " "),
+);
+check("and no row-wide overlay is hung off a link", !css.includes("row-link"), "");

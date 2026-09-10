@@ -1187,23 +1187,20 @@ th.num {
 /* The name was the only thing in a row you could hit. The portrait, the line
    under it and every gap between them did nothing, so opening a record meant
    aiming at a line of text - most of the way across a phone, and none of it
-   where a thumb lands. The row's own link now covers the whole row, and stays
-   a real link while it does: keyboard, middle-click and open-in-new-tab all
-   still work, which an onClick handler would have cost. */
-.list-table tbody tr {
-  position: relative;
-}
-.row-link::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-}
+   where a thumb lands. The whole row opens the record now.
 
-/* A person's row also links to their family, and that has to stay reachable
-   above the one covering everything. */
-.list-table .list-link:not(.row-link) {
-  position: relative;
-  z-index: 1;
+   The row still holds a real link, and that link is still what does the work:
+   keyboard, middle-click and open-in-new-tab all go through it. The row only
+   adds the plain mouse click over the rest of its width, in a handler.
+
+   It used to be a stretched ::after on that link, which needs the <tr> to be a
+   containing block - and position: relative on a table row is undefined in CSS
+   2.1, so WebKit ignores it. Under 820px the row is display: grid and it worked;
+   above it the row is a real table-row, every overlay escaped to the same
+   ancestor, and the last row in the table quietly took every click in it. On a
+   Mac, clicking any family opened the bottom one. */
+.row-clickable {
+  cursor: pointer;
 }
 
 /* --- bits ---------------------------------------------------------------- */

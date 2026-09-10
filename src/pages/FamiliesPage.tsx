@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useDirectory } from "@/data/DirectoryContext";
 import { useAuth } from "@/auth/AuthProvider";
 import { Avatar, EmptyState, LoadingScreen, Notice, TagPill } from "@/components/ui";
@@ -10,6 +10,7 @@ const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 export function FamiliesPage() {
   const { households, tags, membersOf, tagsOfHousehold, loading, error } = useDirectory();
   const { canEdit } = useAuth();
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [letter, setLetter] = useState<string | null>(null);
 
@@ -131,12 +132,21 @@ export function FamiliesPage() {
                 const members = membersOf(household.id);
                 const address = addressLines(household);
                 return (
-                  <tr key={household.id}>
+                  <tr
+                    key={household.id}
+                    className="row-clickable"
+                    onClick={(event) => {
+                      // A click that landed on a link or a button is that
+                      // control's click, not the row's.
+                      if ((event.target as HTMLElement).closest("a, button")) return;
+                      void navigate(`/families/${household.id}`);
+                    }}
+                  >
                     <td>
                       <Avatar path={household.photo_path} initials={household.sort_name} />
                     </td>
                     <td>
-                      <Link className="list-link row-link" to={`/families/${household.id}`}>
+                      <Link className="list-link" to={`/families/${household.id}`}>
                         {household.display_name}
                       </Link>
                       {!household.is_active ? (

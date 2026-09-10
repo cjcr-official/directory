@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useDirectory } from "@/data/DirectoryContext";
 import { useAuth } from "@/auth/AuthProvider";
 import { Avatar, EmptyState, LoadingScreen, Notice, TagPill } from "@/components/ui";
@@ -18,6 +18,7 @@ const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 export function PeoplePage() {
   const { people, tags, householdById, tagsOfPerson, loading, error } = useDirectory();
   const { canEdit } = useAuth();
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [letter, setLetter] = useState<string | null>(null);
   const [scope, setScope] = useState<"all" | "unattached">("all");
@@ -140,7 +141,16 @@ export function PeoplePage() {
                   ? householdById.get(person.household_id)
                   : null;
                 return (
-                  <tr key={person.id}>
+                  <tr
+                    key={person.id}
+                    className="row-clickable"
+                    onClick={(event) => {
+                      // A click that landed on a link or a button is that
+                      // control's click, not the row's.
+                      if ((event.target as HTMLElement).closest("a, button")) return;
+                      void navigate(`/people/${person.id}`);
+                    }}
+                  >
                     <td>
                       <Avatar
                         path={personPhotoPath(person, household)}
@@ -148,7 +158,7 @@ export function PeoplePage() {
                       />
                     </td>
                     <td>
-                      <Link className="list-link row-link" to={`/people/${person.id}`}>
+                      <Link className="list-link" to={`/people/${person.id}`}>
                         {fileAsName(person)}
                       </Link>
                       {!person.is_active ? (
