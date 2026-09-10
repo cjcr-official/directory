@@ -1365,6 +1365,47 @@ th.num {
   cursor: default;
 }
 
+/* --- choosing the columns --------------------------------------------------
+ *
+ * The panel hangs off its own button rather than off the toolbar, so it opens
+ * under the word "Columns" wherever the toolbar has wrapped that button to.
+ * -------------------------------------------------------------------------- */
+
+.column-picker {
+  position: relative;
+}
+/* Invisible, and only there to catch the click that closes the panel before
+   the row of the table underneath it does. */
+.column-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 19;
+}
+.column-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  /* Over the table it covers, under the drawer and the top bar, which start
+     at 35 and run up from there. */
+  z-index: 20;
+  display: grid;
+  gap: 9px;
+  min-width: 190px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--raised);
+  box-shadow: var(--shadow);
+}
+/* The grid above spaces the rows; the margin each tick box carries for a form
+   would land on top of it. */
+.column-panel .check {
+  margin-bottom: 0;
+}
+.column-all {
+  justify-self: start;
+}
+
 /* --- the sign-in screen -------------------------------------------------- */
 
 /*
@@ -2538,6 +2579,14 @@ th.num {
      than pushed off the edge where nothing hints they exist; the full record
      is one tap away. */
   .hide-sm {
+    display: none;
+  }
+
+  /* And with the columns dropped there is nothing left to choose between: a
+     browse list here is a portrait, a name and the line under it, whatever
+     the tick boxes say. So the button goes with them rather than sitting in
+     the toolbar promising a change that would not show. */
+  .column-picker {
     display: none;
   }
 

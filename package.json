@@ -21,6 +21,7 @@
     "strip:check": "node scripts/run.mjs scripts/strip-check.ts",
     "qr:check": "node scripts/run.mjs scripts/qr-check.ts",
     "changed:check": "node scripts/run.mjs scripts/changed-check.ts",
+    "columns:check": "node scripts/run.mjs scripts/columns-check.ts",
     "bundle:check": "node scripts/run.mjs scripts/bundle-check.ts",
     "bench": "node scripts/run.mjs scripts/bench.ts",
     "seed": "node scripts/run.mjs scripts/seed.ts",
