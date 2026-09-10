@@ -97,6 +97,27 @@ export async function fetchDirectory(): Promise<DirectoryData> {
   return { households, people, tags, householdTags, personTags };
 }
 
+/**
+ * Whether anybody has been added since a given moment.
+ *
+ * The directory is fetched once and kept in memory, which is what makes every
+ * screen instant - and also what makes a second administrator's work invisible
+ * until the page is reloaded. The notification tray asks this instead: one
+ * column, one row, no ordering, and an answer of yes or no. It is the cheapest
+ * question this app puts to the database, which is what lets it be asked on a
+ * timer without anybody noticing.
+ *
+ * A yes is followed by a full reload, deliberately. Fetching the new people
+ * alone would leave the tray listing somebody the rest of the app has never
+ * heard of, and a link to a record that is not there.
+ */
+export async function anyPersonAddedSince(iso: string): Promise<boolean> {
+  const rows = unwrap(
+    await supabase.from("people").select("id").gt("created_at", iso).limit(1),
+  ) as { id: string }[];
+  return rows.length > 0;
+}
+
 // ---------------------------------------------------------------------------
 // Households
 // ---------------------------------------------------------------------------
