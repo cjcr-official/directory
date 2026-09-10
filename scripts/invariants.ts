@@ -887,7 +887,7 @@ async function main() {
     );
 
     for (const size of Object.keys(TAG_SIZES) as TagSizeName[]) {
-      const settings = normalizeSettings({ ...DEFAULT_SETTINGS, output: "tags", tagSize: size });
+      const settings = normalizeSettings({ ...DEFAULT_SETTINGS, tagSize: size });
       const book = composeTags(entries, settings, metrics);
       const cards = book.sheets.flatMap((sheet) => sheet.pages.flatMap((page) => page.cards));
       const perSheet = tagsPerSheet(settings);
@@ -956,10 +956,9 @@ async function main() {
       }),
       normalizeSettings({
         ...DEFAULT_SETTINGS,
-        output: "tags",
         tagSize: "avery5395",
         churchName: "Plains Alliance Church",
-        footerText: "We are a Christ-centered Acts 1:8 Family",
+        tagLine: "We are a Christ-centered Acts 1:8 Family",
       }),
       metrics,
     );

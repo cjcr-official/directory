@@ -115,12 +115,18 @@ where a few faces are missing still looks deliberate.
 
 ## Name tags
 
-**Name tags** in the sidebar, under Printing, beside Directories. One is a set
-of tags the same way the other is a book: the same list of people, chosen the
-same way, laid out differently.
+Every directory can print as a book or as a sheet of name tags. They are not
+two kinds of thing: a directory is a list of people and a way of laying them
+out, and tags are the second way.
 
-An existing directory can be turned into tags instead — set **Prints** to _Name
-tags_ on its own page — and it moves between the two lists when you do.
+So there is nothing to set up. **Name tags** in the sidebar lists the
+directories you already have; pick one and everybody in it gets a tag. Change
+who is in the directory — add a family, drop a group — and the tags follow,
+because there is no second list to keep in step.
+
+How the tags look is set on the directory's own page, under **Name tags**: the
+size, and the line under the name. The mark and the church's name come from
+**The cover**, so a book and its tags carry the same one.
 
 Tags print portrait, as many to a sheet as the paper holds, centred, with a
 pale line round each one to cut along. Pick the size to match the holders in
@@ -133,7 +139,7 @@ the cupboard rather than the paper:
 | Avery 5395 (3⅜" × 2⅓") | 8                    |
 
 Each tag carries the mark and the church's name from **The cover**, the
-person's name as large as it will fit, and the footer line underneath. A long
+person's name as large as it will fit, and its own line underneath. A long
 name breaks over two lines and shrinks until it fits, so every tag in a run is
 cut to the same size whatever the name on it.
 

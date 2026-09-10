@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import type { Output } from "@/lib/layout/settings";
 import { useDirectory } from "@/data/DirectoryContext";
 import { useAuth } from "@/auth/AuthProvider";
 import { EmptyState, LoadingScreen, Notice } from "@/components/ui";
@@ -21,26 +20,20 @@ const WORDS = {
   },
   tags: {
     title: "Name tags",
-    sub: "A sheet of tags off the same list of people a directory prints from, cut apart for the holders. Saved the same way, so next Sunday is one click.",
-    add: "New name tags",
-    empty: "No name tags yet",
-    first: "Set up name tags",
-    loading: "Loading name tags…",
+    sub: "Tags for the people in a directory — pick which one, and everybody in it gets a tag. Change who is in the directory and the tags follow.",
+    add: "New directory",
+    empty: "No directories yet",
+    first: "Create the main directory",
+    loading: "Loading directories…",
   },
 } as const;
 
-export function ProjectsPage({ output = "book" }: { output?: Output }) {
+export function ProjectsPage({ tags = false }: { tags?: boolean }) {
   const { entries } = useDirectory();
   const { canEdit } = useAuth();
   const [projects, setProjects] = useState<ProjectRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const words = WORDS[output];
-  // The two lists are the same rows told apart by a setting, so one fetch and
-  // one component do both.
-  const shown = projects?.filter(
-    (project) => normalizeSettings(project.settings).output === output,
-  );
-  const newHref = output === "tags" ? "/projects/new?output=tags" : "/projects/new";
+  const words = WORDS[tags ? "tags" : "book"];
 
   useEffect(() => {
     fetchProjects()
@@ -64,7 +57,7 @@ export function ProjectsPage({ output = "book" }: { output?: Output }) {
           <div className="sub">{words.sub}</div>
         </div>
         {canEdit ? (
-          <Link className="btn primary" to={newHref}>
+          <Link className="btn primary" to="/projects/new">
             {words.add}
           </Link>
         ) : null}
@@ -72,14 +65,14 @@ export function ProjectsPage({ output = "book" }: { output?: Output }) {
 
       {error ? <Notice kind="error">{error}</Notice> : null}
 
-      {shown?.length ? (
+      {projects?.length ? (
         <div className="grid two">
-          {shown.map((project) => {
+          {projects.map((project) => {
             const settings = normalizeSettings(project.settings);
             return (
               <Link
                 key={project.id}
-                to={`/projects/${project.id}`}
+                to={tags ? `/projects/${project.id}/tags` : `/projects/${project.id}`}
                 className="card"
                 style={{ textDecoration: "none", color: "inherit", display: "block" }}
               >
@@ -92,7 +85,7 @@ export function ProjectsPage({ output = "book" }: { output?: Output }) {
                     <p className="muted small">{project.description}</p>
                   ) : null}
                   <p className="muted small" style={{ marginTop: 8 }}>
-                    {settings.output === "tags" ? (
+                    {tags ? (
                       <>
                         {TAG_SIZES[settings.tagSize].label} · {tagsPerSheet(settings)} to a sheet of{" "}
                         {settings.pageSize === "a4"
@@ -127,13 +120,13 @@ export function ProjectsPage({ output = "book" }: { output?: Output }) {
             title={words.empty}
             action={
               canEdit ? (
-                <Link className="btn primary" to={newHref}>
+                <Link className="btn primary" to="/projects/new">
                   {words.first}
                 </Link>
               ) : null
             }
           >
-            {output === "tags" ? (
+            {tags ? (
               <>
                 One tag per person, off whichever people you choose — a family gets one each rather
                 than one between them.

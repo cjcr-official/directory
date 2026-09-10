@@ -86,7 +86,7 @@ export function composeTags(
   const people = peopleOf(entries);
   const logo = settings.coverLogoPath.trim();
   const church = settings.churchName.trim();
-  const tagline = settings.footerText.trim();
+  const tagline = settings.tagLine.trim();
 
   const sheets: SheetModel[] = [];
 

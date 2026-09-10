@@ -17,7 +17,7 @@ import { message } from "@/lib/format";
 /** Sheets drawn on screen before the rest is left to the PDF. */
 const PREVIEW_SHEET_LIMIT = 40;
 
-export function ProjectPreviewPage() {
+export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
   const { id } = useParams();
   const { entries } = useDirectory();
 
@@ -57,10 +57,9 @@ export function ProjectPreviewPage() {
         // Both composers hand back the same model, so the preview, the photo
         // fetch, the download and the progress bar below need no opinion about
         // which one made it.
-        const composed =
-          settings.output === "tags"
-            ? composeTags(included, settings, metrics)
-            : composeBook(included, settings, metrics);
+        const composed = tags
+          ? composeTags(included, settings, metrics)
+          : composeBook(included, settings, metrics);
         setBook(composed);
 
         if (composed.photoPaths.length) {
@@ -114,7 +113,8 @@ export function ProjectPreviewPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${project.name.replace(/[^\w\d-]+/g, "-").toLowerCase()}.pdf`;
+      const stem = project.name.replace(/[^\w\d-]+/g, "-").toLowerCase();
+      link.download = tags ? `${stem}-name-tags.pdf` : `${stem}.pdf`;
       link.click();
       // Give the browser a moment to start the download before releasing it.
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
@@ -131,15 +131,16 @@ export function ProjectPreviewPage() {
       <div className="page">
         <Notice kind="error">{error}</Notice>
         <p style={{ marginTop: 12 }}>
-          <Link className="btn" to={settings?.output === "tags" ? "/tags" : "/projects"}>
-            {settings?.output === "tags" ? "Back to name tags" : "Back to directories"}
+          <Link className="btn" to={tags ? "/tags" : "/projects"}>
+            {tags ? "Back to name tags" : "Back to directories"}
           </Link>
         </p>
       </div>
     );
   }
 
-  if (!book || !project || !settings) return <LoadingScreen label="Laying out the book…" />;
+  if (!book || !project || !settings)
+    return <LoadingScreen label={tags ? "Laying out the tags…" : "Laying out the book…"} />;
 
   const truncated = book.sheets.length > PREVIEW_SHEET_LIMIT;
 
@@ -159,7 +160,7 @@ export function ProjectPreviewPage() {
             <div className="preview-stats">
               <span>
                 <strong>{book.recordCount}</strong>{" "}
-                {settings.output === "tags"
+                {tags
                   ? book.recordCount === 1
                     ? "name tag"
                     : "name tags"
@@ -167,7 +168,7 @@ export function ProjectPreviewPage() {
                     ? "record"
                     : "records"}
               </span>
-              {settings.output === "tags" ? null : (
+              {tags ? null : (
                 <span>
                   <strong>{book.pageCount}</strong> {book.pageCount === 1 ? "page" : "pages"}
                 </span>
@@ -176,23 +177,23 @@ export function ProjectPreviewPage() {
                 <strong>{book.sheets.length}</strong>{" "}
                 {book.sheets.length === 1 ? "sheet" : "sheets"}
               </span>
-              <span>
-                {settings.output === "tags" ? tagsPerSheet(settings) : recordsPerSheet(settings)} to
-                a sheet
-              </span>
+              <span>{tags ? tagsPerSheet(settings) : recordsPerSheet(settings)} to a sheet</span>
             </div>
           </div>
         </div>
 
         <div className="preview-tools">
-          <label className="preview-check">
-            <input
-              type="checkbox"
-              checked={showGuides}
-              onChange={(event) => setShowGuides(event.target.checked)}
-            />
-            Fold guides
-          </label>
+          {/* Tags are cut apart, not folded, so there is no fold to guide. */}
+          {tags ? null : (
+            <label className="preview-check">
+              <input
+                type="checkbox"
+                checked={showGuides}
+                onChange={(event) => setShowGuides(event.target.checked)}
+              />
+              Fold guides
+            </label>
+          )}
 
           <PreviewZoom value={level} onChange={setLevel} />
 

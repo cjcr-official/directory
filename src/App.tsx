@@ -102,7 +102,7 @@ function Protected() {
             <Route path="people/:id" element={<PersonEditPage />} />
             <Route path="groups" element={<GroupsPage />} />
             <Route path="projects" element={<ProjectsPage />} />
-            <Route path="tags" element={<ProjectsPage output="tags" />} />
+            <Route path="tags" element={<ProjectsPage tags />} />
             <Route path="projects/new" element={<ProjectEditPage />} />
             <Route path="projects/:id" element={<ProjectEditPage />} />
             <Route path="settings" element={<SettingsPage />} />
@@ -111,6 +111,7 @@ function Protected() {
           </Route>
           {/* Full-bleed, outside the shell: the preview needs the whole window. */}
           <Route path="projects/:id/preview" element={<ProjectPreviewPage />} />
+          <Route path="projects/:id/tags" element={<ProjectPreviewPage tags />} />
           <Route path="sample" element={<SamplePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -5,8 +5,6 @@ export type TextScale = "compact" | "normal" | "large";
 export type Typeface = "sans" | "serif";
 /** How one record is set off from the next on the page. */
 export type CardStyle = "rule" | "box" | "none";
-/** What this project prints. The book, or a sheet of name tags. */
-export type Output = "book" | "tags";
 export type TagSizeName = "badge4x3" | "badge3x4" | "avery5395";
 
 /**
@@ -16,16 +14,16 @@ export type TagSizeName = "badge4x3" | "badge3x4" | "avery5395";
 export type ProjectSettings = {
   // --- sheet ---------------------------------------------------------------
   /**
-   * A booklet, or name tags off the same list of people.
+   * How this directory's name tags print, when they are printed.
    *
-   * Everything below still applies to the book; a tag sheet reads only the
-   * page size, the church name, the logo and the footer, and lays itself out
-   * from tagSize. Kept here rather than on projects.kind because kind is a
-   * column with a check constraint on it, and this is JSON.
+   * A directory is a list of people and a way of laying them out; it can print
+   * as a book or as a sheet of tags, off the same list either way. So these are
+   * not a mode - nothing here switches the book off - they are the second set
+   * of instructions, read only by the tag sheet.
    */
-  output: Output;
-  /** Which holder the tags have to fit. Only read when output is "tags". */
   tagSize: TagSizeName;
+  /** The line under the name. Its own field: a book's footer says something else. */
+  tagLine: string;
   pageSize: PageSizeName;
   /** Records stacked down each half of the sheet. */
   rows: number;
@@ -92,8 +90,8 @@ export type ProjectSettings = {
 };
 
 export const DEFAULT_SETTINGS: ProjectSettings = {
-  output: "book",
   tagSize: "badge4x3",
+  tagLine: "",
   pageSize: "letter",
   rows: 3,
   columns: 2,
@@ -153,7 +151,6 @@ export function normalizeSettings(raw: unknown): ProjectSettings {
   // Guard rails: the layout maths assumes at least one card per half.
   merged.rows = clamp(Math.round(merged.rows), 1, 8);
   merged.columns = clamp(Math.round(merged.columns), 1, 3);
-  if (!["book", "tags"].includes(merged.output)) merged.output = "book";
   if (!["badge4x3", "badge3x4", "avery5395"].includes(merged.tagSize)) merged.tagSize = "badge4x3";
   if (!["letter", "a4", "legal"].includes(merged.pageSize)) merged.pageSize = "letter";
   if (!["fill", "fit"].includes(merged.photoFit)) merged.photoFit = "fill";
