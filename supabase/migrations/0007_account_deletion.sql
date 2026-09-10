@@ -51,9 +51,9 @@
 -- delete_account, that pairing defeats the Supabase SQL editor: its statement
 -- splitter matches the outer begin to the inner end, decides the function has
 -- finished there, and sends a CREATE FUNCTION cut off before its closing
--- delimiter, which Postgres rejects as an unterminated dollar-quoted string. Nothing was
--- wrong with the SQL; it never arrived whole. Out here the block is the entire
--- body, and every function in this project is once again one begin to one end.
+-- delimiter, which Postgres rejects as an unterminated dollar-quoted string.
+-- Nothing was wrong with the SQL; it never arrived whole. Out here the block is
+-- the entire body, and every function here is once again one begin to one end.
 --
 -- Photographs are uploaded by whoever was at the keyboard, and storage records
 -- that person on the object. Letting the delete reach them would mean losing
