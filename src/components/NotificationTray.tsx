@@ -117,6 +117,20 @@ export function NotificationTray() {
     setShowing(seen);
   }, [seen]);
 
+  /*
+   * Installed to the Home Screen, the strip behind the home indicator is
+   * painted from the document's background rather than from anything drawn
+   * over it - and on a phone this panel is the whole screen, in its own
+   * colour. So the document has to be told the sheet is up, or it ends on a
+   * band of the page underneath. The stylesheet also says this with
+   * :has(.tray-panel); this is the half that cannot fail to match, exactly as
+   * the drawer does it in AppShell.
+   */
+  useEffect(() => {
+    document.documentElement.classList.toggle("tray-open", open);
+    return () => document.documentElement.classList.remove("tray-open");
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
@@ -209,13 +223,33 @@ export function NotificationTray() {
           >
             <div className="tray-head">
               <span className="tray-title">What&apos;s new</span>
-              <span className="muted small">
+              <span className="muted small tray-state">
                 {fresh.size
                   ? `${fresh.size} since you last looked`
                   : listed.length
                     ? "Nothing new"
                     : "Nothing yet"}
               </span>
+              {/* On a phone this panel is the screen, so there is no outside
+                  left to tap: the way out has to be in the sheet itself. On a
+                  desk the stylesheet hides it, where anywhere-but-here and
+                  Escape already close a panel that small. */}
+              <button
+                type="button"
+                className="tray-close"
+                aria-label="Close what's new"
+                onClick={close}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  aria-hidden
+                >
+                  <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+                </svg>
+              </button>
             </div>
 
             {listed.length ? (
