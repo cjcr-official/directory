@@ -5,9 +5,11 @@ import { useAuth } from "@/auth/AuthProvider";
 import { Avatar, EmptyState, LoadingScreen, Notice, TagPill } from "@/components/ui";
 import { ColumnPicker } from "@/components/ColumnPicker";
 import { readColumns, rememberColumns } from "@/lib/columns";
-import type { HouseholdRow, PersonRow, TagRow } from "@/lib/database.types";
+import type { Gender, HouseholdRow, PersonRow, TagRow } from "@/lib/database.types";
 import {
+  addressLines,
   alphaBucket,
+  effectiveAddress,
   fileAsName,
   formatPhone,
   formatShortDate,
@@ -18,7 +20,28 @@ import {
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
-type ColumnKey = "family" | "phone" | "email" | "birthday" | "groups";
+/* Not format.ts's HOUSEHOLD_ROLES: "Head of household" and "Spouse / partner"
+   are labels for a form, not for a column eight characters wide. */
+const ROLES: Record<string, string> = {
+  head: "Head",
+  spouse: "Spouse",
+  child: "Child",
+  other: "Other",
+};
+
+const GENDERS: Record<Gender, string> = { female: "Female", male: "Male" };
+
+type ColumnKey =
+  | "family"
+  | "role"
+  | "phone"
+  | "email"
+  | "address"
+  | "birthday"
+  | "anniversary"
+  | "gender"
+  | "notes"
+  | "groups";
 
 /** What a cell needs beyond the person it is drawn for. */
 interface Cells {
@@ -63,6 +86,13 @@ const COLUMNS: {
       ),
   },
   {
+    key: "role",
+    label: "Role",
+    width: "c-narrow",
+    cellClass: "small muted nowrap",
+    cell: (person) => ROLES[person.household_role ?? ""] ?? "—",
+  },
+  {
     key: "phone",
     label: "Phone",
     width: "c-narrow",
@@ -77,11 +107,41 @@ const COLUMNS: {
     cell: (person) => person.email || "—",
   },
   {
+    // The first line only, as on Families: the rest is a second line the row
+    // has no height for, and the whole address is one tap away.
+    key: "address",
+    label: "Address",
+    width: "c-mid",
+    cellClass: "small muted nowrap",
+    cell: (person, { household }) => addressLines(effectiveAddress(person, household))[0] ?? "—",
+  },
+  {
     key: "birthday",
     label: "Birthday",
     width: "c-tiny",
     cellClass: "small muted nowrap",
     cell: (person) => formatShortDate(person.date_of_birth) || "—",
+  },
+  {
+    key: "anniversary",
+    label: "Anniversary",
+    width: "c-tiny",
+    cellClass: "small muted nowrap",
+    cell: (person) => formatShortDate(person.anniversary) || "—",
+  },
+  {
+    key: "gender",
+    label: "Gender",
+    width: "c-tiny",
+    cellClass: "small muted nowrap",
+    cell: (person) => (person.gender ? GENDERS[person.gender] : "—"),
+  },
+  {
+    key: "notes",
+    label: "Notes",
+    width: "c-mid",
+    cellClass: "small muted nowrap",
+    cell: (person) => person.notes || "—",
   },
   {
     key: "groups",
