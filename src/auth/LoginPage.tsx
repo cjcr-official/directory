@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Logo } from "@/components/Logo";
-import { message } from "@/lib/format";
+import { message as errorText } from "@/lib/format";
 import { useAuth } from "./AuthProvider";
 
 /**
@@ -35,7 +35,7 @@ export function LoginPage() {
         }
       }
     } catch (cause) {
-      setError(message(cause));
+      setError(errorText(cause));
     }
   }
 

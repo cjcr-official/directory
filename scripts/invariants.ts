@@ -556,7 +556,14 @@ async function main() {
       coverLogoPath: "covers/logo.jpg",
     });
     const text = drawn(full.page).join("\n");
-    ok(text.includes("PLAINS ALLIANCE CHURCH"), "the church name is not on the cover");
+    // 87422a8 letterspaces the church name with real spaces - the standard
+    // fonts have no tracking - so every comparison here takes the spacing back
+    // out rather than hard-coding one particular way of spelling it.
+    const squash = (value: string) => value.replace(/\s+/g, "");
+    ok(
+      squash(text).includes(squash("PLAINS ALLIANCE CHURCH")),
+      "the church name is not on the cover",
+    );
     ok(text.includes("2026 Spring Directory"), "the title is not on the cover");
     ok(text.includes("OUR VISION…"), "the statement is not on the cover");
     ok(text.includes("P.O. Box 368"), "the contact block is not on the cover");
@@ -587,23 +594,29 @@ async function main() {
       ok(inside, `a cover picture sits outside the page it belongs to (${photo.path})`);
     }
 
-    // And in the order the stack was built in, top to bottom.
-    const at = (text: string) => full.page.runs.find((r) => r.text.startsWith(text))?.y ?? NaN;
+    // And in the order the stack was built in, top to bottom. 87422a8 made this
+    // three zones - head, title block, foot - so the photograph belongs to the
+    // head now, above the title, where it used to sit below it.
+    const at = (text: string) =>
+      full.page.runs.find((r) => squash(r.text).startsWith(squash(text)))?.y ?? NaN;
     const logo = full.page.photos.find((p) => p.path === "covers/logo.jpg");
     const shot = full.page.photos.find((p) => p.path === "covers/photo.jpg");
-    ok(!!logo && logo.box.y < at("PLAINS"), "the logo is not above the church name");
-    ok(!!shot && at("2026 Spring Directory") < shot.box.y, "the title is not above the photograph");
+    ok(!!logo && logo.box.y < at("PLAINS ALLIANCE"), "the logo is not above the church name");
+    ok(!!shot && at("PLAINS ALLIANCE") < shot.box.y, "the church name is not above the photograph");
     ok(
-      !!shot && shot.box.y + shot.box.h <= at("OUR VISION") + 0.5,
-      "the photograph overlaps the statement",
+      !!shot && shot.box.y + shot.box.h <= at("2026 Spring Directory") + 0.5,
+      "the photograph overlaps the title",
     );
+    ok(at("2026 Spring Directory") < at("OUR VISION"), "the title is not above the statement");
     ok(at("OUR VISION") < at("505 West"), "the statement is not above the contact block");
-    // The sharpest of these: the rule under the title is a page rule and the
-    // photograph is a page picture, so if only one of the two is moved onto the
-    // sheet the picture climbs over it. Nothing else here notices a shift of
-    // exactly one margin.
-    const rule = full.page.rules[0];
-    ok(!!rule && !!shot && rule.y < shot.box.y, "the photograph rides up over the title's rule");
+    // The sharpest of these: the rules are page rules and the photograph is a
+    // page picture, so if only one of the two is moved onto the sheet the
+    // picture climbs over them. Nothing else here notices a shift of exactly
+    // one margin.
+    ok(
+      !!shot && full.page.rules.every((r) => shot.box.y + shot.box.h <= r.y + 0.5),
+      "the photograph rides up over a cover rule",
+    );
 
     // A cover with only a title is only a title: an empty field must take no
     // room at all, not a blank line. Measured as the ink's own span, so padding
