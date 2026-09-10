@@ -47,6 +47,7 @@ function person(id: string, householdId: string | null, photo: string | null = n
     first_name: id,
     last_name: "Person",
     preferred_name: null,
+    gender: null,
     email: null,
     phone: null,
     date_of_birth: null,

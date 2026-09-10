@@ -64,6 +64,7 @@ addresses. What follows is the short form.
    - `0005_updated_by.sql` — who last changed a record
    - `0006_two_step_signin.sql` — an authenticator app, enforced by the database
    - `0007_account_deletion.sql` — letting an owner remove an account outright
+   - `0008_gender.sql` — recording whether a person is male or female
 3. From **Project Settings → API**, copy the **Project URL** and the
    **anon public** key.
 

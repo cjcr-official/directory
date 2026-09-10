@@ -14,7 +14,7 @@ import {
   LoadingScreen,
   Notice,
 } from "@/components/ui";
-import type { HouseholdRole, PersonRow } from "@/lib/database.types";
+import type { Gender, HouseholdRole, PersonRow } from "@/lib/database.types";
 import { removePhoto, uploadPhoto } from "@/lib/photos";
 import { createPerson, deletePerson, isStaleWrite, setTags, updatePerson } from "@/lib/queries";
 import {
@@ -32,6 +32,7 @@ const BLANK: Omit<PersonRow, "id" | "created_at" | "updated_at"> = {
   first_name: "",
   last_name: "",
   preferred_name: null,
+  gender: null,
   email: null,
   phone: null,
   date_of_birth: null,
@@ -331,6 +332,25 @@ export function PersonEditPage() {
                   />
                 )}
               </div>
+
+              <Field
+                label="Gender"
+                hint="For the lists a church keeps by it. Never printed, and never required."
+                htmlFor="gender"
+              >
+                <select
+                  id="gender"
+                  disabled={!canEdit}
+                  value={form.gender ?? ""}
+                  onChange={(event) =>
+                    patch({ gender: (event.target.value || null) as Gender | null })
+                  }
+                >
+                  <option value="">Not said</option>
+                  <option value="female">Female</option>
+                  <option value="male">Male</option>
+                </select>
+              </Field>
 
               <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <Field label="First name" htmlFor="first_name">

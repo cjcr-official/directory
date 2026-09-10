@@ -8,6 +8,8 @@
 
 export type AppRole = "owner" | "editor" | "viewer";
 export type HouseholdRole = "head" | "spouse" | "child" | "other";
+/** Null is a real answer: nobody has to say. See migration 0008. */
+export type Gender = "male" | "female";
 export type ProjectKind = "directory" | "event";
 export type SelectionMode = "all" | "tags" | "manual";
 export type EntryType = "household" | "person";
@@ -65,6 +67,7 @@ export type PersonRow = {
   first_name: string;
   last_name: string;
   preferred_name: string | null;
+  gender: Gender | null;
   email: string | null;
   phone: string | null;
   date_of_birth: string | null;

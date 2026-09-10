@@ -275,6 +275,20 @@ export function buildDemoData(householdCount = 34, individualCount = 9, seed = 2
     if (chance(0.5)) personTags.push({ person_id: person.id, tag_id: pick(tags).id });
   }
 
+  // Read off the pool the first name came from, in one pass rather than at
+  // each of the four places a person is made. Children keep theirs unsaid -
+  // they are drawn from a pool of their own, and an office often does not
+  // record it for them - which leaves the sample with a real spread and a
+  // real third of it null, rather than a column that is all one or all the
+  // other.
+  for (const person of people) {
+    person.gender = MEN.includes(person.first_name)
+      ? "male"
+      : WOMEN.includes(person.first_name)
+        ? "female"
+        : null;
+  }
+
   return { households, people, tags, householdTags, personTags };
 }
 
@@ -286,6 +300,7 @@ function blankPerson(id: string, stamp: string): PersonRow {
     first_name: "",
     last_name: "",
     preferred_name: null,
+    gender: null,
     email: null,
     phone: null,
     date_of_birth: null,

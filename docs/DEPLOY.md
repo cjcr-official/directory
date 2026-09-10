@@ -22,12 +22,13 @@ database exists.
 7. And once more for `supabase/migrations/0004_office_label.sql`.
 8. And again for `supabase/migrations/0005_updated_by.sql`.
 9. Then `supabase/migrations/0006_two_step_signin.sql`.
-10. Last one: `supabase/migrations/0007_account_deletion.sql`.
+10. Then `supabase/migrations/0007_account_deletion.sql`.
+11. Last one: `supabase/migrations/0008_gender.sql`.
 
-All seven files are safe to run twice, so if you are unsure whether one took,
+All eight files are safe to run twice, so if you are unsure whether one took,
 run it again.
 
-An existing directory needs steps 6 to 10 too.
+An existing directory needs steps 6 to 11 too.
 
 **6.** Setting a record's groups used to be a delete and an insert sent
 separately, with a moment in between where the record had none — and a
@@ -73,6 +74,11 @@ up, misspelt addresses, and anyone locked out of their own authenticator app.
 account. It removes the sign-in itself, and nothing that account entered: the
 families, people and directories they typed are the congregation's records and
 stay where they are, and so do the photographs they uploaded.
+
+**11.** Gender. A church office keeps this for the men's breakfast list and the
+women's Bible study, and until now it kept it on a separate sheet of paper.
+0008 adds the column, allows only `male` or `female` in it, and lets it stay
+empty — nobody is required to say, and the form offers "Not said" first.
 
 > **What these do.** The first creates the tables and — more importantly — the
 > row level security policies that stop anyone reading the directory without an
