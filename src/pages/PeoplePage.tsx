@@ -1,10 +1,10 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useDirectory } from "@/data/DirectoryContext";
 import { useAuth } from "@/auth/AuthProvider";
 import { Avatar, EmptyState, LoadingScreen, Notice, TagPill } from "@/components/ui";
 import { ColumnPicker } from "@/components/ColumnPicker";
-import { readColumns, rememberColumns } from "@/lib/columns";
+import { readColumns, readWidths, rememberColumns, rememberWidths } from "@/lib/columns";
 import type { Gender, HouseholdRow, PersonRow, TagRow } from "@/lib/database.types";
 import {
   addressLines,
@@ -53,6 +53,23 @@ interface Cells {
   tagsOf: () => TagRow[];
 }
 
+/*
+ * What each share of the grid comes to in pixels, near enough.
+ *
+ * Only ever used to work out how narrow the table is allowed to get before it
+ * scrolls instead of squeezing. The percentages in the stylesheet still do the
+ * dividing up; this is the floor under them, because ten columns sharing 100%
+ * of a laptop is ten columns none of which can be read.
+ */
+const FLOORS: Record<string, number> = {
+  "c-portrait": 58,
+  "c-wide": 190,
+  "c-mid": 150,
+  "c-narrow": 105,
+  "c-tiny": 78,
+  "c-rest": 120,
+};
+
 /**
  * The columns somebody can switch off, in the order they read in.
  *
@@ -89,14 +106,14 @@ const COLUMNS: {
     key: "role",
     label: "Role",
     width: "c-narrow",
-    cellClass: "small muted nowrap",
+    cellClass: "small muted",
     cell: (person) => ROLES[person.household_role ?? ""] ?? "—",
   },
   {
     key: "phone",
     label: "Phone",
     width: "c-narrow",
-    cellClass: "small muted nowrap",
+    cellClass: "small muted",
     cell: (person) => formatPhone(person.phone) || "—",
   },
   {
@@ -112,35 +129,35 @@ const COLUMNS: {
     key: "address",
     label: "Address",
     width: "c-mid",
-    cellClass: "small muted nowrap",
+    cellClass: "small muted",
     cell: (person, { household }) => addressLines(effectiveAddress(person, household))[0] ?? "—",
   },
   {
     key: "birthday",
     label: "Birthday",
     width: "c-tiny",
-    cellClass: "small muted nowrap",
+    cellClass: "small muted",
     cell: (person) => formatShortDate(person.date_of_birth) || "—",
   },
   {
     key: "anniversary",
     label: "Anniversary",
     width: "c-tiny",
-    cellClass: "small muted nowrap",
+    cellClass: "small muted",
     cell: (person) => formatShortDate(person.anniversary) || "—",
   },
   {
     key: "gender",
     label: "Gender",
     width: "c-tiny",
-    cellClass: "small muted nowrap",
+    cellClass: "small muted",
     cell: (person) => (person.gender ? GENDERS[person.gender] : "—"),
   },
   {
     key: "notes",
     label: "Notes",
     width: "c-mid",
-    cellClass: "small muted nowrap",
+    cellClass: "small muted",
     cell: (person) => person.notes || "—",
   },
   {
@@ -160,6 +177,47 @@ const COLUMNS: {
 
 const KEYS = COLUMNS.map((column) => column.key);
 
+/** Narrower than this and a column is a sliver nobody can grab hold of again. */
+const MIN_WIDTH = 56;
+
+/**
+ * The strip down the right-hand edge of a heading that widens its column.
+ *
+ * Pointer capture rather than listeners on the document: the browser keeps
+ * sending the moves here even once the pointer has left the nine pixels this
+ * is, so there is nothing to attach, nothing to tear down, and no way to leave
+ * a stray handler behind if the table re-renders mid-drag. It is also what
+ * makes this work with a finger and a stylus for free.
+ *
+ * There is none on the last column. That one is auto - it exists to soak up
+ * whatever the others leave - so dragging it would be a handle attached to
+ * nothing.
+ */
+function Grip({ onDrag }: { onDrag: (width: number) => void }) {
+  const start = useRef<{ x: number; width: number } | null>(null);
+
+  return (
+    <span
+      className="col-grip"
+      onPointerDown={(event) => {
+        // Or the drag selects the heading text under it instead.
+        event.preventDefault();
+        const cell = event.currentTarget.parentElement;
+        if (!cell) return;
+        start.current = { x: event.clientX, width: cell.getBoundingClientRect().width };
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }}
+      onPointerMove={(event) => {
+        if (!start.current) return;
+        onDrag(Math.max(MIN_WIDTH, start.current.width + event.clientX - start.current.x));
+      }}
+      onPointerUp={() => {
+        start.current = null;
+      }}
+    />
+  );
+}
+
 export function PeoplePage() {
   const { people, tags, householdById, tagsOfPerson, loading, error } = useDirectory();
   const { canEdit } = useAuth();
@@ -168,6 +226,7 @@ export function PeoplePage() {
   const [letter, setLetter] = useState<string | null>(null);
   const [scope, setScope] = useState<"all" | "unattached">("all");
   const [shown, setShown] = useState(() => readColumns("people", KEYS));
+  const [widths, setWidths] = useState(() => readWidths("people"));
 
   const tagsById = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags]);
 
@@ -193,6 +252,34 @@ export function PeoplePage() {
   );
 
   const visible = COLUMNS.filter((column) => shown.includes(column.key));
+
+  /*
+   * The grid, after the portrait: the name, then whatever is switched on.
+   *
+   * In pixels, not in the stylesheet's percentages. Ten columns' worth of
+   * those add up to a hundred and twenty per cent, and a fixed table given
+   * more than it has scales every column down to fit and leaves the last one -
+   * the auto one, the one that is meant to take the slack - exactly nothing.
+   * Groups simply was not drawn. Pixels here, a floor under the table, and the
+   * last column gets what is left over instead of what is left of nothing.
+   */
+  const grid = [
+    { key: "name", width: "c-wide" },
+    ...visible.map((column) => ({ key: column.key, width: column.width })),
+  ];
+  const widthOf = (key: string, share: string) => widths[key] ?? FLOORS[share] ?? 120;
+
+  /* Every column but the last, which is auto and needs a floor of its own. */
+  const leastWidth =
+    FLOORS["c-portrait"] +
+    FLOORS["c-rest"] +
+    grid.slice(0, -1).reduce((total, column) => total + widthOf(column.key, column.width), 0);
+
+  const drag = (key: string) => (width: number) => {
+    const next = { ...widths, [key]: Math.round(width) };
+    setWidths(next);
+    rememberWidths("people", next);
+  };
 
   if (loading && !people.length) return <LoadingScreen label="Loading people…" />;
 
@@ -266,9 +353,16 @@ export function PeoplePage() {
         ))}
       </div>
 
-      <div className="card">
+      <div className="card table-scroll">
         {filtered.length ? (
-          <table className="list-table grid-table">
+          <table
+            className="list-table grid-table"
+            /* A property rather than min-width itself, so the phone rules can
+               drop it: down there the table is a stack of cards and a floor
+               under its width would only give the card something to scroll
+               sideways over. */
+            style={{ "--least-width": `${leastWidth}px` } as CSSProperties}
+          >
             {/* The column widths live here rather than in the cells, so the
                 grid is one thing to read and one thing to change. Whichever
                 column ends up last takes the slack, because a fixed table with
@@ -277,21 +371,25 @@ export function PeoplePage() {
                 of a portrait the moment somebody switched the groups off. */}
             <colgroup>
               <col className="c-portrait" />
-              <col className={visible.length ? "c-wide" : "c-rest"} />
-              {visible.map((column, index) => (
-                <col
-                  key={column.key}
-                  className={index === visible.length - 1 ? "c-rest" : column.width}
-                />
-              ))}
+              {grid.map((column, index) =>
+                index === grid.length - 1 ? (
+                  <col key={column.key} className="c-rest" />
+                ) : (
+                  <col key={column.key} style={{ width: widthOf(column.key, column.width) }} />
+                ),
+              )}
             </colgroup>
             <thead>
               <tr>
                 <th style={{ width: 56 }}></th>
-                <th>Name</th>
-                {visible.map((column) => (
+                <th>
+                  Name
+                  {visible.length ? <Grip onDrag={drag("name")} /> : null}
+                </th>
+                {visible.map((column, index) => (
                   <th key={column.key} className={column.onPhone ? "" : "hide-sm"}>
                     {column.label}
+                    {index === visible.length - 1 ? null : <Grip onDrag={drag(column.key)} />}
                   </th>
                 ))}
               </tr>

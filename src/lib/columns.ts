@@ -23,6 +23,7 @@
  */
 
 const PREFIX = "church-directory:columns:";
+const WIDTHS = "church-directory:widths:";
 
 /** Everything unreadable is treated as "nothing hidden" - the whole table. */
 function hiddenSet(stored: string | null): Set<string> {
@@ -70,5 +71,43 @@ export function rememberColumns<K extends string>(
   } catch {
     // Not worth failing over: the table is simply back to all of its columns
     // the next time this device opens it.
+  }
+}
+
+/**
+ * The same again for widths a person has dragged, keyed by column.
+ *
+ * A width is a number of pixels or it is nothing: anything else in storage -
+ * a string, a negative, a NaN that JSON turned into null - is dropped rather
+ * than argued with, and that column goes back to its share of the grid.
+ */
+export function parseWidths(stored: string | null): Record<string, number> {
+  const widths: Record<string, number> = {};
+  if (!stored) return widths;
+  try {
+    const parsed: unknown = JSON.parse(stored);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return widths;
+    for (const [key, value] of Object.entries(parsed)) {
+      if (typeof value === "number" && Number.isFinite(value) && value > 0) widths[key] = value;
+    }
+  } catch {
+    // Same as above: an unreadable choice is no choice.
+  }
+  return widths;
+}
+
+export function readWidths(table: string): Record<string, number> {
+  try {
+    return parseWidths(localStorage.getItem(WIDTHS + table));
+  } catch {
+    return {};
+  }
+}
+
+export function rememberWidths(table: string, widths: Record<string, number>): void {
+  try {
+    localStorage.setItem(WIDTHS + table, JSON.stringify(widths));
+  } catch {
+    // As above.
   }
 }

@@ -1131,12 +1131,27 @@ td {
  */
 .grid-table {
   table-layout: fixed;
+  /* The floor the page works out from the columns it is drawing. Past it the
+     card scrolls sideways rather than squeezing ten columns into a laptop. */
+  min-width: var(--least-width, 0);
 }
 
 .grid-table td,
 .grid-table th {
   overflow: hidden;
   text-overflow: ellipsis;
+  /* Shorter text, never taller rows. The whole point of a fixed grid is that
+     every row is the same height, and a column dragged narrow would otherwise
+     take a long address and stack it three lines deep - which is the one thing
+     this layout exists to prevent. Phones put it back, below. */
+  white-space: nowrap;
+}
+
+/* Headings are the handle for the drag that resizes a column, so they are not
+   text anybody is trying to select - and half a selected heading dragged
+   across the table is what happens if they stay selectable. */
+.grid-table th {
+  user-select: none;
 }
 
 /* The portrait, then the columns in the order each page declares them. */
@@ -1363,6 +1378,57 @@ th.num {
 .letter-bar button:disabled {
   opacity: 0.3;
   cursor: default;
+}
+
+/* --- a table wider than its card -------------------------------------------
+ *
+ * Ten columns do not fit a laptop, and a fixed table asked to fit them anyway
+ * does not drop any - it squeezes all of them, until every column is four
+ * characters and an ellipsis and the table says nothing. Past the floor the
+ * page works out for its columns, this scrolls sideways instead.
+ * -------------------------------------------------------------------------- */
+
+.table-scroll {
+  overflow-x: auto;
+  /* The rounded corners are on this box now that it clips, or the first and
+     last rows square themselves off against it. */
+  overflow-y: hidden;
+}
+
+/* The strip at the right-hand edge of a heading that drags its column wider.
+   Nine pixels: narrower is a target you hunt for, wider and it eats into the
+   heading it sits on. */
+.col-grip {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 9px;
+  cursor: col-resize;
+  /* The pointer is what drags this, so nothing here should be selectable or
+     draggable as text. */
+  user-select: none;
+  touch-action: none;
+}
+.col-grip::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  right: 4px;
+  bottom: 6px;
+  width: 1px;
+  background: var(--line-strong);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+/* Quiet until it is wanted: a line between every pair of headings would read
+   as a ruled table, which this one deliberately is not. */
+.col-grip:hover::after,
+.col-grip:active::after {
+  opacity: 1;
+}
+.grid-table th {
+  position: relative;
 }
 
 /* --- choosing the columns --------------------------------------------------
@@ -2523,6 +2589,12 @@ th.num {
     display: none;
   }
 
+  /* Cards, not columns - so the floor under the table's width goes, or the
+     card is left with a thousand pixels of nothing to swipe sideways over. */
+  .list-table {
+    min-width: 0;
+  }
+
   .list-table,
   .list-table tbody,
   .list-table tr,
@@ -2548,6 +2620,10 @@ th.num {
   .list-table td {
     padding: 0;
     border: none;
+    /* A card is not a column: there is no grid to keep even here, and a long
+       name clipped at the edge of a phone is worse than a long name on two
+       lines. */
+    white-space: normal;
   }
 
   /* Must out-rank ".list-table td" above, which would otherwise turn the

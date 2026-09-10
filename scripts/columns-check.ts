@@ -14,7 +14,7 @@
  *
  *   npm run columns:check
  */
-import { shownColumns } from "../src/lib/columns";
+import { parseWidths, shownColumns } from "../src/lib/columns";
 import { same } from "./check";
 
 // The People table, in the order it reads in.
@@ -80,3 +80,23 @@ same("a list with junk in it", shownColumns('["email",7,null]', ALL), [
   "birthday",
   "groups",
 ]);
+
+console.log("\nwidths somebody dragged\n");
+
+same("nothing stored", parseWidths(null), {});
+same("a column widened", parseWidths('{"email":270}'), { email: 270 });
+same("several", parseWidths('{"name":190,"email":270}'), { name: 190, email: 270 });
+
+// A width is a number of pixels or it is nothing. Each of these would
+// otherwise reach the style attribute and take a column with it: a string
+// width silently does nothing, a zero or a negative collapses the column to a
+// line, and NaN takes the whole row's layout with it.
+same("a width that is a string", parseWidths('{"email":"270"}'), {});
+same("a width of zero", parseWidths('{"email":0}'), {});
+same("a negative width", parseWidths('{"email":-40}'), {});
+same("a null where a number was", parseWidths('{"email":null}'), {});
+same("the good ones survive the bad", parseWidths('{"email":270,"name":"wide"}'), { email: 270 });
+
+same("not JSON", parseWidths("email=270"), {});
+same("a list, not an object", parseWidths('["email"]'), {});
+same("the word null", parseWidths("null"), {});
