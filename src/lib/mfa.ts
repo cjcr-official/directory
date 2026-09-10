@@ -1,3 +1,4 @@
+import { qrDataUri } from "./qr";
 import { supabase } from "./supabase";
 
 /**
@@ -121,11 +122,11 @@ export async function beginEnrolment(name: string): Promise<Enrolment> {
 
   return {
     factorId: data.id,
-    // Supabase hands back the QR as SVG source rather than as a URL. It is
-    // percent-encoded on the way into the data: URI rather than pasted in
-    // raw - the artwork carries #000000 in it, and a bare # ends a URL and
-    // starts a fragment, which renders as a broken image and nothing else.
-    qr: `data:image/svg+xml;utf-8,${encodeURIComponent(data.totp.qr_code)}`,
+    // Supabase hands back the QR as SVG source rather than as a URL, and how
+    // that becomes one is not a detail - see lib/qr.ts, where getting it wrong
+    // drew a broken image on every iPhone and a perfect QR code everywhere it
+    // was looked at.
+    qr: qrDataUri(data.totp.qr_code),
     secret: data.totp.secret,
   };
 }

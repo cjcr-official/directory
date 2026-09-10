@@ -2817,13 +2817,22 @@ th.num {
 }
 
 /* The steps of setting up an authenticator: scan, or type it in, then prove
-   it arrived. Numbered because they are done in order. */
+   it arrived. Numbered because they are done in order, and each one opens with
+   the instruction in bold so the three read as three actions before a word of
+   the explanation is read. */
 .steps {
-  margin: 6px 0 16px;
-  padding-left: 20px;
+  margin: 6px 0 18px;
+  padding-left: 22px;
   display: grid;
-  gap: 14px;
+  gap: 20px;
   font-size: 0.9rem;
+}
+.steps > li::marker {
+  color: var(--accent);
+  font-weight: 700;
+}
+.steps strong {
+  font-weight: 640;
 }
 
 /*
@@ -2833,30 +2842,60 @@ th.num {
  * transparent code leaves nothing to read at all.
  */
 .qr {
-  display: inline-block;
-  margin-top: 10px;
-  padding: 10px;
+  /* A figure, so it hugs the artwork rather than stretching to the card. The
+     lift is what makes it read as something laid on the page to be
+     photographed, rather than as an empty box. */
+  width: fit-content;
+  margin: 12px 0 0;
+  padding: 12px;
   background: var(--sheet);
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 .qr img {
   display: block;
-  width: 168px;
-  height: 168px;
+  width: 176px;
+  height: 176px;
 }
 
-/* The same secret in letters, for a phone that cannot photograph this screen -
-   the second device is often the one being set up. Selectable in one gesture,
-   because it is going to be copied. */
-.secret {
-  margin-top: 8px;
+/* The same key in letters, for a phone that cannot photograph this screen -
+   the second device is often the one being set up. Grouped in fours by
+   lib/qr.ts, so it wraps between groups and can be read across without losing
+   your place; selectable in one gesture, and copyable in none. */
+.setup-key {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.setup-key code {
+  flex: 1 1 220px;
+  min-width: 0;
   padding: 9px 11px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--canvas);
-  word-break: break-all;
+  font-size: 0.86rem;
+  word-break: break-word;
   user-select: all;
+}
+
+/* Six digits need the width of six digits, and the label above them is doing
+   the work a wider box would only pretend to do. */
+.code-field {
+  max-width: 210px;
+  margin: 10px 0 0;
+}
+
+/* One button is the decision and the other is the way out. On a phone they
+   share the row rather than leaving the primary one stranded at the left, and
+   the cap stops them looking like a pair of banners on a desktop. */
+.enrol-actions .btn {
+  flex: 1 1 auto;
+  justify-content: center;
+  max-width: 220px;
 }
 
 /* Six digits, read off one screen and typed onto another. Spaced out and set
