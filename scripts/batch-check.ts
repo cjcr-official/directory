@@ -39,7 +39,11 @@ console.log("\na page of faces asking one at a time");
   same("every face gets its URL", results.length, 400);
   same("and they are the right ones", results[7], "url:people/7.jpg");
   same("requests made", calls.length, 4);
-  same("all four are full batches", calls.map((c) => c.length), [100, 100, 100, 100]);
+  same(
+    "all four are full batches",
+    calls.map((c) => c.length),
+    [100, 100, 100, 100],
+  );
 }
 
 console.log("\nthe same photograph asked for by several rows at once");

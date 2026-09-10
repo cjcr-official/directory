@@ -171,7 +171,11 @@ console.log("\none family was deleted, and work has happened since");
   const rows = selectRows(file, live, "missing", new Set(["p:p1:t2"]));
   same("only the deleted family comes back", ids(rows.households), ["h1"]);
   same("only its people come back", ids(rows.people), ["p1", "p2"]);
-  same("they are still in their family", rows.people.every((p) => p.household_id === "h1"), true);
+  same(
+    "they are still in their family",
+    rows.people.every((p) => p.household_id === "h1"),
+    true,
+  );
   same("its group link is restored", rows.householdTags, [{ household_id: "h1", tag_id: "t1" }]);
   same("a link already there is left alone", rows.personTags.length, 0);
   same("nothing about h3 or p4 is touched", ids(rows.households).includes("h3"), false);
@@ -270,7 +274,11 @@ console.log("\nlinks and entries pointing at things that will not exist");
   same("the dangling directory group is dropped", rows.projectTags, [
     { project_id: "pr1", tag_id: "t1" },
   ]);
-  same("only the entry that resolves survives", rows.projectEntries.map((e) => e.ref_id), ["h1"]);
+  same(
+    "only the entry that resolves survives",
+    rows.projectEntries.map((e) => e.ref_id),
+    ["h1"],
+  );
 }
 
 console.log("\nphotographs");
