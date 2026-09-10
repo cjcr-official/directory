@@ -21,6 +21,7 @@
 
 import { qrDataUri, formatSetupKey } from "@/lib/qr";
 import { check } from "./check";
+import { readFileSync } from "node:fs";
 
 /** What Supabase hands back: SVG source, with a colour written as a hex. */
 const SVG =
@@ -94,4 +95,23 @@ check(
   "and a key that does not divide by four keeps every character",
   formatSetupKey("ABCDEF").replace(/ /g, "") === "ABCDEF",
   formatSetupKey("ABCDEF"),
+);
+
+// The half of this that is not the artwork: the pane has to still be there
+// when you come back from the authenticator app. UpdateGate reloads on the
+// visibilitychange that returning fires, and its guard against destroying work
+// only knows about typing - the trip out happens before a digit is typed. So a
+// reload landed on the enrolment and took the secret with it, and the next
+// attempt had to unenrol the half-made factor before it could start again.
+//
+// A rule about the source rather than a rendered page, in the same spirit as
+// fields-check and strip-check: seeing this needs a phone, a backgrounded app
+// and a deploy in flight, and CI has none of the three.
+const gate = readFileSync("src/components/UpdateGate.tsx", "utf8");
+const busy = /const busy =[^;]*;/.exec(gate)?.[0] ?? "";
+check("the enrolment screen holds a reload back", busy.includes('"/settings"'), busy);
+check(
+  "as the backup and the preview still do",
+  busy.includes('"/backup"') && busy.includes('"/preview"'),
+  busy,
 );

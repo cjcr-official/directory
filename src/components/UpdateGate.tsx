@@ -150,8 +150,12 @@ export function UpdateGate() {
   }, [updating]);
 
   // The preview renders a book and the backup builds a zip file; neither is a
-  // form, and neither should be interrupted halfway.
-  const busy = pathname === "/backup" || pathname.endsWith("/preview");
+  // form, and neither should be interrupted halfway. Settings is here for the
+  // authenticator setup: reading a code off an authenticator means leaving the
+  // app, coming back is exactly when this looks for a new version, and the QR
+  // and its key are a server-made secret that a reload throws away for good -
+  // editedRef cannot help, because the trip out happens before anything is typed.
+  const busy = pathname === "/backup" || pathname === "/settings" || pathname.endsWith("/preview");
 
   useEffect(() => {
     if (!pending || updating) return;
