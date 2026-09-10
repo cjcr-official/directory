@@ -2821,8 +2821,9 @@ th.num {
    the instruction in bold so the three read as three actions before a word of
    the explanation is read. */
 .steps {
+  --step-indent: 22px;
   margin: 6px 0 18px;
-  padding-left: 22px;
+  padding-left: var(--step-indent);
   display: grid;
   gap: 20px;
   font-size: 0.9rem;
@@ -2847,6 +2848,9 @@ th.num {
      photographed, rather than as an empty box. */
   width: fit-content;
   margin: 12px auto 0;
+  /* The list indents this column on its left only, so centring inside it sits
+     half an indent right of the card. Half of it back, off the same value. */
+  transform: translateX(calc(var(--step-indent) / -2));
   padding: 12px;
   background: var(--sheet);
   border: 1px solid var(--line-strong);
