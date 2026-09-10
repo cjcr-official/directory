@@ -115,3 +115,18 @@ check(
   busy.includes('"/backup"') && busy.includes('"/preview"'),
   busy,
 );
+
+// The other half of the same trip. Supabase re-announces SIGNED_IN on every
+// visibilitychange back to visible, and AuthProvider used to blank profileLoaded
+// on any auth event - which sends App's Protected back to its loading screen and
+// unmounts every screen underneath, enrolment pane included. Blank it only when
+// the person actually changes.
+const auth = readFileSync("src/auth/AuthProvider.tsx", "utf8");
+const listener = /onAuthStateChange\(([\s\S]*?)\n    \}\);/.exec(auth)?.[1] ?? "";
+const blanking = listener.split("\n").filter((line) => line.includes("setProfileLoaded(false)"));
+check("the auth listener was found to check", listener.includes("setSession"), "it moved");
+check(
+  "coming back to the app does not blank the page under it",
+  blanking.every((line) => line.includes("if (")),
+  blanking.join(" / "),
+);

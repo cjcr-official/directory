@@ -60,6 +60,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   const latestLoad = useRef(0);
 
+  /**
+   * Who the last auth event was about.
+   *
+   * Supabase re-announces SIGNED_IN every time the tab becomes visible again -
+   * _recoverAndRefresh does it from its own visibilitychange listener - and a
+   * token refresh says the same thing on the hour. Neither is a new person, and
+   * telling them apart is the whole job of this ref.
+   */
+  const lastUser = useRef<string | undefined>(undefined);
+
   const loadProfile = useCallback(async (userId: string | undefined) => {
     const ticket = (latestLoad.current += 1);
     const current = () => latestLoad.current === ticket;
@@ -106,16 +116,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(async ({ data }) => {
       if (!active) return;
       setSession(data.session);
+      lastUser.current = data.session?.user.id;
       await loadProfile(data.session?.user.id);
       if (active) setReady(true);
     });
 
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      const nextUser = nextSession?.user.id;
       setSession(nextSession);
-      setProfileLoaded(false);
+      // Only when the person actually changes. Blanking this on every event sent
+      // Protected back to its loading screen, which unmounts everything below it
+      // - so returning to the app from an authenticator threw away the enrolment
+      // pane, and any half-filled family or person form with it. There is nothing
+      // to hide while the same profile reloads: it is still the right one.
+      if (nextUser !== lastUser.current) setProfileLoaded(false);
+      lastUser.current = nextUser;
       // The profile row is created by a database trigger on first sign-up, so
       // it may appear a moment after the session does.
-      void loadProfile(nextSession?.user.id);
+      void loadProfile(nextUser);
     });
 
     return () => {
