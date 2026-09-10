@@ -12,7 +12,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { useDirectory } from "@/data/DirectoryContext";
 import { Avatar } from "@/components/ui";
-import { describeWhen, fullName, join, labelledHouseholdName, personPhotoPath } from "@/lib/format";
+import { describeWhen, fullName, personPhotoPath } from "@/lib/format";
 import {
   addedBy,
   newestArrival,
@@ -273,11 +273,14 @@ export function NotificationTray() {
                             {fullName(person)}
                             {fresh.has(person.id) ? <span className="tray-new">New</span> : null}
                           </span>
+                          {/* Who arrived and when, and nothing else. The
+                              family was on this line too and it was the
+                              longest part of it - a second name, in brackets,
+                              wrapping every row onto three lines to repeat
+                              what the surname above had already said. It is
+                              one tap away on the record itself. */}
                           <span className="muted small">
-                            {join([
-                              when ? `Added ${when}${who ? ` by ${who}` : ""}` : null,
-                              household ? labelledHouseholdName(household) : null,
-                            ])}
+                            {when ? `Added ${when}${who ? ` by ${who}` : ""}` : null}
                           </span>
                         </span>
                       </Link>
