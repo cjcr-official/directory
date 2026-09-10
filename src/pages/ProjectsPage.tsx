@@ -5,7 +5,8 @@ import { useAuth } from "@/auth/AuthProvider";
 import { EmptyState, LoadingScreen, Notice } from "@/components/ui";
 import { fetchProjects } from "@/lib/queries";
 import type { ProjectRow } from "@/lib/database.types";
-import { normalizeSettings, recordsPerSheet } from "@/lib/layout/settings";
+import { TAG_SIZES, normalizeSettings, recordsPerSheet } from "@/lib/layout/settings";
+import { tagsPerSheet } from "@/lib/layout/tags";
 import { message } from "@/lib/format";
 
 export function ProjectsPage() {
@@ -61,20 +62,41 @@ export function ProjectsPage() {
                 <div className="card-body">
                   <div className="row" style={{ marginBottom: 6 }}>
                     <h2 style={{ flex: 1 }}>{project.name}</h2>
-                    <span className="pill">{project.kind === "event" ? "Event" : "Main"}</span>
+                    <span className="pill">
+                      {settings.output === "tags"
+                        ? "Name tags"
+                        : project.kind === "event"
+                          ? "Event"
+                          : "Main"}
+                    </span>
                   </div>
                   {project.description ? (
                     <p className="muted small">{project.description}</p>
                   ) : null}
                   <p className="muted small" style={{ marginTop: 8 }}>
-                    {settings.rows} per half-page · {recordsPerSheet(settings)} records to a sheet ·{" "}
-                    {settings.pageSize === "a4"
-                      ? "A4"
-                      : settings.pageSize === "legal"
-                        ? "Legal"
-                        : "Letter"}{" "}
-                    landscape
-                    {settings.bookletOrder ? " · booklet order" : ""}
+                    {settings.output === "tags" ? (
+                      <>
+                        {TAG_SIZES[settings.tagSize].label} · {tagsPerSheet(settings)} to a sheet of{" "}
+                        {settings.pageSize === "a4"
+                          ? "A4"
+                          : settings.pageSize === "legal"
+                            ? "Legal"
+                            : "Letter"}{" "}
+                        portrait
+                      </>
+                    ) : (
+                      <>
+                        {settings.rows} per half-page · {recordsPerSheet(settings)} records to a
+                        sheet ·{" "}
+                        {settings.pageSize === "a4"
+                          ? "A4"
+                          : settings.pageSize === "legal"
+                            ? "Legal"
+                            : "Letter"}{" "}
+                        landscape
+                        {settings.bookletOrder ? " · booklet order" : ""}
+                      </>
+                    )}
                   </p>
                 </div>
               </Link>

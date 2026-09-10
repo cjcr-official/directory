@@ -112,3 +112,28 @@ fast and PDFs small.
 
 Records without a photograph print with initials in a soft box. A directory
 where a few faces are missing still looks deliberate.
+
+## Name tags
+
+A directory can print name tags instead of a booklet. It is the same recipe —
+the same list of people, chosen the same way — laid out differently: set
+**Prints** to _Name tags_ on the directory's page.
+
+Tags print portrait, as many to a sheet as the paper holds, centred, with a
+pale line round each one to cut along. Pick the size to match the holders in
+the cupboard rather than the paper:
+
+| Size                   | To a sheet of Letter |
+| ---------------------- | -------------------- |
+| 4" × 3" landscape      | 6                    |
+| 3" × 4" portrait       | 4                    |
+| Avery 5395 (3⅜" × 2⅓") | 8                    |
+
+Each tag carries the mark and the church's name from **The cover**, the
+person's name as large as it will fit, and the footer line underneath. A long
+name breaks over two lines and shrinks until it fits, so every tag in a run is
+cut to the same size whatever the name on it.
+
+One tag per person: a family prints one for each of its members, not one for
+the household. Print on card if you have it — ordinary paper curls inside a
+holder.

@@ -5,6 +5,9 @@ export type TextScale = "compact" | "normal" | "large";
 export type Typeface = "sans" | "serif";
 /** How one record is set off from the next on the page. */
 export type CardStyle = "rule" | "box" | "none";
+/** What this project prints. The book, or a sheet of name tags. */
+export type Output = "book" | "tags";
+export type TagSizeName = "badge4x3" | "badge3x4" | "avery5395";
 
 /**
  * Everything about how one project prints. Stored as JSON in projects.settings,
@@ -12,6 +15,17 @@ export type CardStyle = "rule" | "box" | "none";
  */
 export type ProjectSettings = {
   // --- sheet ---------------------------------------------------------------
+  /**
+   * A booklet, or name tags off the same list of people.
+   *
+   * Everything below still applies to the book; a tag sheet reads only the
+   * page size, the church name, the logo and the footer, and lays itself out
+   * from tagSize. Kept here rather than on projects.kind because kind is a
+   * column with a check constraint on it, and this is JSON.
+   */
+  output: Output;
+  /** Which holder the tags have to fit. Only read when output is "tags". */
+  tagSize: TagSizeName;
   pageSize: PageSizeName;
   /** Records stacked down each half of the sheet. */
   rows: number;
@@ -78,6 +92,8 @@ export type ProjectSettings = {
 };
 
 export const DEFAULT_SETTINGS: ProjectSettings = {
+  output: "book",
+  tagSize: "badge4x3",
   pageSize: "letter",
   rows: 3,
   columns: 2,
@@ -137,6 +153,8 @@ export function normalizeSettings(raw: unknown): ProjectSettings {
   // Guard rails: the layout maths assumes at least one card per half.
   merged.rows = clamp(Math.round(merged.rows), 1, 8);
   merged.columns = clamp(Math.round(merged.columns), 1, 3);
+  if (!["book", "tags"].includes(merged.output)) merged.output = "book";
+  if (!["badge4x3", "badge3x4", "avery5395"].includes(merged.tagSize)) merged.tagSize = "badge4x3";
   if (!["letter", "a4", "legal"].includes(merged.pageSize)) merged.pageSize = "letter";
   if (!["fill", "fit"].includes(merged.photoFit)) merged.photoFit = "fill";
   if (!["compact", "detailed"].includes(merged.memberStyle)) merged.memberStyle = "compact";
@@ -157,6 +175,20 @@ export const PAGE_SIZES: Record<PageSizeName, { width: number; height: number; l
   letter: { width: 792, height: 612, label: 'Letter (11" x 8.5")' },
   legal: { width: 1008, height: 612, label: 'Legal (14" x 8.5")' },
   a4: { width: 841.89, height: 595.28, label: "A4 (297mm x 210mm)" },
+};
+
+/**
+ * The rectangles a name tag is cut to, in PDF points.
+ *
+ * Named for the holder rather than the paper: whoever is printing these has
+ * a box of pouches on the desk and needs the one that fits them, not a page
+ * fraction. How many fit on a sheet is not written here - tagsPerSheet works it
+ * out, so the number on screen cannot drift from the number that prints.
+ */
+export const TAG_SIZES: Record<TagSizeName, { w: number; h: number; label: string }> = {
+  badge4x3: { w: 4 * 72, h: 3 * 72, label: '4" x 3" landscape' },
+  badge3x4: { w: 3 * 72, h: 4 * 72, label: '3" x 4" portrait' },
+  avery5395: { w: 3.375 * 72, h: 2.333 * 72, label: 'Avery 5395 (3⅜" x 2⅓")' },
 };
 
 export const TEXT_SCALES: Record<TextScale, number> = {

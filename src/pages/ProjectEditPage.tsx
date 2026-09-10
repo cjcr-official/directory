@@ -25,10 +25,13 @@ import type { ProjectKind, SelectionMode } from "@/lib/database.types";
 import {
   DEFAULT_SETTINGS,
   PAGE_SIZES,
+  TAG_SIZES,
   normalizeSettings,
   recordsPerSheet,
   type CardStyle,
+  type Output,
   type PageSizeName,
+  type TagSizeName,
   type ProjectSettings,
   type TextScale,
   type Typeface,
@@ -38,6 +41,7 @@ import { labelledHouseholdName, message } from "@/lib/format";
 import { getPhotoUrls, removePhoto, uploadPhoto } from "@/lib/photos";
 import { CoverCanvas } from "@/components/BookPreview";
 import { composeCoverPage } from "@/lib/layout/compose";
+import { tagsPerSheet } from "@/lib/layout/tags";
 import { loadMetrics, type Metrics } from "@/lib/layout/metrics";
 import { PhotoInput } from "@/components/PhotoInput";
 
@@ -256,6 +260,14 @@ export function ProjectEditPage() {
     safeSettings.typeface === "serif" ? "serif" : "sans serif",
     safeSettings.textScale === "large" ? "large text" : "normal text",
     safeSettings.bookletOrder && "booklet order",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const tagSummary = [
+    TAG_SIZES[safeSettings.tagSize].label,
+    `${tagsPerSheet(safeSettings)} to a sheet`,
+    safeSettings.footerText.trim() !== "" && "a line underneath",
   ]
     .filter(Boolean)
     .join(" · ");
@@ -496,6 +508,22 @@ export function ProjectEditPage() {
                   </select>
                 </Field>
 
+                <Field
+                  label="Prints"
+                  hint="The same list of people, laid out either way."
+                  htmlFor="project_output"
+                >
+                  <select
+                    id="project_output"
+                    value={settings.output}
+                    disabled={!canEdit}
+                    onChange={(event) => set({ output: event.target.value as Output })}
+                  >
+                    <option value="book">A directory booklet</option>
+                    <option value="tags">Name tags</option>
+                  </select>
+                </Field>
+
                 <Field label="Description" htmlFor="project_description">
                   <textarea
                     id="project_description"
@@ -581,225 +609,274 @@ export function ProjectEditPage() {
               </div>
             </div>
 
-            <Disclosure title="The page" summary={pageSummary}>
-              <Field label="Paper" htmlFor="page_size">
-                <select
-                  id="page_size"
-                  value={settings.pageSize}
-                  disabled={!canEdit}
-                  onChange={(event) => set({ pageSize: event.target.value as PageSizeName })}
+            {settings.output === "tags" ? (
+              <Disclosure title="The tags" summary={tagSummary} open>
+                <Field
+                  label="Size"
+                  hint="Match the holders you have. As many as fit go on a sheet, centred, to be cut apart."
+                  htmlFor="tag_size"
                 >
-                  {(Object.keys(PAGE_SIZES) as PageSizeName[]).map((key) => (
-                    <option key={key} value={key}>
-                      {PAGE_SIZES[key].label} landscape
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <Field label="Records per half-page" htmlFor="rows">
-                  <input
-                    id="rows"
-                    type="number"
-                    min={1}
-                    max={8}
-                    value={settings.rows}
-                    disabled={!canEdit}
-                    onChange={(event) => set({ rows: Number(event.target.value) })}
-                  />
-                </Field>
-                <Field label="Halves per sheet" htmlFor="columns">
-                  <input
-                    id="columns"
-                    type="number"
-                    min={1}
-                    max={3}
-                    value={settings.columns}
-                    disabled={!canEdit}
-                    onChange={(event) => set({ columns: Number(event.target.value) })}
-                  />
-                </Field>
-              </div>
-
-              <Notice>
-                <strong>{recordsPerSheet(safeSettings)} records on one sheet of paper</strong> —{" "}
-                {safeSettings.rows} down each half, {safeSettings.columns} halves across. Fold the
-                sheet down the middle for a {safeSettings.pageSize === "a4" ? "A5" : "half-letter"}{" "}
-                booklet.
-              </Notice>
-
-              <Field label="Typeface" htmlFor="typeface">
-                <select
-                  id="typeface"
-                  value={settings.typeface}
-                  disabled={!canEdit}
-                  onChange={(event) => set({ typeface: event.target.value as Typeface })}
-                >
-                  <option value="serif">Serif — traditional, best for a book</option>
-                  <option value="sans">Sans serif — plainer, a little more compact</option>
-                </select>
-              </Field>
-
-              <Field label="Text size" htmlFor="text_scale">
-                <select
-                  id="text_scale"
-                  value={settings.textScale}
-                  disabled={!canEdit}
-                  onChange={(event) => set({ textScale: event.target.value as TextScale })}
-                >
-                  <option value="compact">Compact — fits more</option>
-                  <option value="normal">Normal</option>
-                  <option value="large">Large — easier to read</option>
-                </select>
-              </Field>
-
-              <Checkbox
-                label="Booklet page order"
-                hint="Reorders pages for double-sided printing, folding and stapling the spine. Leave off for a straight-through PDF."
-                checked={settings.bookletOrder}
-                disabled={!canEdit || settings.columns !== 2}
-                onChange={(value) => set({ bookletOrder: value })}
-              />
-            </Disclosure>
-
-            <Disclosure title="What each card shows" summary={cardSummary}>
-              <Checkbox
-                label="Photographs"
-                checked={settings.showPhotos}
-                disabled={!canEdit}
-                onChange={(value) => set({ showPhotos: value })}
-              />
-              {settings.showPhotos ? (
-                <div className="check-child">
-                  <Field
-                    label="Photo shape"
-                    hint="Cropping gives every card the same shape, which is tidiest on the page."
-                    htmlFor="photo_fit"
-                  >
-                    <select
-                      id="photo_fit"
-                      value={settings.photoFit}
-                      disabled={!canEdit}
-                      onChange={(event) => set({ photoFit: event.target.value as "fill" | "fit" })}
-                    >
-                      <option value="fill">Crop to a matching portrait</option>
-                      <option value="fit">Show the whole photo</option>
-                    </select>
-                  </Field>
-                </div>
-              ) : null}
-              <Checkbox
-                label="Family members' names"
-                checked={settings.showMembers}
-                disabled={!canEdit}
-                onChange={(value) => set({ showMembers: value })}
-              />
-              {settings.showMembers ? (
-                <div className="check-child">
-                  <Field label="Member style" htmlFor="member_style">
-                    <select
-                      id="member_style"
-                      value={settings.memberStyle}
-                      disabled={!canEdit}
-                      onChange={(event) =>
-                        set({ memberStyle: event.target.value as "compact" | "detailed" })
-                      }
-                    >
-                      <option value="compact">One line of first names</option>
-                      <option value="detailed">A line each, with their own contact details</option>
-                    </select>
-                  </Field>
-                </div>
-              ) : null}
-              <Checkbox
-                label="Address"
-                checked={settings.showAddress}
-                disabled={!canEdit}
-                onChange={(value) => set({ showAddress: value })}
-              />
-              <Checkbox
-                label="Phone numbers"
-                checked={settings.showPhone}
-                disabled={!canEdit}
-                onChange={(value) => set({ showPhone: value })}
-              />
-              <Checkbox
-                label="Email addresses"
-                checked={settings.showEmail}
-                disabled={!canEdit}
-                onChange={(value) => set({ showEmail: value })}
-              />
-              <Checkbox
-                label="Birthdays"
-                checked={settings.showBirthdays}
-                disabled={!canEdit}
-                onChange={(value) => set({ showBirthdays: value })}
-              />
-              <Checkbox
-                label="Family anniversaries"
-                checked={settings.showAnniversary}
-                disabled={!canEdit}
-                onChange={(value) => set({ showAnniversary: value })}
-              />
-              <div className="form-decision">
-                <Field label="How records are separated" htmlFor="card_style">
                   <select
-                    id="card_style"
-                    value={settings.cardStyle}
+                    id="tag_size"
+                    value={settings.tagSize}
                     disabled={!canEdit}
-                    onChange={(event) => set({ cardStyle: event.target.value as CardStyle })}
+                    onChange={(event) => set({ tagSize: event.target.value as TagSizeName })}
                   >
-                    <option value="rule">A hairline between records</option>
-                    <option value="box">A light box around each record</option>
-                    <option value="none">Nothing — space only</option>
+                    {(Object.keys(TAG_SIZES) as TagSizeName[]).map((key) => (
+                      <option key={key} value={key}>
+                        {TAG_SIZES[key].label}
+                      </option>
+                    ))}
                   </select>
                 </Field>
-              </div>
-            </Disclosure>
 
-            <Disclosure title="Inside the book" summary={bookSummary}>
-              <Field
-                label="Footer note"
-                hint="Along the bottom of every page."
-                htmlFor="footer_text"
-              >
-                <input
-                  id="footer_text"
-                  type="text"
-                  value={settings.footerText}
-                  placeholder="Please keep this directory for church use only."
-                  disabled={!canEdit}
-                  onChange={(event) => set({ footerText: event.target.value })}
-                />
-              </Field>
+                <Field
+                  label="The line underneath"
+                  hint="The same footer the book uses. Leave it empty for none."
+                  htmlFor="tag_footer"
+                >
+                  <input
+                    id="tag_footer"
+                    type="text"
+                    value={settings.footerText}
+                    disabled={!canEdit}
+                    onChange={(event) => set({ footerText: event.target.value })}
+                  />
+                </Field>
 
-              <Checkbox
-                label="Alphabetical index at the back"
-                hint="Every person by surname, with the page their family is on."
-                checked={settings.includeIndex}
-                disabled={!canEdit}
-                onChange={(value) => set({ includeIndex: value })}
-              />
-              <Checkbox
-                label="Church name in the running header"
-                checked={settings.runningHeader}
-                disabled={!canEdit}
-                onChange={(value) => set({ runningHeader: value })}
-              />
-              <Checkbox
-                label="Letter tabs (A, B, C…)"
-                checked={settings.showLetterTabs}
-                disabled={!canEdit}
-                onChange={(value) => set({ showLetterTabs: value })}
-              />
-              <Checkbox
-                label="Page numbers"
-                checked={settings.showPageNumbers}
-                disabled={!canEdit}
-                onChange={(value) => set({ showPageNumbers: value })}
-              />
-            </Disclosure>
+                <p className="hint">
+                  A tag carries the mark and the church's name from <strong>The cover</strong>, then
+                  the person's name as large as it will go, then the line above. Every person prints
+                  one tag — a family prints one for each of its members, not one for the household.
+                </p>
+              </Disclosure>
+            ) : (
+              <>
+                <Disclosure title="The page" summary={pageSummary}>
+                  <Field label="Paper" htmlFor="page_size">
+                    <select
+                      id="page_size"
+                      value={settings.pageSize}
+                      disabled={!canEdit}
+                      onChange={(event) => set({ pageSize: event.target.value as PageSizeName })}
+                    >
+                      {(Object.keys(PAGE_SIZES) as PageSizeName[]).map((key) => (
+                        <option key={key} value={key}>
+                          {PAGE_SIZES[key].label} landscape
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <Field label="Records per half-page" htmlFor="rows">
+                      <input
+                        id="rows"
+                        type="number"
+                        min={1}
+                        max={8}
+                        value={settings.rows}
+                        disabled={!canEdit}
+                        onChange={(event) => set({ rows: Number(event.target.value) })}
+                      />
+                    </Field>
+                    <Field label="Halves per sheet" htmlFor="columns">
+                      <input
+                        id="columns"
+                        type="number"
+                        min={1}
+                        max={3}
+                        value={settings.columns}
+                        disabled={!canEdit}
+                        onChange={(event) => set({ columns: Number(event.target.value) })}
+                      />
+                    </Field>
+                  </div>
+
+                  <Notice>
+                    <strong>{recordsPerSheet(safeSettings)} records on one sheet of paper</strong> —{" "}
+                    {safeSettings.rows} down each half, {safeSettings.columns} halves across. Fold
+                    the sheet down the middle for a{" "}
+                    {safeSettings.pageSize === "a4" ? "A5" : "half-letter"} booklet.
+                  </Notice>
+
+                  <Field label="Typeface" htmlFor="typeface">
+                    <select
+                      id="typeface"
+                      value={settings.typeface}
+                      disabled={!canEdit}
+                      onChange={(event) => set({ typeface: event.target.value as Typeface })}
+                    >
+                      <option value="serif">Serif — traditional, best for a book</option>
+                      <option value="sans">Sans serif — plainer, a little more compact</option>
+                    </select>
+                  </Field>
+
+                  <Field label="Text size" htmlFor="text_scale">
+                    <select
+                      id="text_scale"
+                      value={settings.textScale}
+                      disabled={!canEdit}
+                      onChange={(event) => set({ textScale: event.target.value as TextScale })}
+                    >
+                      <option value="compact">Compact — fits more</option>
+                      <option value="normal">Normal</option>
+                      <option value="large">Large — easier to read</option>
+                    </select>
+                  </Field>
+
+                  <Checkbox
+                    label="Booklet page order"
+                    hint="Reorders pages for double-sided printing, folding and stapling the spine. Leave off for a straight-through PDF."
+                    checked={settings.bookletOrder}
+                    disabled={!canEdit || settings.columns !== 2}
+                    onChange={(value) => set({ bookletOrder: value })}
+                  />
+                </Disclosure>
+
+                <Disclosure title="What each card shows" summary={cardSummary}>
+                  <Checkbox
+                    label="Photographs"
+                    checked={settings.showPhotos}
+                    disabled={!canEdit}
+                    onChange={(value) => set({ showPhotos: value })}
+                  />
+                  {settings.showPhotos ? (
+                    <div className="check-child">
+                      <Field
+                        label="Photo shape"
+                        hint="Cropping gives every card the same shape, which is tidiest on the page."
+                        htmlFor="photo_fit"
+                      >
+                        <select
+                          id="photo_fit"
+                          value={settings.photoFit}
+                          disabled={!canEdit}
+                          onChange={(event) =>
+                            set({ photoFit: event.target.value as "fill" | "fit" })
+                          }
+                        >
+                          <option value="fill">Crop to a matching portrait</option>
+                          <option value="fit">Show the whole photo</option>
+                        </select>
+                      </Field>
+                    </div>
+                  ) : null}
+                  <Checkbox
+                    label="Family members' names"
+                    checked={settings.showMembers}
+                    disabled={!canEdit}
+                    onChange={(value) => set({ showMembers: value })}
+                  />
+                  {settings.showMembers ? (
+                    <div className="check-child">
+                      <Field label="Member style" htmlFor="member_style">
+                        <select
+                          id="member_style"
+                          value={settings.memberStyle}
+                          disabled={!canEdit}
+                          onChange={(event) =>
+                            set({ memberStyle: event.target.value as "compact" | "detailed" })
+                          }
+                        >
+                          <option value="compact">One line of first names</option>
+                          <option value="detailed">
+                            A line each, with their own contact details
+                          </option>
+                        </select>
+                      </Field>
+                    </div>
+                  ) : null}
+                  <Checkbox
+                    label="Address"
+                    checked={settings.showAddress}
+                    disabled={!canEdit}
+                    onChange={(value) => set({ showAddress: value })}
+                  />
+                  <Checkbox
+                    label="Phone numbers"
+                    checked={settings.showPhone}
+                    disabled={!canEdit}
+                    onChange={(value) => set({ showPhone: value })}
+                  />
+                  <Checkbox
+                    label="Email addresses"
+                    checked={settings.showEmail}
+                    disabled={!canEdit}
+                    onChange={(value) => set({ showEmail: value })}
+                  />
+                  <Checkbox
+                    label="Birthdays"
+                    checked={settings.showBirthdays}
+                    disabled={!canEdit}
+                    onChange={(value) => set({ showBirthdays: value })}
+                  />
+                  <Checkbox
+                    label="Family anniversaries"
+                    checked={settings.showAnniversary}
+                    disabled={!canEdit}
+                    onChange={(value) => set({ showAnniversary: value })}
+                  />
+                  <div className="form-decision">
+                    <Field label="How records are separated" htmlFor="card_style">
+                      <select
+                        id="card_style"
+                        value={settings.cardStyle}
+                        disabled={!canEdit}
+                        onChange={(event) => set({ cardStyle: event.target.value as CardStyle })}
+                      >
+                        <option value="rule">A hairline between records</option>
+                        <option value="box">A light box around each record</option>
+                        <option value="none">Nothing — space only</option>
+                      </select>
+                    </Field>
+                  </div>
+                </Disclosure>
+
+                <Disclosure title="Inside the book" summary={bookSummary}>
+                  <Field
+                    label="Footer note"
+                    hint="Along the bottom of every page."
+                    htmlFor="footer_text"
+                  >
+                    <input
+                      id="footer_text"
+                      type="text"
+                      value={settings.footerText}
+                      placeholder="Please keep this directory for church use only."
+                      disabled={!canEdit}
+                      onChange={(event) => set({ footerText: event.target.value })}
+                    />
+                  </Field>
+
+                  <Checkbox
+                    label="Alphabetical index at the back"
+                    hint="Every person by surname, with the page their family is on."
+                    checked={settings.includeIndex}
+                    disabled={!canEdit}
+                    onChange={(value) => set({ includeIndex: value })}
+                  />
+                  <Checkbox
+                    label="Church name in the running header"
+                    checked={settings.runningHeader}
+                    disabled={!canEdit}
+                    onChange={(value) => set({ runningHeader: value })}
+                  />
+                  <Checkbox
+                    label="Letter tabs (A, B, C…)"
+                    checked={settings.showLetterTabs}
+                    disabled={!canEdit}
+                    onChange={(value) => set({ showLetterTabs: value })}
+                  />
+                  <Checkbox
+                    label="Page numbers"
+                    checked={settings.showPageNumbers}
+                    disabled={!canEdit}
+                    onChange={(value) => set({ showPageNumbers: value })}
+                  />
+                </Disclosure>
+              </>
+            )}
           </div>
 
           <div>
@@ -942,7 +1019,13 @@ export function ProjectEditPage() {
                 <h2>As it will print</h2>
               </div>
               <div className="card-body">
-                {coverPage ? (
+                {safeSettings.output === "tags" ? (
+                  <p className="hint cover-figure">
+                    Name tags have no cover. Open the preview to see the sheet as it will print —{" "}
+                    {tagsPerSheet(safeSettings)} to a page of{" "}
+                    {PAGE_SIZES[safeSettings.pageSize].label}, portrait.
+                  </p>
+                ) : coverPage ? (
                   <figure className="cover-figure">
                     <CoverCanvas
                       page={coverPage.page}

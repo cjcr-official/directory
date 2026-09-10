@@ -15,6 +15,8 @@ import { PDFDocument } from "pdf-lib";
 import { buildEntries } from "../src/lib/entries";
 import { resolveEntries } from "../src/lib/projectEntries";
 import { composeBook } from "../src/lib/layout/compose";
+import { composeTags, tagsPerSheet } from "../src/lib/layout/tags";
+import { TAG_SIZES, type TagSizeName } from "../src/lib/layout/settings";
 import { pdfMetrics } from "../src/lib/layout/pdf";
 import { STANDARD_FONTS, type Metrics } from "../src/lib/layout/metrics";
 import { toWinAnsi } from "../src/lib/format";
@@ -868,6 +870,109 @@ async function main() {
 
     console.log(`measured widths: ${matched} of ${shapes.length} book shapes compose identically`);
     ok(matched === shapes.length, "caching text measurement changed the composed book");
+  }
+
+  // ---- 13. name tags ------------------------------------------------------
+  {
+    // The same failures as the book, on a smaller piece of paper: somebody
+    // printed twice or not at all, and a name that has quietly walked off the
+    // card it is about to be cut to. Neither raises anything - they are found
+    // at the guillotine, after a hundred sheets.
+    const entries = buildEntries(buildDemoData());
+    // Stated here rather than read off the composer, so this is a second
+    // opinion about who gets a tag: a household prints its members, not one
+    // tag for the family.
+    const expected = entries.flatMap((entry) =>
+      entry.type === "household" ? entry.household.members : [entry.person],
+    );
+
+    for (const size of Object.keys(TAG_SIZES) as TagSizeName[]) {
+      const settings = normalizeSettings({ ...DEFAULT_SETTINGS, output: "tags", tagSize: size });
+      const book = composeTags(entries, settings, metrics);
+      const cards = book.sheets.flatMap((sheet) => sheet.pages.flatMap((page) => page.cards));
+      const perSheet = tagsPerSheet(settings);
+
+      ok(
+        cards.length === expected.length,
+        `tags ${size}: ${cards.length} tags for ${expected.length} people`,
+      );
+      ok(
+        new Set(cards.map((card) => card.entryId)).size === cards.length,
+        `tags ${size}: somebody is printed twice`,
+      );
+      ok(
+        book.sheets.every((sheet) => sheet.pages[0].cards.length <= perSheet),
+        `tags ${size}: a sheet holds more tags than it has room for`,
+      );
+      ok(
+        book.sheets.length === Math.ceil(expected.length / perSheet),
+        `tags ${size}: ${book.sheets.length} sheets for ${expected.length} at ${perSheet} a sheet`,
+      );
+
+      let spilling = 0;
+      let offPaper = 0;
+      for (const card of cards) {
+        if (
+          card.box.x < -0.01 ||
+          card.box.y < -0.01 ||
+          card.box.x + card.box.w > book.width + 0.01 ||
+          card.box.y + card.box.h > book.height + 0.01
+        ) {
+          offPaper += 1;
+        }
+        for (const run of card.runs) {
+          const inked = metrics.widthOf(run.text, run.size, run.weight);
+          if (
+            run.x < card.box.x - 0.01 ||
+            run.x + run.w > card.box.x + card.box.w + 0.01 ||
+            run.y < card.box.y - 0.01 ||
+            run.y + metrics.lineHeight(run.size) > card.box.y + card.box.h + 0.01 ||
+            inked > run.w + 0.01
+          ) {
+            spilling += 1;
+          }
+        }
+      }
+      ok(spilling === 0, `tags ${size}: ${spilling} lines run outside their tag`);
+      ok(offPaper === 0, `tags ${size}: ${offPaper} tags fall off the paper`);
+    }
+
+    // The awkward one: the longest name in the congregation on the smallest
+    // tag, with a church name above it and a line below. It has to shrink and
+    // break rather than run over the edge.
+    const long = composeTags(
+      buildEntries({
+        households: [],
+        people: [
+          blankPerson({
+            id: "long",
+            first_name: "Bartholomew",
+            last_name: "Vandersteen-Fotheringay",
+          }),
+        ],
+        tags: [],
+        householdTags: [],
+        personTags: [],
+      }),
+      normalizeSettings({
+        ...DEFAULT_SETTINGS,
+        output: "tags",
+        tagSize: "avery5395",
+        churchName: "Plains Alliance Church",
+        footerText: "We are a Christ-centered Acts 1:8 Family",
+      }),
+      metrics,
+    );
+    const longCard = long.sheets[0].pages[0].cards[0];
+    const nameRuns = longCard.runs.filter((run) => run.weight === "bold" && run.align === "center");
+    ok(nameRuns.length > 0 && nameRuns.length <= 2, "a very long name did not fit in two lines");
+    ok(
+      nameRuns.every((run) => metrics.widthOf(run.text, run.size, run.weight) <= run.w + 0.01),
+      "a very long name runs past the edge of the smallest tag",
+    );
+    console.log(
+      `tags: the longest name sets at ${nameRuns[0]?.size}pt over ${nameRuns.length} line(s)`,
+    );
   }
 
   console.log(

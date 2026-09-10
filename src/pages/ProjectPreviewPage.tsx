@@ -9,6 +9,7 @@ import { downloadPhoto, getPhotoUrls } from "@/lib/photos";
 import { composeBook, type BookModel } from "@/lib/layout/compose";
 import { loadMetrics } from "@/lib/layout/metrics";
 import { normalizeSettings, recordsPerSheet } from "@/lib/layout/settings";
+import { composeTags, tagsPerSheet } from "@/lib/layout/tags";
 import { resolveEntries } from "@/lib/projectEntries";
 import type { ProjectRow } from "@/lib/database.types";
 import { message } from "@/lib/format";
@@ -53,7 +54,13 @@ export function ProjectPreviewPage() {
         const metrics = await loadMetrics(settings.typeface);
         if (!active) return;
 
-        const composed = composeBook(included, settings, metrics);
+        // Both composers hand back the same model, so the preview, the photo
+        // fetch, the download and the progress bar below need no opinion about
+        // which one made it.
+        const composed =
+          settings.output === "tags"
+            ? composeTags(included, settings, metrics)
+            : composeBook(included, settings, metrics);
         setBook(composed);
 
         if (composed.photoPaths.length) {
@@ -151,16 +158,28 @@ export function ProjectPreviewPage() {
             <h1 className="preview-title">{project.name}</h1>
             <div className="preview-stats">
               <span>
-                <strong>{book.recordCount}</strong> {book.recordCount === 1 ? "record" : "records"}
+                <strong>{book.recordCount}</strong>{" "}
+                {settings.output === "tags"
+                  ? book.recordCount === 1
+                    ? "name tag"
+                    : "name tags"
+                  : book.recordCount === 1
+                    ? "record"
+                    : "records"}
               </span>
-              <span>
-                <strong>{book.pageCount}</strong> {book.pageCount === 1 ? "page" : "pages"}
-              </span>
+              {settings.output === "tags" ? null : (
+                <span>
+                  <strong>{book.pageCount}</strong> {book.pageCount === 1 ? "page" : "pages"}
+                </span>
+              )}
               <span>
                 <strong>{book.sheets.length}</strong>{" "}
                 {book.sheets.length === 1 ? "sheet" : "sheets"}
               </span>
-              <span>{recordsPerSheet(settings)} to a sheet</span>
+              <span>
+                {settings.output === "tags" ? tagsPerSheet(settings) : recordsPerSheet(settings)} to
+                a sheet
+              </span>
             </div>
           </div>
         </div>
