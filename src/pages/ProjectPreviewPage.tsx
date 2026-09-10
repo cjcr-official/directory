@@ -131,8 +131,8 @@ export function ProjectPreviewPage() {
       <div className="page">
         <Notice kind="error">{error}</Notice>
         <p style={{ marginTop: 12 }}>
-          <Link className="btn" to="/projects">
-            Back to directories
+          <Link className="btn" to={settings?.output === "tags" ? "/tags" : "/projects"}>
+            {settings?.output === "tags" ? "Back to name tags" : "Back to directories"}
           </Link>
         </p>
       </div>

@@ -102,6 +102,7 @@ function Protected() {
             <Route path="people/:id" element={<PersonEditPage />} />
             <Route path="groups" element={<GroupsPage />} />
             <Route path="projects" element={<ProjectsPage />} />
+            <Route path="tags" element={<ProjectsPage output="tags" />} />
             <Route path="projects/new" element={<ProjectEditPage />} />
             <Route path="projects/:id" element={<ProjectEditPage />} />
             <Route path="settings" element={<SettingsPage />} />

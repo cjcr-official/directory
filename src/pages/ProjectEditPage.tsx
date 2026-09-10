@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useDirectory } from "@/data/DirectoryContext";
 import { useAuth } from "@/auth/AuthProvider";
 import {
@@ -61,14 +61,20 @@ export function ProjectEditPage() {
   const { canEdit } = useAuth();
   const { entries, tags, authorName, reload } = useDirectory();
   const isNew = !id;
+  // "New name tags" arrives here with the kind of output it wants, so a fresh
+  // one starts on the right form instead of being switched over afterwards.
+  const [params] = useSearchParams();
+  const startsAsTags = isNew && params.get("output") === "tags";
 
-  const [name, setName] = useState("Church Directory");
+  const [name, setName] = useState(startsAsTags ? "Name tags" : "Church Directory");
   const [kind, setKind] = useState<ProjectKind>("directory");
   const [description, setDescription] = useState("");
   const [mode, setMode] = useState<SelectionMode>("all");
   const [tagIds, setTagIds] = useState<string[]>([]);
   const [picked, setPicked] = useState<string[]>([]);
-  const [settings, setSettings] = useState<ProjectSettings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<ProjectSettings>(
+    startsAsTags ? { ...DEFAULT_SETTINGS, output: "tags" } : DEFAULT_SETTINGS,
+  );
   /**
    * Cover artwork chosen but not yet uploaded.
    *
@@ -168,6 +174,8 @@ export function ProjectEditPage() {
   // and the saved record both use the clamped version so neither can show or
   // store "0 records to a sheet".
   const safeSettings = useMemo(() => normalizeSettings(settings), [settings]);
+  /** Whichever of the two lists this one is on. */
+  const listHref = safeSettings.output === "tags" ? "/tags" : "/projects";
   const sheets = Math.ceil(included.length / recordsPerSheet(safeSettings));
 
   // --- the cover, drawn ------------------------------------------------------
@@ -414,7 +422,7 @@ export function ProjectEditPage() {
     <div className="page form">
       <div className="page-head">
         <div className="grow">
-          <h1>{isNew ? "New directory" : name}</h1>
+          <h1>{isNew ? (startsAsTags ? "New name tags" : "New directory") : name}</h1>
           <div className="sub">
             {included.length} record{included.length === 1 ? "" : "s"} ·{" "}
             {recordsPerSheet(safeSettings)} to a sheet · about {sheets} sheet
@@ -1057,14 +1065,20 @@ export function ProjectEditPage() {
         {canEdit ? (
           <div className="row" style={{ marginTop: 18 }}>
             <button type="submit" className="btn primary" disabled={saving}>
-              {saving ? "Saving…" : isNew ? "Create directory" : "Save changes"}
+              {saving
+                ? "Saving…"
+                : isNew
+                  ? startsAsTags
+                    ? "Create name tags"
+                    : "Create directory"
+                  : "Save changes"}
             </button>
             {!isNew ? (
               <Link className="btn" to={`/projects/${id}/preview`}>
                 Preview &amp; print
               </Link>
             ) : null}
-            <Link className="btn ghost" to="/projects">
+            <Link className="btn ghost" to={listHref}>
               Back
             </Link>
           </div>
@@ -1082,7 +1096,7 @@ export function ProjectEditPage() {
               onConfirm={async () => {
                 await deleteProject(id);
                 await reload();
-                navigate("/projects");
+                navigate(listHref);
               }}
             />
           </div>

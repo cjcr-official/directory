@@ -115,9 +115,12 @@ where a few faces are missing still looks deliberate.
 
 ## Name tags
 
-A directory can print name tags instead of a booklet. It is the same recipe —
-the same list of people, chosen the same way — laid out differently: set
-**Prints** to _Name tags_ on the directory's page.
+**Name tags** in the sidebar, under Printing, beside Directories. One is a set
+of tags the same way the other is a book: the same list of people, chosen the
+same way, laid out differently.
+
+An existing directory can be turned into tags instead — set **Prints** to _Name
+tags_ on its own page — and it moves between the two lists when you do.
 
 Tags print portrait, as many to a sheet as the paper holds, centred, with a
 pale line round each one to cut along. Pick the size to match the holders in

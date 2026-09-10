@@ -92,6 +92,7 @@ export function AppShell() {
 
         <div className="nav-section">Printing</div>
         <Item to="/projects" label="Directories" />
+        <Item to="/tags" label="Name tags" />
 
         <div className="nav-section">Settings</div>
         <Item to="/settings" label="Settings" />
