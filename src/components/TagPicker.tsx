@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { TagRow } from "@/lib/database.types";
 import { createTag } from "@/lib/queries";
+import { message } from "@/lib/format";
 
 interface Props {
   tags: TagRow[];
@@ -45,7 +46,7 @@ export function TagPicker({ tags, selected, onChange, allowCreate, onCreated, di
       setName("");
       setAdding(false);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(message(cause));
     } finally {
       setBusy(false);
     }

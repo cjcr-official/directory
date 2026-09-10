@@ -1,7 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { ConfirmButton, Notice, Spinner } from "@/components/ui";
-import { describeWhen } from "@/lib/format";
+import { ConfirmButton, Notice } from "@/components/ui";
+import { describeWhen, message } from "@/lib/format";
 import {
   CODE_LENGTH,
   beginEnrolment,
@@ -112,7 +112,7 @@ function TwoStep() {
     try {
       setFactors(await listAuthenticators());
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(message(cause));
       setFactors([]);
     }
   }
@@ -130,7 +130,7 @@ function TwoStep() {
       setCode("");
       setCopied(false);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(message(cause));
     } finally {
       setBusy(false);
     }
@@ -165,7 +165,7 @@ function TwoStep() {
       setNote("Two-step sign-in is on. Keep the app on your phone — you will need it every time.");
       await load();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(message(cause));
     } finally {
       setBusy(false);
     }
@@ -197,7 +197,10 @@ function TwoStep() {
         </p>
 
         {factors === null ? (
-          <Spinner label="Checking this account…" />
+          <span className="row tight">
+            <span className="spinner" aria-hidden />
+            <span className="muted small">Checking this account…</span>
+          </span>
         ) : on ? (
           <>
             <Notice kind="ok">

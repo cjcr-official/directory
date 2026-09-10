@@ -186,8 +186,3 @@ export function buildEntries(data: DirectoryData, includeInactive = false): Dire
 
   return entries.sort(byEntryOrder);
 }
-
-/** People inside a record - one for an individual, all members for a household. */
-export function entryPeople(entry: DirectoryEntry): PersonRow[] {
-  return entry.type === "household" ? entry.household.members : [entry.person];
-}

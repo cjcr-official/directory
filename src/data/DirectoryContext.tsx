@@ -2,7 +2,7 @@ import { createContext, use, useCallback, useEffect, useMemo, useState } from "r
 import { fetchDirectory, fetchProfiles } from "@/lib/queries";
 import { buildEntries, sortMembers, type DirectoryData, type DirectoryEntry } from "@/lib/entries";
 import type { HouseholdRow, PersonRow, ProfileRow, TagRow } from "@/lib/database.types";
-import { sortByKey, sortKey } from "@/lib/format";
+import { message, sortByKey, sortKey } from "@/lib/format";
 
 interface DirectoryState {
   loading: boolean;
@@ -81,7 +81,7 @@ export function DirectoryProvider({ children }: { children: React.ReactNode }) {
       setProfiles(roster);
       setData(directory);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(message(cause));
     } finally {
       setLoading(false);
       setReady(true);

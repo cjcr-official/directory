@@ -1,15 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { getPhotoUrl } from "@/lib/photos";
-import { describeChange } from "@/lib/format";
-
-export function Spinner({ label }: { label?: string }) {
-  return (
-    <span className="row tight">
-      <span className="spinner" aria-hidden />
-      {label ? <span className="muted small">{label}</span> : null}
-    </span>
-  );
-}
+import { describeChange, message } from "@/lib/format";
 
 export function LoadingScreen({ label = "Loading…" }: { label?: string }) {
   return (
@@ -241,7 +232,7 @@ export function ConfirmButton({
           } catch (cause) {
             // Without this the rejection is swallowed and a failed delete
             // looks exactly like a successful one.
-            setError(cause instanceof Error ? cause.message : String(cause));
+            setError(message(cause));
             setArmed(false);
           } finally {
             setBusy(false);

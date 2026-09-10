@@ -22,7 +22,6 @@ import {
   deleteHousehold,
   setPersonHousehold,
   setTags,
-  officeLabelUnavailable,
   updateHousehold,
   updatePerson,
 } from "@/lib/queries";
@@ -30,19 +29,14 @@ import {
   firstName,
   formatPhone,
   fullName,
+  HOUSEHOLD_ROLES,
+  message,
   personPhotoPath,
   sameDisplayName,
   sortKey,
   suggestHouseholdName,
   suggestOfficeLabel,
 } from "@/lib/format";
-
-const ROLES: { value: HouseholdRole; label: string }[] = [
-  { value: "head", label: "Head of household" },
-  { value: "spouse", label: "Spouse / partner" },
-  { value: "child", label: "Child" },
-  { value: "other", label: "Other" },
-];
 
 /**
  * A person's place in the family. People themselves are created and edited on
@@ -371,7 +365,7 @@ export function FamilyEditPage() {
       navigate(`/families/${householdId}`, { replace: true });
     } catch (cause) {
       setStale(isStaleWrite(cause));
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(message(cause));
     } finally {
       setSaving(false);
     }
@@ -393,7 +387,7 @@ export function FamilyEditPage() {
       // Same conflict can happen on this path, so offer the same way out of it
       // rather than a message with nothing to do about it.
       setStale(isStaleWrite(cause));
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(message(cause));
     } finally {
       setSaving(false);
     }
@@ -559,15 +553,7 @@ export function FamilyEditPage() {
               {nameClashes.length || form.office_label ? (
                 <Field
                   label="Which one? (office only)"
-                  hint={
-                    // A label typed into a database that has not run 0004 is
-                    // dropped so the rest of the save can go through. Saying so
-                    // is the difference between a known wait and a field that
-                    // mysteriously forgets what was typed into it.
-                    officeLabelUnavailable()
-                      ? "Waiting on migration 0004 — until that is run, this will not save. See docs/DEPLOY.md, step 7."
-                      : "Shown beside the name in your lists so you can tell the two apart. Never printed, and not in the book or its index."
-                  }
+                  hint="Shown beside the name in your lists so you can tell the two apart. Never printed, and not in the book or its index."
                   htmlFor="office_label"
                 >
                   <div className="row tight">
@@ -720,7 +706,7 @@ export function FamilyEditPage() {
                               setRole(link.id, event.target.value as HouseholdRole)
                             }
                           >
-                            {ROLES.map((role) => (
+                            {HOUSEHOLD_ROLES.map((role) => (
                               <option key={role.value} value={role.value}>
                                 {role.label}
                               </option>

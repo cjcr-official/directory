@@ -1,4 +1,12 @@
-import type { HouseholdRow, PersonRow } from "./database.types";
+import type { HouseholdRole, HouseholdRow, PersonRow } from "./database.types";
+
+/** A person's place in a family, and what each one is called on screen. */
+export const HOUSEHOLD_ROLES: { value: HouseholdRole; label: string }[] = [
+  { value: "head", label: "Head of household" },
+  { value: "spouse", label: "Spouse / partner" },
+  { value: "child", label: "Child" },
+  { value: "other", label: "Other" },
+];
 
 /** A person's everyday first name: "Bill" wins over "William" when set. */
 export function firstName(person: Pick<PersonRow, "first_name" | "preferred_name">): string {
@@ -317,13 +325,6 @@ export function formatShortDate(iso: string | null | undefined): string {
   return `${parts.month}/${parts.day}`;
 }
 
-/** "June 12, 1984" - the form used in the editing screens. */
-export function formatLongDate(iso: string | null | undefined): string {
-  const parts = parseDateParts(iso);
-  if (!parts) return "";
-  return `${MONTHS[parts.month - 1]} ${parts.day}, ${parts.year}`;
-}
-
 /** Day of the year, for birthday and anniversary lists. */
 export function monthDayOrder(iso: string | null | undefined): number {
   const parts = parseDateParts(iso);
@@ -360,6 +361,19 @@ export function toWinAnsi(text: string): string {
     out += folded.length > 0 && /^[\x20-\xff]*$/.test(folded) ? folded : "?";
   }
   return out;
+}
+
+/**
+ * What went wrong, in words fit for a screen.
+ *
+ * Anything at all can be thrown, and every screen catching one wants the same
+ * thing out of it: a line of text. An Error gives up its message; anything else
+ * is described as best it can be, unless the caller knows a better word for it
+ * than the raw form would be.
+ */
+export function message(cause: unknown, fallback?: string): string {
+  if (cause instanceof Error) return cause.message;
+  return fallback ?? String(cause);
 }
 
 /** Joins non-empty pieces with a separator. */

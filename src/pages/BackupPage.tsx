@@ -4,6 +4,7 @@ import { useDirectory } from "@/data/DirectoryContext";
 import { Checkbox, LoadingScreen, Notice } from "@/components/ui";
 import { RestorePanel } from "@/components/RestorePanel";
 import { buildBackup, type BackupProgress } from "@/lib/backup";
+import { message } from "@/lib/format";
 
 const LAST_BACKUP_KEY = "church-directory:last-backup";
 
@@ -79,7 +80,7 @@ export function BackupPage() {
         missing: backup.missingPhotos.length,
       });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(message(cause));
     } finally {
       setBusy(false);
       setProgress(null);

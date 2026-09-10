@@ -6,6 +6,7 @@ import { EmptyState, LoadingScreen, Notice } from "@/components/ui";
 import { fetchProjects } from "@/lib/queries";
 import type { ProjectRow } from "@/lib/database.types";
 import { normalizeSettings, recordsPerSheet } from "@/lib/layout/settings";
+import { message } from "@/lib/format";
 
 export function ProjectsPage() {
   const { entries } = useDirectory();
@@ -16,7 +17,7 @@ export function ProjectsPage() {
   useEffect(() => {
     fetchProjects()
       .then(setProjects)
-      .catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)));
+      .catch((cause) => setError(message(cause)));
   }, []);
 
   const summary = useMemo(() => {

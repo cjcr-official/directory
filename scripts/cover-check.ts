@@ -3,18 +3,13 @@ import { DEFAULT_SETTINGS, type ProjectSettings } from "@/lib/layout/settings";
 import { pdfMetrics } from "@/lib/layout/pdf";
 import { buildEntries, type DirectoryData } from "@/lib/entries";
 import type { HouseholdRow } from "@/lib/database.types";
+import { check } from "./check";
 
 /**
  * The cover has no scrolling and no reflow to save it: everything is placed
  * absolutely, so a long vision statement or a long church name either fits or
  * prints over the address. These are the shapes a real cover comes in.
  */
-let bad = 0;
-const check = (n: string, pass: boolean, d = "") => {
-  if (!pass) bad += 1;
-  console.log(`${pass ? "PASS" : "FAIL"}  ${n}${d ? " — " + d : ""}`);
-};
-
 const household: HouseholdRow = {
   id: "h1",
   display_name: "The Johnston Family",
@@ -198,6 +193,3 @@ for (const [name, overrides] of cases) {
   }
   console.log("");
 }
-
-console.log(bad ? `${bad} failed` : "all passed");
-process.exit(bad ? 1 : 0);

@@ -6,6 +6,7 @@ import type {
   ProjectRow,
   TagRow,
 } from "./database.types";
+import { message } from "./format";
 
 /**
  * What loading a backup back in would do.
@@ -127,10 +128,7 @@ export async function readBackup(bytes: Uint8Array, live: LiveDirectory): Promis
   } catch (cause) {
     // The likeliest wrong file by far is the PDF that was made at the same
     // time, so say what was expected rather than repeating a parser's words.
-    throw new Error(
-      `${cause instanceof Error ? cause.message : String(cause)} Choose the .zip file the ` +
-        `backup page produced.`,
-    );
+    throw new Error(`${message(cause)} Choose the .zip file the backup page produced.`);
   }
 
   const json = contents.find((entry) => entry.name === "directory.json");

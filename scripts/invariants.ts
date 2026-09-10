@@ -862,6 +862,11 @@ async function main() {
       ? `\n${fails.length} PROBLEM(S):\n- ${fails.join("\n- ")}`
       : "\nno problems found in this pass",
   );
+  // Without this the whole file reported its problems and still exited 0,
+  // so a book that had stopped composing passed CI in green.
+  if (fails.length) process.exitCode = 1;
 }
 
-void main();
+// Awaited, not fired off: scripts/checks.ts imports this file, and an import
+// that returns before its checks have run would be reported on an empty tally.
+await main();

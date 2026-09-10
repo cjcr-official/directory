@@ -28,7 +28,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "verify": "node scripts/run.mjs scripts/verify-setup.ts",
-    "checks": "npm run invariants && npm run restore:check && npm run batch:check && npm run names:check && npm run contrast:check && npm run cover:check && npm run fields:check && npm run strip:check && npm run qr:check && npm run changed:check"
+    "checks": "node scripts/run.mjs scripts/checks.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",

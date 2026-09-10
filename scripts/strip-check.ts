@@ -20,6 +20,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { check } from "./check";
 
 const css = readFileSync("src/styles/app.css", "utf8");
 
@@ -30,12 +31,6 @@ const css = readFileSync("src/styles/app.css", "utf8");
  * above the variables it is mixed from mentions it by name.
  */
 const clean = css.replace(/\/\*[\s\S]*?\*\//g, "");
-
-let failures = 0;
-function check(name: string, pass: boolean, detail = ""): void {
-  if (!pass) failures += 1;
-  console.log(`${pass ? "PASS" : "FAIL"}  ${name}${detail ? " — " + detail : ""}`);
-}
 
 /** Every rule in the sheet, as a selector list and its declarations. */
 function rules(): { selector: string; body: string }[] {
@@ -271,6 +266,3 @@ if (translucent) {
 } else {
   check("the status bar is opaque, so nothing needs giving back", true);
 }
-
-console.log(failures ? `\n${failures} failed` : "\nall passed");
-process.exit(failures ? 1 : 0);

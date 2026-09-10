@@ -9,16 +9,7 @@
  */
 
 import { createBatcher } from "@/lib/batch";
-
-let failures = 0;
-
-function check(what: string, got: unknown, want: unknown): void {
-  const same = JSON.stringify(got) === JSON.stringify(want);
-  if (!same) failures += 1;
-  console.log(
-    `  ${same ? "ok  " : "FAIL"} ${what}${same ? "" : `  got ${JSON.stringify(got)}, wanted ${JSON.stringify(want)}`}`,
-  );
-}
+import { same } from "./check";
 
 /** A stand-in for the signing call, counting how often it is asked. */
 function counted(answer: (key: string) => string | undefined = (k) => `url:${k}`) {
@@ -45,14 +36,10 @@ console.log("\na page of faces asking one at a time");
     Array.from({ length: 400 }, (_, i) => batcher.get(`people/${i}.jpg`)),
   );
 
-  check("every face gets its URL", results.length, 400);
-  check("and they are the right ones", results[7], "url:people/7.jpg");
-  check("requests made", calls.length, 4);
-  check(
-    "all four are full batches",
-    calls.map((c) => c.length),
-    [100, 100, 100, 100],
-  );
+  same("every face gets its URL", results.length, 400);
+  same("and they are the right ones", results[7], "url:people/7.jpg");
+  same("requests made", calls.length, 4);
+  same("all four are full batches", calls.map((c) => c.length), [100, 100, 100, 100]);
 }
 
 console.log("\nthe same photograph asked for by several rows at once");
@@ -67,14 +54,14 @@ console.log("\nthe same photograph asked for by several rows at once");
     batcher.get("households/b.jpg"),
   ]);
 
-  check("everyone is answered", results, [
+  same("everyone is answered", results, [
     "url:households/a.jpg",
     "url:households/a.jpg",
     "url:households/a.jpg",
     "url:households/b.jpg",
   ]);
-  check("one request", calls.length, 1);
-  check("carrying each path once", calls[0], ["households/a.jpg", "households/b.jpg"]);
+  same("one request", calls.length, 1);
+  same("carrying each path once", calls[0], ["households/a.jpg", "households/b.jpg"]);
 }
 
 console.log("\nasking again while the first ask is still in the air");
@@ -87,11 +74,11 @@ console.log("\nasking again while the first ask is still in the air");
   await Promise.resolve();
   const second = batcher.get("people/x.jpg");
 
-  check("both get the answer", await Promise.all([first, second]), [
+  same("both get the answer", await Promise.all([first, second]), [
     "url:people/x.jpg",
     "url:people/x.jpg",
   ]);
-  check("without asking twice", calls.length, 1);
+  same("without asking twice", calls.length, 1);
 }
 
 console.log("\nasks in separate ticks are separate requests");
@@ -102,7 +89,7 @@ console.log("\nasks in separate ticks are separate requests");
   await batcher.get("a");
   await batcher.get("b");
 
-  check("one request each", calls.length, 2);
+  same("one request each", calls.length, 2);
 }
 
 console.log("\na photograph that is not there");
@@ -111,9 +98,9 @@ console.log("\na photograph that is not there");
   const batcher = createBatcher(run, 100);
 
   const [missing, present] = await Promise.all([batcher.get("gone.jpg"), batcher.get("here.jpg")]);
-  check("the missing one resolves rather than hanging", missing, undefined);
-  check("and does not take its neighbour down", present, "url:here.jpg");
-  check("one request", calls.length, 1);
+  same("the missing one resolves rather than hanging", missing, undefined);
+  same("and does not take its neighbour down", present, "url:here.jpg");
+  same("one request", calls.length, 1);
 }
 
 console.log("\nthe request itself failing");
@@ -125,13 +112,13 @@ console.log("\nthe request itself failing");
   }, 100);
 
   const results = await Promise.all([batcher.get("a"), batcher.get("b")]);
-  check("every waiter is answered rather than left spinning", results, [undefined, undefined]);
-  check("the failure did not become an unhandled rejection", calls, 1);
+  same("every waiter is answered rather than left spinning", results, [undefined, undefined]);
+  same("the failure did not become an unhandled rejection", calls, 1);
 
   // And the next ask is allowed to try again rather than being stuck.
   const again = await batcher.get("a");
-  check("a later ask retries", again, undefined);
-  check("as a fresh request", calls, 2);
+  same("a later ask retries", again, undefined);
+  same("as a fresh request", calls, 2);
 }
 
 console.log("\nsigning out mid-flight");
@@ -149,19 +136,16 @@ console.log("\nsigning out mid-flight");
   await Promise.resolve(); // the request has gone out
   batcher.reset();
 
-  check("the waiter is let go rather than left hanging", await pending, undefined);
+  same("the waiter is let go rather than left hanging", await pending, undefined);
 
   // And when the answer finally lands, it is not handed to anybody: those
   // links outlive the session by up to an hour, which is the whole reason
   // sign-out clears them.
   release?.();
   const afterReset = await batcher.get("people/private.jpg");
-  check(
+  same(
     "a fresh ask after signing out is answered on its own terms",
     afterReset,
     "url:people/private.jpg",
   );
 }
-
-console.log(failures === 0 ? "\nno problems found in this pass" : `\n${failures} CHECKS FAILED`);
-process.exit(failures === 0 ? 0 : 1);

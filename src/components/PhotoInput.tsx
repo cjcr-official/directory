@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { getPhotoUrl, preparePhoto, type PreparedPhoto } from "@/lib/photos";
+import { message } from "@/lib/format";
 
 interface Props {
   /** Storage path of the photo already saved, if any. */
@@ -90,7 +91,7 @@ export function PhotoInput({
       setRemoved(false);
       onChange(prepared.blob, false);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not read that image.");
+      setError(message(cause, "Could not read that image."));
     } finally {
       setBusy(false);
     }

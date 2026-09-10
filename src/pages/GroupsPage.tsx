@@ -5,7 +5,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { ConfirmButton, EmptyState, Field, LoadingScreen, Notice } from "@/components/ui";
 import { createTag, deleteTag, updateTag } from "@/lib/queries";
 import { resolveEntries } from "@/lib/projectEntries";
-import { fileAsName, firstName, join, labelledHouseholdName } from "@/lib/format";
+import { fileAsName, firstName, join, labelledHouseholdName, message } from "@/lib/format";
 import type { TagRow } from "@/lib/database.types";
 
 const PALETTE = [
@@ -106,7 +106,7 @@ export function GroupsPage() {
       // The stored name is still the old one, so the field goes back to saying
       // so rather than showing a name nothing was saved under.
       setDraft(tag.name);
-      setFormError(cause instanceof Error ? cause.message : String(cause));
+      setFormError(message(cause));
     } finally {
       setRenaming(false);
     }
@@ -134,7 +134,7 @@ export function GroupsPage() {
       setColor(PALETTE[(PALETTE.indexOf(color) + 1) % PALETTE.length]);
       await reload();
     } catch (cause) {
-      setFormError(cause instanceof Error ? cause.message : String(cause));
+      setFormError(message(cause));
     } finally {
       setBusy(false);
     }
@@ -209,9 +209,7 @@ export function GroupsPage() {
                                 // Shown at the top of the card, where the add
                                 // form's errors go, rather than as small print
                                 // beside a button in a row.
-                                setFormError(
-                                  cause instanceof Error ? cause.message : String(cause),
-                                );
+                                setFormError(message(cause));
                                 throw cause;
                               }
                               if (openId === tag.id) setOpenId(null);

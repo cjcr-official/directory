@@ -4,6 +4,7 @@ import { useDirectory } from "@/data/DirectoryContext";
 import { Notice } from "@/components/ui";
 import { fetchProjects } from "@/lib/queries";
 import { applyRestore, readBackupFile } from "@/lib/restore";
+import { message } from "@/lib/format";
 import type {
   LiveDirectory,
   RestoreMode,
@@ -76,7 +77,7 @@ export function RestorePanel() {
       setLive(current);
       setPlan(await readBackupFile(file, current));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(message(cause));
       setFileName("");
     } finally {
       setReading(false);
@@ -104,7 +105,7 @@ export function RestorePanel() {
       // chosen file are dropped and it has to be read again. Reusing this one
       // would try to insert rows that landed before the failure.
       setPartial(true);
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(message(cause));
       setPlan(null);
       setLive(null);
       setTyped("");

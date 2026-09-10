@@ -20,12 +20,7 @@
  */
 
 import { qrDataUri, formatSetupKey } from "@/lib/qr";
-
-let failures = 0;
-function check(name: string, pass: boolean, detail = ""): void {
-  if (!pass) failures += 1;
-  console.log(`${pass ? "PASS" : "FAIL"}  ${name}${detail ? " — " + detail : ""}`);
-}
+import { check } from "./check";
 
 /** What Supabase hands back: SVG source, with a colour written as a hex. */
 const SVG =
@@ -100,6 +95,3 @@ check(
   formatSetupKey("ABCDEF").replace(/ /g, "") === "ABCDEF",
   formatSetupKey("ABCDEF"),
 );
-
-console.log(failures ? `\n${failures} failed` : "\nall passed");
-process.exit(failures ? 1 : 0);

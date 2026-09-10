@@ -24,6 +24,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { check } from "./check";
 
 /** WCAG AA: 4.5:1 for body text, 3:1 once it is large or bold. */
 const AA_TEXT = 4.5;
@@ -118,8 +119,6 @@ const PAIRS: Pair[] = [
   { what: "accent text on the soft accent", fg: "--accent", bg: "--accent-soft" },
 ];
 
-let failures = 0;
-
 console.log(
   `\nreading ${light.size} colour tokens and ${dark.size} after dark ` + `from src/styles/app.css`,
 );
@@ -134,16 +133,9 @@ for (const [theme, palette] of [
     const fg = colour(palette, pair.fg);
     const bg = colour(palette, pair.bg);
     const got = contrast(fg, bg);
-    const passes = got >= need;
-    if (!passes) failures += 1;
-    console.log(
-      `  ${passes ? "ok  " : "FAIL"} ${got.toFixed(2).padStart(5)}:1  (needs ${need})  ` +
-        `${pair.what}  ${fg} on ${bg}`,
+    check(
+      `${got.toFixed(2).padStart(5)}:1  (needs ${need})  ${pair.what}  ${fg} on ${bg}`,
+      got >= need,
     );
   }
 }
-
-console.log(
-  failures === 0 ? "\nno problems found in this pass" : `\n${failures} PAIR(S) BELOW THE THRESHOLD`,
-);
-process.exit(failures === 0 ? 0 : 1);

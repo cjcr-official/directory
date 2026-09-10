@@ -34,7 +34,7 @@ import {
   type Typeface,
 } from "@/lib/layout/settings";
 import { resolveEntries, type Selection } from "@/lib/projectEntries";
-import { labelledHouseholdName } from "@/lib/format";
+import { labelledHouseholdName, message } from "@/lib/format";
 import { getPhotoUrls, removePhoto, uploadPhoto } from "@/lib/photos";
 import { CoverCanvas } from "@/components/BookPreview";
 import { composeCoverPage } from "@/lib/layout/compose";
@@ -119,7 +119,7 @@ export function ProjectEditPage() {
         setChanged({ at: loaded.project.updated_at, by: loaded.project.updated_by ?? null });
         setStale(false);
       })
-      .catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)))
+      .catch((cause) => setError(message(cause)))
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
@@ -317,7 +317,7 @@ export function ProjectEditPage() {
       setStale(false);
       setError(null);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(message(cause));
     } finally {
       setSaving(false);
     }
@@ -392,7 +392,7 @@ export function ProjectEditPage() {
       if (!id) navigate(`/projects/${project.id}`, { replace: true });
     } catch (cause) {
       setStale(isStaleWrite(cause));
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(message(cause));
     } finally {
       setSaving(false);
     }

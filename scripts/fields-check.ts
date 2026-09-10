@@ -18,14 +18,9 @@
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { check } from "./check";
 
 const css = readFileSync("src/styles/app.css", "utf8");
-
-let failures = 0;
-function check(name: string, pass: boolean, detail = ""): void {
-  if (!pass) failures += 1;
-  console.log(`${pass ? "PASS" : "FAIL"}  ${name}${detail ? " — " + detail : ""}`);
-}
 
 /** Every input type the app actually uses, read out of the source. */
 function typesInUse(): Set<string> {
@@ -93,6 +88,3 @@ for (const type of relevant) {
 // field's own content and drags the page wider than the phone.
 const fieldRule = css.slice(css.indexOf(".field {"), css.indexOf("}", css.indexOf(".field {")));
 check(".field can shrink to its track", /min-width:\s*0/.test(fieldRule));
-
-console.log(failures ? `\n${failures} failed` : "\nall passed");
-process.exit(failures ? 1 : 0);

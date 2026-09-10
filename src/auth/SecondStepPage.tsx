@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Logo } from "@/components/Logo";
 import { CODE_LENGTH, completeSecondStep } from "@/lib/mfa";
+import { message } from "@/lib/format";
 import { useAuth } from "./AuthProvider";
 
 /**
@@ -38,7 +39,7 @@ export function SecondStepPage() {
       // Nothing to do on success: Supabase issues a session at the higher
       // level, the auth listener picks it up, and the app is behind it.
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(message(cause));
       setCode("");
     } finally {
       setBusy(false);

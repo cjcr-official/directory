@@ -1,11 +1,6 @@
 import { PHOTO_BUCKET, supabase } from "./supabase";
 import { readBackup, selectRows } from "./restorePlan";
-import {
-  missingColumn,
-  noteOfficeLabelMissing,
-  withoutAuthor,
-  withoutOfficeLabel,
-} from "./queries";
+import { withoutAuthor } from "./queries";
 import type {
   LiveDirectory,
   RestoreMode,
@@ -66,17 +61,7 @@ function fail(what: string, message: string): never {
 async function insertHouseholds(rows: HouseholdRow[]): Promise<void> {
   for (const batch of chunked(rows.map(withoutAuthor))) {
     const { error } = await supabase.from("households").insert(batch);
-    if (!error) continue;
-    // A backup taken after 0004 can be restored into a database that has not
-    // run it. Losing the office's filing notes is a small cost; refusing to
-    // restore the congregation over them would not be.
-    if (missingColumn(error)) {
-      noteOfficeLabelMissing();
-      const retry = await supabase.from("households").insert(batch.map(withoutOfficeLabel));
-      if (retry.error) fail("families", retry.error.message);
-      continue;
-    }
-    fail("families", error.message);
+    if (error) fail("families", error.message);
   }
 }
 

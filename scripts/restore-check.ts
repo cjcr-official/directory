@@ -13,16 +13,7 @@
 import { readBackup, selectRows, type BackupFile, type LiveDirectory } from "@/lib/restorePlan";
 import { buildZip } from "@/lib/zip";
 import type { HouseholdRow, PersonRow, ProjectRow, TagRow } from "@/lib/database.types";
-
-let failures = 0;
-
-function check(what: string, got: unknown, want: unknown): void {
-  const same = JSON.stringify(got) === JSON.stringify(want);
-  if (!same) failures += 1;
-  console.log(
-    `  ${same ? "ok  " : "FAIL"} ${what}${same ? "" : `  got ${JSON.stringify(got)}, wanted ${JSON.stringify(want)}`}`,
-  );
-}
+import { check, same } from "./check";
 
 const WHEN = "2026-01-01T00:00:00+00:00";
 
@@ -136,13 +127,13 @@ const ids = (rows: { id: string }[]) => rows.map((r) => r.id).sort();
 console.log("\nan empty directory, adding back what is missing");
 {
   const rows = selectRows(backup(), EMPTY, "missing");
-  check("every family goes in", ids(rows.households), ["h1", "h2"]);
-  check("every person goes in", ids(rows.people), ["p1", "p2", "p3"]);
-  check("every group goes in", ids(rows.tags), ["t1", "t2"]);
-  check("the directory goes in", ids(rows.projects), ["pr1"]);
-  check("its group survives", rows.projectTags.length, 1);
-  check("both its entries survive", rows.projectEntries.length, 2);
-  check("nobody is orphaned", rows.orphaned, 0);
+  same("every family goes in", ids(rows.households), ["h1", "h2"]);
+  same("every person goes in", ids(rows.people), ["p1", "p2", "p3"]);
+  same("every group goes in", ids(rows.tags), ["t1", "t2"]);
+  same("the directory goes in", ids(rows.projects), ["pr1"]);
+  same("its group survives", rows.projectTags.length, 1);
+  same("both its entries survive", rows.projectEntries.length, 2);
+  same("nobody is orphaned", rows.orphaned, 0);
 }
 
 console.log("\nnothing has been lost - restoring must be a no-op");
@@ -158,11 +149,11 @@ console.log("\nnothing has been lost - restoring must be a no-op");
   };
   const existing = new Set(["h:h1:t1", "p:p1:t2"]);
   const rows = selectRows(file, live, "missing", existing);
-  check("no family rewritten", rows.households.length, 0);
-  check("no person rewritten", rows.people.length, 0);
-  check("no group rewritten", rows.tags.length, 0);
-  check("no directory rewritten", rows.projects.length, 0);
-  check("no link rewritten", rows.householdTags.length + rows.personTags.length, 0);
+  same("no family rewritten", rows.households.length, 0);
+  same("no person rewritten", rows.people.length, 0);
+  same("no group rewritten", rows.tags.length, 0);
+  same("no directory rewritten", rows.projects.length, 0);
+  same("no link rewritten", rows.householdTags.length + rows.personTags.length, 0);
 }
 
 console.log("\none family was deleted, and work has happened since");
@@ -178,17 +169,13 @@ console.log("\none family was deleted, and work has happened since");
     personTags: [{ person_id: "p1", tag_id: "t2" }],
   };
   const rows = selectRows(file, live, "missing", new Set(["p:p1:t2"]));
-  check("only the deleted family comes back", ids(rows.households), ["h1"]);
-  check("only its people come back", ids(rows.people), ["p1", "p2"]);
-  check(
-    "they are still in their family",
-    rows.people.every((p) => p.household_id === "h1"),
-    true,
-  );
-  check("its group link is restored", rows.householdTags, [{ household_id: "h1", tag_id: "t1" }]);
-  check("a link already there is left alone", rows.personTags.length, 0);
-  check("nothing about h3 or p4 is touched", ids(rows.households).includes("h3"), false);
-  check("nobody is orphaned", rows.orphaned, 0);
+  same("only the deleted family comes back", ids(rows.households), ["h1"]);
+  same("only its people come back", ids(rows.people), ["p1", "p2"]);
+  same("they are still in their family", rows.people.every((p) => p.household_id === "h1"), true);
+  same("its group link is restored", rows.householdTags, [{ household_id: "h1", tag_id: "t1" }]);
+  same("a link already there is left alone", rows.personTags.length, 0);
+  same("nothing about h3 or p4 is touched", ids(rows.households).includes("h3"), false);
+  same("nobody is orphaned", rows.orphaned, 0);
 }
 
 console.log("\na link was lost but its records were not");
@@ -204,9 +191,9 @@ console.log("\na link was lost but its records were not");
   };
   // Both ends are alive; the link between them is not recorded any more.
   const rows = selectRows(file, live, "missing", new Set());
-  check("the missing link is put back", rows.householdTags, [{ household_id: "h1", tag_id: "t1" }]);
-  check("and the person's", rows.personTags, [{ person_id: "p1", tag_id: "t2" }]);
-  check("without rewriting the records", rows.households.length + rows.people.length, 0);
+  same("the missing link is put back", rows.householdTags, [{ household_id: "h1", tag_id: "t1" }]);
+  same("and the person's", rows.personTags, [{ person_id: "p1", tag_id: "t2" }]);
+  same("without rewriting the records", rows.households.length + rows.people.length, 0);
 }
 
 console.log("\nreplacing everything");
@@ -221,11 +208,11 @@ console.log("\nreplacing everything");
     personTags: [],
   };
   const rows = selectRows(file, live, "replace", new Set(["h:h1:t1"]));
-  check("the file's families all go in", ids(rows.households), ["h1", "h2"]);
-  check("the file's people all go in", ids(rows.people), ["p1", "p2", "p3"]);
-  check("the file's groups all go in", ids(rows.tags), ["t1", "t2"]);
-  check("nothing of the live directory is written", ids(rows.households).includes("h9"), false);
-  check("links are not skipped as already-there", rows.householdTags.length, 1);
+  same("the file's families all go in", ids(rows.households), ["h1", "h2"]);
+  same("the file's people all go in", ids(rows.people), ["p1", "p2", "p3"]);
+  same("the file's groups all go in", ids(rows.tags), ["t1", "t2"]);
+  same("nothing of the live directory is written", ids(rows.households).includes("h9"), false);
+  same("links are not skipped as already-there", rows.householdTags.length, 1);
 }
 
 console.log("\na backup taken while a family was being deleted");
@@ -236,12 +223,12 @@ console.log("\na backup taken while a family was being deleted");
     people: [person("p1", "h1"), person("p3", "h2")],
   });
   const rows = selectRows(file, EMPTY, "missing");
-  check("everybody still comes back", ids(rows.people), ["p1", "p3"]);
+  same("everybody still comes back", ids(rows.people), ["p1", "p3"]);
   const stray = rows.people.find((p) => p.id === "p3");
-  check("the one with no family comes back without one", stray?.household_id, null);
-  check("and without a role in it", stray?.household_role, null);
-  check("the other keeps their family", rows.people.find((p) => p.id === "p1")?.household_id, "h1");
-  check("it is reported", rows.orphaned, 1);
+  same("the one with no family comes back without one", stray?.household_id, null);
+  same("and without a role in it", stray?.household_role, null);
+  same("the other keeps their family", rows.people.find((p) => p.id === "p1")?.household_id, "h1");
+  same("it is reported", rows.orphaned, 1);
 }
 
 console.log("\na person whose family survived in the directory");
@@ -249,8 +236,8 @@ console.log("\na person whose family survived in the directory");
   const file = backup({ households: [], people: [person("p1", "h1")], householdTags: [] });
   const live: LiveDirectory = { ...EMPTY, households: [household("h1", "Smith")] };
   const rows = selectRows(file, live, "missing");
-  check("keeps it", rows.people[0]?.household_id, "h1");
-  check("and is not counted as orphaned", rows.orphaned, 0);
+  same("keeps it", rows.people[0]?.household_id, "h1");
+  same("and is not counted as orphaned", rows.orphaned, 0);
 }
 
 console.log("\nlinks and entries pointing at things that will not exist");
@@ -276,18 +263,14 @@ console.log("\nlinks and entries pointing at things that will not exist");
     ],
   });
   const rows = selectRows(file, EMPTY, "missing");
-  check("only the whole family link is written", rows.householdTags, [
+  same("only the whole family link is written", rows.householdTags, [
     { household_id: "h1", tag_id: "t1" },
   ]);
-  check("the dangling person link is dropped", rows.personTags.length, 0);
-  check("the dangling directory group is dropped", rows.projectTags, [
+  same("the dangling person link is dropped", rows.personTags.length, 0);
+  same("the dangling directory group is dropped", rows.projectTags, [
     { project_id: "pr1", tag_id: "t1" },
   ]);
-  check(
-    "only the entry that resolves survives",
-    rows.projectEntries.map((e) => e.ref_id),
-    ["h1"],
-  );
+  same("only the entry that resolves survives", rows.projectEntries.map((e) => e.ref_id), ["h1"]);
 }
 
 console.log("\nphotographs");
@@ -302,17 +285,17 @@ console.log("\nphotographs");
     ["people/unreferenced.jpg", new Uint8Array([3])],
   ]);
   const rows = selectRows(file, EMPTY, "missing", new Set(), photos);
-  check("only pictures that are in the archive", rows.photoPaths.sort(), [
+  same("only pictures that are in the archive", rows.photoPaths.sort(), [
     "households/a.jpg",
     "people/b.jpg",
   ]);
 
   const none = selectRows(file, EMPTY, "missing");
-  check("a records-only backup asks for none", none.photoPaths.length, 0);
+  same("a records-only backup asks for none", none.photoPaths.length, 0);
 
   const live: LiveDirectory = { ...EMPTY, households: file.households, people: file.people };
   const nothingMissing = selectRows(file, live, "missing", new Set(), photos);
-  check("and none when no record is being written", nothingMissing.photoPaths.length, 0);
+  same("and none when no record is being written", nothingMissing.photoPaths.length, 0);
 }
 
 console.log("\nan archive with nothing in it");
@@ -331,7 +314,7 @@ console.log("\nan archive with nothing in it");
   );
   const total =
     rows.households.length + rows.people.length + rows.tags.length + rows.projects.length;
-  check("writes nothing rather than throwing", total, 0);
+  same("writes nothing rather than throwing", total, 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -357,13 +340,10 @@ function archive(file: Partial<BackupFile> = {}, extra: { name: string; data: Ui
 async function refuses(what: string, bytes: Uint8Array, expect: RegExp): Promise<void> {
   try {
     await readBackup(bytes, EMPTY);
-    failures += 1;
-    console.log(`  FAIL ${what}  it was accepted`);
+    check(what, false, "it was accepted");
   } catch (cause) {
-    const message = cause instanceof Error ? cause.message : String(cause);
-    const ok = expect.test(message);
-    if (!ok) failures += 1;
-    console.log(`  ${ok ? "ok  " : "FAIL"} ${what}${ok ? "" : `  said "${message}"`}`);
+    const said = cause instanceof Error ? cause.message : String(cause);
+    check(what, expect.test(said), `said "${said}"`);
   }
 }
 
@@ -376,22 +356,22 @@ console.log("\nreading a whole archive back");
     ]),
     EMPTY,
   );
-  check("families are counted", plan.inFile.households, 2);
-  check("people are counted", plan.inFile.people, 3);
-  check("groups are counted", plan.inFile.tags, 2);
-  check("directories are counted", plan.inFile.projects, 1);
-  check("all of them read as missing from an empty directory", plan.missing.people, 3);
-  check("nothing is newer than the backup", plan.newerThanBackup.people, 0);
-  check(
+  same("families are counted", plan.inFile.households, 2);
+  same("people are counted", plan.inFile.people, 3);
+  same("groups are counted", plan.inFile.tags, 2);
+  same("directories are counted", plan.inFile.projects, 1);
+  same("all of them read as missing from an empty directory", plan.missing.people, 3);
+  same("nothing is newer than the backup", plan.newerThanBackup.people, 0);
+  same(
     "the date it was taken is understood",
     plan.takenAt?.toISOString(),
     "2026-01-01T00:00:00.000Z",
   );
-  check("photographs are keyed without the photos/ prefix", [...plan.photos.keys()].sort(), [
+  same("photographs are keyed without the photos/ prefix", [...plan.photos.keys()].sort(), [
     "households/a.jpg",
     "people/b.jpg",
   ]);
-  check("and their bytes survive", [...(plan.photos.get("people/b.jpg") ?? [])], [4, 5]);
+  same("and their bytes survive", [...(plan.photos.get("people/b.jpg") ?? [])], [4, 5]);
 }
 
 console.log("\nreading it against a directory that has moved on");
@@ -406,11 +386,11 @@ console.log("\nreading it against a directory that has moved on");
     personTags: [{ person_id: "p1", tag_id: "t2" }],
   };
   const plan = await readBackup(archive(), live);
-  check("one family is missing", plan.missing.households, 1);
-  check("two people are missing", plan.missing.people, 2);
-  check("one directory is missing", plan.missing.projects, 1);
-  check("one family is newer than the backup", plan.newerThanBackup.households, 1);
-  check("one person is newer than the backup", plan.newerThanBackup.people, 1);
+  same("one family is missing", plan.missing.households, 1);
+  same("two people are missing", plan.missing.people, 2);
+  same("one directory is missing", plan.missing.projects, 1);
+  same("one family is newer than the backup", plan.newerThanBackup.households, 1);
+  same("one person is newer than the backup", plan.newerThanBackup.people, 1);
 }
 
 console.log("\nfiles that are not a backup");
@@ -474,11 +454,11 @@ console.log("\nan older backup with no directories in it");
     ]),
     EMPTY,
   );
-  check("it reads", plan.inFile.households, 1);
-  check("with no directories", plan.inFile.projects, 0);
-  check("and no links", plan.file.householdTags.length + plan.file.personTags.length, 0);
+  same("it reads", plan.inFile.households, 1);
+  same("with no directories", plan.inFile.projects, 0);
+  same("and no links", plan.file.householdTags.length + plan.file.personTags.length, 0);
   const rows = selectRows(plan.file, EMPTY, "missing");
-  check("and restores what it does have", ids(rows.households), ["h1"]);
+  same("and restores what it does have", ids(rows.households), ["h1"]);
 }
 
 console.log("\ncounting what is missing, so the page can say so before writing");
@@ -494,16 +474,16 @@ console.log("\ncounting what is missing, so the page can say so before writing")
   };
 
   const nothing = await readBackup(archive(), whole);
-  check("an untouched directory is missing no records", nothing.missing.people, 0);
-  check("and no group labels", nothing.missing.links, 0);
+  same("an untouched directory is missing no records", nothing.missing.people, 0);
+  same("and no group labels", nothing.missing.links, 0);
 
   // The records all survived; one group label against one of them did not.
   // This is the case the page would otherwise call "nothing is missing".
   const lostLink = await readBackup(archive(), { ...whole, householdTags: [] });
-  check("a lost group label is counted", lostLink.missing.links, 1);
-  check("even though every record is present", lostLink.missing.households, 0);
+  same("a lost group label is counted", lostLink.missing.links, 1);
+  same("even though every record is present", lostLink.missing.households, 0);
   const rows = selectRows(lostLink.file, { ...whole, householdTags: [] }, "missing");
-  check("and restoring would put it back", rows.householdTags, [
+  same("and restoring would put it back", rows.householdTags, [
     { household_id: "h1", tag_id: "t1" },
   ]);
 
@@ -512,8 +492,5 @@ console.log("\ncounting what is missing, so the page can say so before writing")
     householdTags: [],
     personTags: [],
   });
-  check("both kinds of link are counted", lostBoth.missing.links, 2);
+  same("both kinds of link are counted", lostBoth.missing.links, 2);
 }
-
-console.log(failures === 0 ? "\nno problems found in this pass" : `\n${failures} CHECKS FAILED`);
-process.exit(failures === 0 ? 0 : 1);

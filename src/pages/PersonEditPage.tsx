@@ -17,14 +17,14 @@ import {
 import type { HouseholdRole, PersonRow } from "@/lib/database.types";
 import { removePhoto, uploadPhoto } from "@/lib/photos";
 import { createPerson, deletePerson, isStaleWrite, setTags, updatePerson } from "@/lib/queries";
-import { addressLines, fullName, labelledHouseholdName, samePersonName } from "@/lib/format";
-
-const ROLES: { value: HouseholdRole; label: string }[] = [
-  { value: "head", label: "Head of household" },
-  { value: "spouse", label: "Spouse / partner" },
-  { value: "child", label: "Child" },
-  { value: "other", label: "Other" },
-];
+import {
+  addressLines,
+  fullName,
+  HOUSEHOLD_ROLES,
+  labelledHouseholdName,
+  message,
+  samePersonName,
+} from "@/lib/format";
 
 const BLANK: Omit<PersonRow, "id" | "created_at" | "updated_at"> = {
   household_id: null,
@@ -229,7 +229,7 @@ export function PersonEditPage() {
       });
     } catch (cause) {
       setStale(isStaleWrite(cause));
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(message(cause));
     } finally {
       setSaving(false);
     }
@@ -476,7 +476,7 @@ export function PersonEditPage() {
                       patch({ household_role: event.target.value as HouseholdRole })
                     }
                   >
-                    {ROLES.map((role) => (
+                    {HOUSEHOLD_ROLES.map((role) => (
                       <option key={role.value} value={role.value}>
                         {role.label}
                       </option>

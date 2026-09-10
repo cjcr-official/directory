@@ -11,6 +11,7 @@ import { loadMetrics } from "@/lib/layout/metrics";
 import { normalizeSettings, recordsPerSheet } from "@/lib/layout/settings";
 import { resolveEntries } from "@/lib/projectEntries";
 import type { ProjectRow } from "@/lib/database.types";
+import { message } from "@/lib/format";
 
 /** Sheets drawn on screen before the rest is left to the PDF. */
 const PREVIEW_SHEET_LIMIT = 40;
@@ -60,7 +61,7 @@ export function ProjectPreviewPage() {
           if (active) setPhotoUrls(urls);
         }
       } catch (cause) {
-        if (active) setError(cause instanceof Error ? cause.message : String(cause));
+        if (active) setError(message(cause));
       }
     })();
 
@@ -111,7 +112,7 @@ export function ProjectPreviewPage() {
       // Give the browser a moment to start the download before releasing it.
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(message(cause));
     } finally {
       setBuilding(false);
       setProgress(null);

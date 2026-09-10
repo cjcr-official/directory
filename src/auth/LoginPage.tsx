@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Logo } from "@/components/Logo";
+import { message } from "@/lib/format";
 import { useAuth } from "./AuthProvider";
 
 /**
@@ -34,7 +35,7 @@ export function LoginPage() {
         }
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(message(cause));
     }
   }
 

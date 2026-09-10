@@ -3,6 +3,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { ConfirmButton, LoadingScreen, Notice } from "@/components/ui";
 import { deleteAccount, fetchProfiles, updateProfile } from "@/lib/queries";
 import type { AppRole, ProfileRow } from "@/lib/database.types";
+import { message } from "@/lib/format";
 
 const ROLES: { value: AppRole; label: string; blurb: string }[] = [
   { value: "owner", label: "Owner", blurb: "Everything, including managing administrators." },
@@ -39,7 +40,7 @@ export function AdministratorsPage() {
     try {
       setProfiles(await fetchProfiles());
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(message(cause));
     }
   }
 
@@ -54,7 +55,7 @@ export function AdministratorsPage() {
       await updateProfile(id, patch);
       await load();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(message(cause));
     } finally {
       setBusy(null);
     }
