@@ -61,6 +61,8 @@ function person(id: string, householdId: string | null, photo: string | null = n
     country: null,
     photo_path: photo,
     notes: null,
+    background_check_on: null,
+    background_check_due: null,
     sort_order: 0,
     is_active: true,
     created_at: WHEN,

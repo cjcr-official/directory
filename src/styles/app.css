@@ -592,6 +592,24 @@ p:last-child {
   text-transform: uppercase;
 }
 
+/* Only drawn once the panel holds more than one kind of thing, so an ordinary
+   afternoon's tray is a list of arrivals with nothing over it. */
+.tray-section {
+  margin: 0;
+  padding: 12px 14px 2px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+/* Not the first one: a rule over the top of the panel would be a second line
+   under the header it already has. */
+.tray-list + .tray-section {
+  margin-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
 .tray-empty {
   margin: 0;
   padding: 16px 14px;
@@ -1485,9 +1503,31 @@ th.num {
   border-color: var(--warn-line);
   color: var(--warn-deep);
 }
+/* For the one thing on a browse table that is not a fact about a person but a
+   job nobody has done: a background check that has run out. */
+.pill.danger {
+  background: var(--danger-soft);
+  border-color: var(--danger-line);
+  color: var(--danger-deep);
+}
 
 .muted {
   color: var(--ink-3);
+}
+
+/* How long a background check has left, wherever it is said - the line under
+   a name in the tray, the cell in the People table. Coloured rather than
+   muted: in the tray it is the whole reason the row is there, and in the
+   table it is the one column somebody is scanning for trouble. Overdue takes
+   the stronger of the two, because "in three weeks" and "five months ago" are
+   not the same errand and should not look like it. Never colour alone - the
+   words say which it is. */
+.due-note {
+  color: var(--warn-deep);
+  font-weight: 600;
+}
+.due-note.late {
+  color: var(--danger);
 }
 .small {
   font-size: 0.85rem;
@@ -2778,16 +2818,21 @@ th.num {
     height: 21px;
   }
 
-  /* The head and the foot stay put and the list moves between them, which is
-     what makes it a screen rather than a long card. */
-  .tray-list,
-  .tray-empty {
+  /* The head and the foot stay put and everything between them moves, which
+     is what makes it a screen rather than a long card. One scrolling box
+     around the lot rather than the list itself, because the panel can hold
+     two lists and two headings now - and two boxes each claiming flex: 1
+     would be two half-height lists scrolling past each other. */
+  .tray-body {
     flex: 1;
     overflow-y: auto;
     overscroll-behavior: contain;
   }
   .tray-list {
     padding: 0;
+  }
+  .tray-section {
+    padding: 14px calc(14px + env(safe-area-inset-right)) 4px calc(14px + env(safe-area-inset-left));
   }
 
   /*

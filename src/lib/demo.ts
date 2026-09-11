@@ -1,5 +1,6 @@
 import type { HouseholdRow, PersonRow, TagRow } from "./database.types";
 import { suggestHouseholdName } from "./format";
+import { suggestDue } from "./backgroundChecks";
 
 /**
  * A believable congregation.
@@ -289,6 +290,32 @@ export function buildDemoData(householdCount = 34, individualCount = 9, seed = 2
         : null;
   }
 
+  /*
+   * Background checks, on about a fifth of the adults.
+   *
+   * Which is roughly what a church has: nobody checks the whole congregation,
+   * only whoever works with children or handles money, and the office knows
+   * who they are. Children are left out entirely.
+   *
+   * The last check is scattered over the past three and a half years while a
+   * renewal falls due at three, so the sample comes out with most of them
+   * clear, one or two coming up, and a couple that have quietly lapsed -
+   * which is the only spread that shows what the screens are for. A sample
+   * where everybody is up to date demonstrates nothing.
+   *
+   * Its own random stream, drawn after everything else is built: sharing the
+   * one above would shift every name, address and photograph in the demo book
+   * by however many numbers this took.
+   */
+  const spin = makeRandom(seed + 1);
+  const today = Date.parse(stamp);
+  const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+  for (const person of people) {
+    if (person.household_role === "child" || spin() > 0.2) continue;
+    person.background_check_on = isoDay(today - Math.floor(spin() * 1280) * 86_400_000);
+    person.background_check_due = suggestDue(person.background_check_on);
+  }
+
   return { households, people, tags, householdTags, personTags };
 }
 
@@ -314,6 +341,8 @@ function blankPerson(id: string, stamp: string): PersonRow {
     country: null,
     photo_path: null,
     notes: null,
+    background_check_on: null,
+    background_check_due: null,
     sort_order: 0,
     is_active: true,
     created_at: stamp,

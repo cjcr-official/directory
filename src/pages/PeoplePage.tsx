@@ -17,6 +17,7 @@ import {
   personPhotoPath,
   sortKey,
 } from "@/lib/format";
+import { checkState, describeDue } from "@/lib/backgroundChecks";
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
@@ -40,6 +41,7 @@ type ColumnKey =
   | "birthday"
   | "anniversary"
   | "gender"
+  | "check"
   | "notes"
   | "groups";
 
@@ -152,6 +154,29 @@ const COLUMNS: {
     width: "c-tiny",
     cellClass: "small muted",
     cell: (person) => (person.gender ? GENDERS[person.gender] : "—"),
+  },
+  {
+    /*
+     * The sentence the tray says, in the words the tray says it in - because
+     * a table that dates a check and a bell that counts the days from it are
+     * the same fact, and reading them differently is how somebody comes to
+     * believe neither.
+     *
+     * A pill and a date read better here and would not fit: together they are
+     * two lines in a 150px cell, which made the two rows that matter the two
+     * tallest rows in the table. Colour does the flagging instead, and it is
+     * never the only thing doing it - "Overdue by 3 weeks" says so in words.
+     */
+    key: "check",
+    label: "Background check",
+    width: "c-wide",
+    cellClass: "small muted",
+    cell: (person) => {
+      const state = checkState(person);
+      if (state === "untracked") return "—";
+      const flag = state === "overdue" ? "due-note late" : state === "due-soon" ? "due-note" : "";
+      return <span className={flag}>{describeDue(person)}</span>;
+    },
   },
   {
     key: "notes",

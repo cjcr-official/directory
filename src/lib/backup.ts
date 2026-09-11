@@ -127,6 +127,12 @@ function peopleCsv(data: DirectoryData): string {
     person.country,
     tagNames(data.tags, linked.get(person.id) ?? []),
     person.notes,
+    // Office-only and never printed, and in the spreadsheet for the reason
+    // everything office-only is: a backup that cannot rebuild what was on
+    // screen is not a backup. Whoever opens people.csv to work out who is due
+    // wants these two beside the name.
+    person.background_check_on,
+    person.background_check_due,
     person.is_active,
     person.photo_path ? `photos/${person.photo_path}` : "",
     person.id,
@@ -153,6 +159,8 @@ function peopleCsv(data: DirectoryData): string {
       "Country",
       "Groups",
       "Notes",
+      "Background check done",
+      "Background check due",
       "In printed directories",
       "Photo file",
       "Id",

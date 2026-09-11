@@ -19,12 +19,14 @@ import { removePhoto, uploadPhoto } from "@/lib/photos";
 import { createPerson, deletePerson, isStaleWrite, setTags, updatePerson } from "@/lib/queries";
 import {
   addressLines,
+  formatFullDate,
   fullName,
   HOUSEHOLD_ROLES,
   labelledHouseholdName,
   message,
   samePersonName,
 } from "@/lib/format";
+import { checkState, describeDue, RENEWAL_YEARS, suggestDue } from "@/lib/backgroundChecks";
 
 const BLANK: Omit<PersonRow, "id" | "created_at" | "updated_at"> = {
   household_id: null,
@@ -46,6 +48,8 @@ const BLANK: Omit<PersonRow, "id" | "created_at" | "updated_at"> = {
   country: null,
   photo_path: null,
   notes: null,
+  background_check_on: null,
+  background_check_due: null,
   sort_order: 0,
   is_active: true,
 };
@@ -128,6 +132,28 @@ export function PersonEditPage() {
 
   const household = form.household_id ? householdById.get(form.household_id) : null;
   const inheritedAddress = household ? addressLines(household) : [];
+
+  /*
+   * Where this person's background check stands, in the words the tray uses.
+   *
+   * Said in one line under the two dates rather than left for the reader to
+   * work out from them, because "is 3 March 2026 a problem?" is arithmetic
+   * nobody should be doing on a screen that already knows the answer - and
+   * because a record and the bell that nags about it disagreeing, even in
+   * wording, is how somebody comes to believe neither.
+   */
+  const dueState = checkState(form);
+  const dueOn = formatFullDate(form.background_check_due);
+  const standing =
+    dueState === "overdue"
+      ? `${describeDue(form)} — it was due on ${dueOn}.`
+      : dueState === "due-soon"
+        ? `${describeDue(form)}, on ${dueOn}.`
+        : dueState === "clear"
+          ? `Up to date. The next one is due on ${dueOn}.`
+          : form.background_check_on
+            ? "A check with no renewal date, so nothing will be said when it lapses."
+            : "Nothing recorded, so this person is left out of the reminders.";
 
   /**
    * People already here who would be hard to tell apart from this one.
@@ -576,6 +602,70 @@ export function PersonEditPage() {
                   onChange={(value) => patch({ is_active: value })}
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Its own card, and the last one, because it is the only thing on
+              this screen that is nobody's business but the office's - not a
+              detail of the person, not part of where they live, and never
+              printed. */}
+          <div className="card">
+            <div className="card-head column">
+              <h2>Background check</h2>
+              <span className="muted small">
+                For whoever works with children or handles money. Leave both blank for everybody
+                else — a blank record is not an overdue one, and nothing will nag about it.
+              </span>
+            </div>
+            <div className="card-body">
+              <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <Field label="Last one done" hint="The date on the clearance." htmlFor="check_on">
+                  <input
+                    id="check_on"
+                    type="date"
+                    disabled={!canEdit}
+                    value={form.background_check_on ?? ""}
+                    onChange={(event) => {
+                      const done = event.target.value || null;
+                      /*
+                       * The due date follows the last one until somebody sets
+                       * it themselves, exactly as a family name follows the
+                       * surname it was suggested from. A renewal booked for a
+                       * particular week is a fact rather than an arithmetic
+                       * result, and rewriting it each time the other date is
+                       * corrected would quietly lose it.
+                       */
+                      const following =
+                        !form.background_check_due ||
+                        form.background_check_due === suggestDue(form.background_check_on);
+                      const next: Partial<typeof BLANK> = { background_check_on: done };
+                      if (following) next.background_check_due = suggestDue(done);
+                      patch(next);
+                    }}
+                  />
+                </Field>
+                <Field
+                  label="Next one due"
+                  hint={`Starts at ${RENEWAL_YEARS} years on. Change it and it stays changed.`}
+                  htmlFor="check_due"
+                >
+                  <input
+                    id="check_due"
+                    type="date"
+                    disabled={!canEdit}
+                    value={form.background_check_due ?? ""}
+                    onChange={(event) =>
+                      patch({ background_check_due: event.target.value || null })
+                    }
+                  />
+                </Field>
+              </div>
+
+              {dueState === "overdue" || dueState === "due-soon" ? (
+                <Notice kind="warn">{standing}</Notice>
+              ) : (
+                <p className="hint">{standing}</p>
+              )}
             </div>
           </div>
         </div>
