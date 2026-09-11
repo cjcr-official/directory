@@ -10,6 +10,7 @@ import {
   ChangedNote,
   Checkbox,
   ConfirmButton,
+  DateInput,
   Field,
   LoadingScreen,
   Notice,
@@ -606,12 +607,11 @@ export function FamilyEditPage() {
                 hint="Optional. Only printed if you switch it on for a directory."
                 htmlFor="anniversary"
               >
-                <input
+                <DateInput
                   id="anniversary"
-                  type="date"
                   disabled={!canEdit}
-                  value={form.anniversary ?? ""}
-                  onChange={(event) => patch({ anniversary: event.target.value || null })}
+                  value={form.anniversary}
+                  onChange={(anniversary) => patch({ anniversary })}
                 />
               </Field>
             </div>

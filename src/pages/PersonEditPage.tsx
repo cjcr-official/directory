@@ -10,6 +10,7 @@ import {
   ChangedNote,
   Checkbox,
   ConfirmButton,
+  DateInput,
   Field,
   LoadingScreen,
   Notice,
@@ -471,12 +472,11 @@ export function PersonEditPage() {
               {/* An anniversary belongs to a couple, which is what a family
                   record is - so it is asked for there and only there. */}
               <Field label="Date of birth" hint="Optional." htmlFor="dob">
-                <input
+                <DateInput
                   id="dob"
-                  type="date"
                   disabled={!canEdit}
-                  value={form.date_of_birth ?? ""}
-                  onChange={(event) => patch({ date_of_birth: event.target.value || null })}
+                  value={form.date_of_birth}
+                  onChange={(date_of_birth) => patch({ date_of_birth })}
                 />
               </Field>
             </div>
@@ -620,13 +620,11 @@ export function PersonEditPage() {
             <div className="card-body">
               <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <Field label="Last one done" hint="The date on the clearance." htmlFor="check_on">
-                  <input
+                  <DateInput
                     id="check_on"
-                    type="date"
                     disabled={!canEdit}
-                    value={form.background_check_on ?? ""}
-                    onChange={(event) => {
-                      const done = event.target.value || null;
+                    value={form.background_check_on}
+                    onChange={(done) => {
                       /*
                        * The due date follows the last one until somebody sets
                        * it themselves, exactly as a family name follows the
@@ -649,14 +647,11 @@ export function PersonEditPage() {
                   hint={`Starts at ${RENEWAL_YEARS} years on. Change it and it stays changed.`}
                   htmlFor="check_due"
                 >
-                  <input
+                  <DateInput
                     id="check_due"
-                    type="date"
                     disabled={!canEdit}
-                    value={form.background_check_due ?? ""}
-                    onChange={(event) =>
-                      patch({ background_check_due: event.target.value || null })
-                    }
+                    value={form.background_check_due}
+                    onChange={(background_check_due) => patch({ background_check_due })}
                   />
                 </Field>
               </div>

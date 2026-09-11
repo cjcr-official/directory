@@ -24,19 +24,23 @@ import { check } from "./check";
 
 const css = readFileSync("src/styles/app.css", "utf8");
 
+/** Every TypeScript file under src, as paths. */
+function sourceFiles(dir = "src"): string[] {
+  const found: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const path = join(dir, entry);
+    if (statSync(path).isDirectory()) found.push(...sourceFiles(path));
+    else if (/\.tsx?$/.test(path)) found.push(path);
+  }
+  return found;
+}
+
 /** Every input type the app actually uses, read out of the source. */
 function typesInUse(): Set<string> {
   const found = new Set<string>();
-  const walk = (dir: string) => {
-    for (const entry of readdirSync(dir)) {
-      const path = join(dir, entry);
-      if (statSync(path).isDirectory()) walk(path);
-      else if (/\.tsx?$/.test(path)) {
-        for (const m of readFileSync(path, "utf8").matchAll(/type="([a-z-]+)"/g)) found.add(m[1]);
-      }
-    }
-  };
-  walk("src");
+  for (const path of sourceFiles()) {
+    for (const m of readFileSync(path, "utf8").matchAll(/type="([a-z-]+)"/g)) found.add(m[1]);
+  }
   return found;
 }
 
@@ -107,3 +111,27 @@ check(
   rowRule.replace(/\s+/g, " "),
 );
 check("and no row-wide overlay is hung off a link", !css.includes("row-link"), "");
+
+/*
+ * And that every date field in the app is the same component.
+ *
+ * iOS draws its own calendar for these, and that calendar has a Reset button
+ * which empties the element through a path a controlled React input was not
+ * hearing: the field went blank and the form went on holding the date, so a
+ * date could be changed and not removed. On the device most of this app is
+ * used from, that is most of what an optional date field is for.
+ *
+ * ui.tsx's DateInput is where that is dealt with, once, by reading the value
+ * back off the element rather than waiting to be told. This is the rule that
+ * stops a fifth date field being added the way the first four were - which is
+ * a thing nobody would notice on a desk, where all of this works.
+ */
+const DATE_FIELD = join("src", "components", "ui.tsx");
+const raw = sourceFiles().filter(
+  (path) => path !== DATE_FIELD && readFileSync(path, "utf8").includes('type="date"'),
+);
+check(
+  "every date field goes through DateInput",
+  raw.length === 0,
+  `${raw.join(", ")} draws its own - use DateInput from components/ui`,
+);
