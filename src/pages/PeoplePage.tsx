@@ -90,6 +90,19 @@ const COLUMNS: {
   cell: (person: PersonRow, cells: Cells) => ReactNode;
 }[] = [
   {
+    /*
+     * The family a person belongs to, said and not linked.
+     *
+     * It was a link, and on a phone it is the whole second line of the row -
+     * so the largest thing to aim at in a list of people took you to a family.
+     * Somebody scrolling for Case Johnston and tapping the name they can see
+     * landed on the Johnston family instead, which is the one place on this
+     * screen nobody was going.
+     *
+     * A family is opened from Families, where every row is one. Here it is a
+     * fact about the person, like their role or their phone number, and the
+     * row belongs to the person whose row it is.
+     */
     key: "family",
     label: "Family",
     width: "c-wide",
@@ -97,9 +110,7 @@ const COLUMNS: {
     onPhone: true,
     cell: (_person, { household }) =>
       household ? (
-        <Link className="list-link" to={`/families/${household.id}`}>
-          {labelledHouseholdName(household)}
-        </Link>
+        <span>{labelledHouseholdName(household)}</span>
       ) : (
         <span className="muted">On their own</span>
       ),
