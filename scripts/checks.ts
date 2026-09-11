@@ -26,3 +26,4 @@ import "./qr-check";
 import "./changed-check";
 import "./columns-check";
 import "./notifications-check";
+import "./background-check";

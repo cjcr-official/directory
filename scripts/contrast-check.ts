@@ -116,6 +116,10 @@ const PAIRS: Pair[] = [
   { what: "warning text on its own notice", fg: "--warn-deep", bg: "--warn-soft" },
   { what: "confirmation text on its own notice", fg: "--accent-deep", bg: "--accent-soft" },
   { what: "a warning pill's label", fg: "--warn-deep", bg: "--warn-soft" },
+  // The tray says how long a background check has left in the warning colour
+  // and how long ago it lapsed in the danger one, both straight onto the
+  // panel rather than onto a tint of their own.
+  { what: "a check coming due, in the tray", fg: "--warn-deep", bg: "--raised" },
   { what: "accent text on the soft accent", fg: "--accent", bg: "--accent-soft" },
 ];
 

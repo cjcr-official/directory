@@ -304,7 +304,7 @@ const MONTHS = [
 ];
 
 /** Parses "YYYY-MM-DD" without letting the local timezone shift the day. */
-function parseDateParts(iso: string | null | undefined) {
+export function parseDateParts(iso: string | null | undefined) {
   if (!iso) return null;
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
   if (!match) return null;
@@ -316,6 +316,20 @@ export function formatMonthDay(iso: string | null | undefined): string {
   const parts = parseDateParts(iso);
   if (!parts) return "";
   return `${MONTHS[parts.month - 1]} ${parts.day}`;
+}
+
+/**
+ * "12 June 2027" - a date whose year is the point of it.
+ *
+ * The two above drop the year because a birthday's year is noise on a printed
+ * card. A renewal three years out is the opposite case: "12 June" alone could
+ * be this year or the year after next, which is the whole question being
+ * asked.
+ */
+export function formatFullDate(iso: string | null | undefined): string {
+  const parts = parseDateParts(iso);
+  if (!parts) return "";
+  return `${parts.day} ${MONTHS[parts.month - 1]} ${parts.year}`;
 }
 
 /** "6/12" - the compact form for a crowded card. */

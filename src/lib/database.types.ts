@@ -81,6 +81,17 @@ export type PersonRow = {
   country: string | null;
   photo_path: string | null;
   notes: string | null;
+  /**
+   * When the last background check was done, and when the next one is due -
+   * both bare YYYY-MM-DD, both office-only, and both added by migration 0009.
+   *
+   * Either can be null on its own and each null means something different. No
+   * due date at all is a person nobody is tracking, which is most of a
+   * congregation; a due date with nothing done is a volunteer who needs a
+   * check and has never had one.
+   */
+  background_check_on: string | null;
+  background_check_due: string | null;
   sort_order: number;
   is_active: boolean;
   created_at: string;

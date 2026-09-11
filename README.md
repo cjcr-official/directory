@@ -37,13 +37,17 @@ CSVs that open in any spreadsheet, every photograph as an ordinary JPEG, and a
 there is no undo, so this is what turns a bad click into an annoyance. Once a
 month, and again before a print run.
 
-**What's new.** A directory is kept by more than one person, and everybody's
-work lands in the same alphabetical list where it looks like everything else in
-it. The bell — in the sidebar on a desk, on the bar on a phone — carries the
-number of people who have been added since you last looked, and opens on who
-they are, when they arrived and who added them. On a desk that is a panel
-beside the bell; on a phone it is a screen of its own. Your own typing is not
-counted back at you.
+**Background checks.** For whoever works with children or handles money: when
+the last check was done, and when the next one is due. The office is told
+before it lapses rather than years afterwards. Optional per person, and blank
+for everybody else — a record with nothing recorded is not an overdue one.
+
+**Notices.** A directory is kept by more than one person, and everybody's work
+lands in the same alphabetical list where it looks like everything else in it.
+The bell — in the sidebar on a desk, on the bar on a phone — carries the number
+of people added since you last looked and the number of background checks that
+have come due, and opens on both. On a desk that is a panel beside the bell; on
+a phone it is a screen of its own. Your own typing is not counted back at you.
 
 **Printing.** A preview that matches the PDF line for line, then either a
 downloaded PDF or a straight browser print. Optional cover page, alphabetical
@@ -73,6 +77,8 @@ addresses. What follows is the short form.
    - `0006_two_step_signin.sql` — an authenticator app, enforced by the database
    - `0007_account_deletion.sql` — letting an owner remove an account outright
    - `0008_gender.sql` — recording whether a person is male or female
+   - `0009_background_checks.sql` — when a person's background check was done,
+     and when the next one is due
 3. From **Project Settings → API**, copy the **Project URL** and the
    **anon public** key.
 
@@ -247,6 +253,7 @@ src/
     entries.ts         families + individuals -> one alphabetical list
     format.ts          names, phones, dates, addresses, sort keys
     notifications.ts   who has arrived since a reader last looked
+    backgroundChecks.ts  when a check was done, and when the next one is due
     photos.ts          resize in the browser, upload, signed URLs
     queries.ts         every database read and write
     demo.ts            the invented congregation used by /sample
@@ -338,7 +345,15 @@ version behind beats a reload loop.
 The running build is printed at the bottom of the sidebar, so "which version
 are you on?" has an answer.
 
-### What's new
+### Notices
+
+The bell carries two kinds of thing, and the difference between them is the
+point. An arrival is news, and reading it is what makes it stop counting. A
+background check that has run out is not news, it is work: it cannot be read
+away, and it stops counting when somebody records the renewal or archives the
+person. One bell rather than two, because an office has one habit.
+
+#### Who has arrived
 
 Two or three people keep a directory between them and rarely at the same desk
 on the same afternoon. Somebody typed in on Tuesday used to be four names that
@@ -389,6 +404,47 @@ Screen that page can be a week old. While the app is in front of somebody,
 `DirectoryContext` asks the one cheap question there is to ask — has anybody
 been added since the newest row we hold — and pulls the whole directory in
 again only when the answer is yes.
+
+#### Whose background check has run out
+
+Anyone who works with children or handles money gets one, and a check has a
+shelf life — two or three years, depending on the state, the agency and
+sometimes the role. Nothing on any screen changes on the day one expires, which
+is why a lapse is normally found out years late, by somebody asking.
+
+Two dates on a person: when the last check was done, and when the next one is
+due. Two rather than one, because the second is not reliably the first plus a
+constant — a church can renew the nursery yearly, and a renewal booked for a
+particular week is a fact rather than an arithmetic result. The form suggests
+three years on from the last check and stops guessing the moment somebody types
+over it, exactly as the family name suggestion does.
+
+Both are allowed to be missing, and the app leans on that: somebody with no due
+date is _untracked_, not overdue. Most of a congregation is never checked — a
+directory is not a staff register — and reading those as lapsed would put four
+hundred names behind the bell on the first afternoon and teach the office to
+stop looking.
+
+`src/lib/backgroundChecks.ts` holds the reasoning, and `npm run
+background:check` holds it down:
+
+- **Days, not instants.** These are bare `YYYY-MM-DD` dates, and parsing one
+  through `new Date()` lands it at UTC midnight — a day earlier than it says
+  for anybody west of Greenwich. On the boundary this exists to draw, that is
+  the difference between "due today" and "overdue".
+- **Due today counts as due.** It is the one day in three years on which
+  anything actually has to happen.
+- **A number that only comes down when the work is done.** Opening the panel
+  clears the arrivals and leaves the checks exactly where they were. That is a
+  badge you cannot clear by looking at it, which is normally how a badge earns
+  its way into being ignored — and it is still the right answer here, because
+  the alternative is a reminder that stops reminding.
+
+Never printed: this is office-only, alongside the notes field, and it is
+deliberately a date rather than the check itself — no reference numbers, no
+agency, no result. Those belong wherever the church's safeguarding records
+already live. It is in `people.csv` in a backup, because a backup that cannot
+rebuild what was on screen is not a backup.
 
 ### Light and dark
 
