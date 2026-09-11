@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { getPhotoUrl } from "@/lib/photos";
 import { describeChange, message } from "@/lib/format";
 
@@ -92,6 +92,80 @@ export function Field({
       {children}
       {hint ? <span className="hint">{hint}</span> : null}
     </div>
+  );
+}
+
+/**
+ * A date, and every way a browser has of emptying one.
+ *
+ * iOS does not draw these itself: tapping one opens the system calendar, and
+ * that calendar has a Reset button. Reset empties the element - but through a
+ * path a controlled React input was not hearing, so the field went blank on
+ * screen while the form went on holding the date. The line underneath still
+ * described it, saving kept it, and the next render put it back on screen. A
+ * date could be changed and not removed, which for four optional fields is
+ * most of what they are for.
+ *
+ * So the element is asked what it holds rather than waited on to say: on its
+ * own change event, which some browsers raise for the picker where React's
+ * onChange hears nothing, and again when it loses focus, which is the last
+ * moment before anything else can be done with the form. Each is compared
+ * with what is held, so the ordinary case - typing a date, and hearing about
+ * it three times - still only reports once.
+ *
+ * The blur pass earns its place on a desk too. Half a date typed into one of
+ * these leaves the element empty, and the form used to keep the old value
+ * against a field showing nothing.
+ */
+export function DateInput({
+  id,
+  value,
+  disabled,
+  onChange,
+}: {
+  id: string;
+  value: string | null;
+  disabled?: boolean;
+  /** Null for an empty field, which every date in this app is allowed to be. */
+  onChange: (value: string | null) => void;
+}) {
+  const field = useRef<HTMLInputElement>(null);
+  /*
+   * What the listeners below compare against, kept somewhere they can read it.
+   * They are attached once - re-attaching them on every render to pick up a
+   * new closure would mean adding and removing two listeners per keystroke -
+   * so the props they need are put where a listener attached on the first
+   * render can still find the latest of them.
+   */
+  const latest = useRef({ value, onChange });
+  useEffect(() => {
+    latest.current = { value, onChange };
+  });
+
+  useEffect(() => {
+    const node = field.current;
+    if (!node) return;
+    const sync = () => {
+      const next = node.value || null;
+      if (next !== latest.current.value) latest.current.onChange(next);
+    };
+    node.addEventListener("change", sync);
+    node.addEventListener("blur", sync);
+    return () => {
+      node.removeEventListener("change", sync);
+      node.removeEventListener("blur", sync);
+    };
+  }, []);
+
+  return (
+    <input
+      ref={field}
+      id={id}
+      type="date"
+      disabled={disabled}
+      value={value ?? ""}
+      onChange={(event) => onChange(event.target.value || null)}
+    />
   );
 }
 
