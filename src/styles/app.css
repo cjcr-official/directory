@@ -3080,13 +3080,6 @@ th.num {
     font-size: 0.85rem;
     color: var(--ink-3);
   }
-  /* The family stays tappable but reads as the subtitle it is, rather than
-     competing with the name above it. */
-  .list-table td:nth-child(3) .list-link {
-    color: inherit;
-    font-weight: 500;
-  }
-
   /* Six columns cannot fit a phone. The secondary ones are dropped rather
      than pushed off the edge where nothing hints they exist; the full record
      is one tap away. */
