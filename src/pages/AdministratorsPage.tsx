@@ -171,7 +171,7 @@ export function AdministratorsPage() {
                           role, and it is the one deletion the database refuses
                           outright - so the button is not offered either. */}
                       {isMe ? (
-                        <span className="muted small">—</span>
+                        <span className="muted small admins-self">—</span>
                       ) : (
                         <ConfirmButton
                           label="Delete"

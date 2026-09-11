@@ -3116,16 +3116,27 @@ th.num {
     display: block;
   }
 
+  /*
+   * Two lines a person, rather than four.
+   *
+   * A name, an address, a menu and a Delete each had a line of their own, and
+   * the menu's line carried the access word beside it saying what the menu
+   * already said. That is about 150px for one administrator: a church office
+   * has three or four between them, and they filled the screen under two
+   * paragraphs of explanation that had not finished either.
+   *
+   * The right-hand column is where the controls go and the left is who they
+   * are, so each line is a fact and the thing that changes it, side by side.
+   */
   .admins-table tr {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
-      "who who"
-      "email email"
-      "role access";
+      "who role"
+      "email access";
     align-items: center;
-    gap: 7px 12px;
-    padding: 12px 14px;
+    gap: 4px 12px;
+    padding: 10px 14px;
     border-bottom: 1px solid var(--line);
   }
   .admins-table tbody tr:last-child {
@@ -3157,21 +3168,40 @@ th.num {
     justify-self: end;
   }
 
-  /* An owner's table carries a Delete on every row, and at 393px it will not
-     fit beside the role menu - so it takes a line of its own. Scoped with
-     :has() to a table that actually has that column: an empty grid row is
-     still a grid row, and the gap above it would leave a viewer's rows with a
-     band of dead space under every one of them. */
+  /*
+   * An owner's table carries a Delete on every row, and it takes the corner
+   * the access word had.
+   *
+   * It can, because an owner is the one reader for whom that word is a
+   * repetition: they are looking at a menu that already reads "Editor" or "No
+   * access". A viewer has no menu, so their rows keep it - which is what the
+   * :has() is for, along with not giving a viewer a grid row that holds
+   * nothing but the gap above it.
+   *
+   * Armed, the Delete becomes "Delete this account" and a Cancel beside it,
+   * which is wider than this corner. It wraps within it, and the row grows
+   * for the five seconds that lasts - which is the right way round: a line
+   * per row, permanently, to hold a state almost nobody is in is what was
+   * being paid before.
+   */
   .admins-table:has(td:nth-child(5)) tr {
     grid-template-areas:
-      "who who"
-      "email email"
-      "role access"
-      "remove remove";
+      "who role"
+      "email remove";
+  }
+  .admins-table:has(td:nth-child(5)) td:nth-child(4) {
+    display: none;
   }
   .admins-table td:nth-child(5) {
     grid-area: remove;
     justify-self: end;
+  }
+  /* Your own row has no Delete, and an em dash in the corner where one would
+     be is a line of the row spent saying nothing. The desk table keeps it -
+     there it sits in a column of buttons, where a blank cell reads as one
+     that failed to draw. */
+  .admins-self {
+    display: none;
   }
 
   .role-key {
