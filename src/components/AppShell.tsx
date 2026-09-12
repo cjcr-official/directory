@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Logo } from "@/components/Logo";
 import { NotificationTray } from "@/components/NotificationTray";
 import { useAuth } from "@/auth/AuthProvider";
@@ -24,6 +25,11 @@ export function AppShell() {
   const { households, people, tags, entries } = useDirectory();
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+
+  // Where the crash screen's way out goes. Overview is the one screen that is
+  // always there and never needs an id, so it is the safe place to land.
+  const goHome = useCallback(() => void navigate("/"), [navigate]);
 
   // Following a link should put the drawer away.
   useEffect(() => setMenuOpen(false), [location.pathname]);
@@ -130,7 +136,20 @@ export function AppShell() {
       </nav>
 
       <main className="main">
-        <Outlet />
+        {/*
+         * Inside main, so a screen that throws leaves the navigation, the tray
+         * and the sign-out button where they were. One page failing is then one
+         * page failing, with somewhere to go from it, rather than the whole app
+         * going white - which is what an uncaught render error does, and on a
+         * phone opened from the Home Screen there is not even an address bar to
+         * reload from.
+         *
+         * Keyed on the path, so walking away from a broken screen is enough to
+         * clear it and no reload is needed.
+         */}
+        <ErrorBoundary resetKey={location.pathname} onGoHome={goHome}>
+          <Outlet />
+        </ErrorBoundary>
       </main>
     </div>
   );

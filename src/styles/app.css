@@ -2486,6 +2486,15 @@ th.num {
   color: rgb(255 255 255 / 62%);
 }
 
+/* The crash screen borrows the updating screen's ground, so its buttons need
+   the same breathing room the spinner there gets, and centring - .row is a
+   flex row and would otherwise leave two buttons hugging the left edge of a
+   panel whose every other line is centred. */
+.crash-actions {
+  justify-content: center;
+  margin-top: 6px;
+}
+
 /* The default spinner is drawn for a light card and disappears on this one. */
 .spinner.on-dark {
   width: 22px;
@@ -2545,10 +2554,24 @@ th.num {
   flex: none;
 }
 
-.update-bar .btn.ghost {
+/* Both of the app's dark full-bleed surfaces, together, because they are one
+   case: .btn.ghost is drawn for a light card - it takes its colour from --ink-2
+   and its edge from --line - and on this ground in the light theme that is a
+   dark grey button on dark green, which is a button you cannot read. The
+   contrast check cannot catch it: these are literal alpha-on-brand colours
+   rather than the hex tokens it reads. */
+.update-bar .btn.ghost,
+.update-screen .btn.ghost {
   border-color: rgb(255 255 255 / 26%);
   color: rgb(255 255 255 / 82%);
   background: none;
+}
+
+/* The hover rule underneath has the same problem: --canvas is the light page,
+   which on this ground flashes the button nearly white. */
+.update-bar .btn.ghost:hover:not(:disabled),
+.update-screen .btn.ghost:hover:not(:disabled) {
+  background: rgb(255 255 255 / 10%);
 }
 
 /* --- mobile ---------------------------------------------------------------
