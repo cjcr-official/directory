@@ -127,7 +127,11 @@ console.log("\nthe request itself failing");
 
 console.log("\nsigning out mid-flight");
 {
-  let release: (() => void) | null = null;
+  // Definitely assigned, and not in a way TypeScript can follow: the executor
+  // runs synchronously inside the constructor, so `release` is set before the
+  // next line - but the compiler only sees an assignment inside a callback and
+  // goes on believing the variable is still null.
+  let release!: () => void;
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
@@ -145,7 +149,7 @@ console.log("\nsigning out mid-flight");
   // And when the answer finally lands, it is not handed to anybody: those
   // links outlive the session by up to an hour, which is the whole reason
   // sign-out clears them.
-  release?.();
+  release();
   const afterReset = await batcher.get("people/private.jpg");
   same(
     "a fresh ask after signing out is answered on its own terms",

@@ -1,6 +1,6 @@
 import { PHOTO_BUCKET, supabase } from "./supabase";
 import { readBackup, selectRows } from "./restorePlan";
-import { withoutAuthor } from "./queries";
+import { fetchAll, withoutAuthor } from "./queries";
 import type {
   LiveDirectory,
   RestoreMode,
@@ -167,18 +167,26 @@ async function uploadPhotos(
   return uploaded;
 }
 
-/** The links already in the database, as keys, so a re-add does not collide. */
+/**
+ * The links already in the database, as keys, so a re-add does not collide.
+ *
+ * Read through the pager rather than with a plain select, and that is the whole
+ * point of it. Both of these tables are larger than the congregation - a
+ * thousand people in two groups each is two thousand rows - and an unpaged read
+ * stops at the first thousand without saying so. Every link past that would
+ * look absent, the restore would write it again, and the composite primary key
+ * would refuse it: a merge that fails a third of the way through, with the
+ * families and people already in.
+ */
 async function currentLinkKeys(): Promise<Set<string>> {
+  const [households, people] = await Promise.all([
+    fetchAll<{ household_id: string; tag_id: string }>("household_tags"),
+    fetchAll<{ person_id: string; tag_id: string }>("person_tags"),
+  ]);
+
   const keys = new Set<string>();
-
-  const households = await supabase.from("household_tags").select("household_id,tag_id");
-  if (households.error) throw new Error(households.error.message);
-  for (const link of households.data ?? []) keys.add(`h:${link.household_id}:${link.tag_id}`);
-
-  const people = await supabase.from("person_tags").select("person_id,tag_id");
-  if (people.error) throw new Error(people.error.message);
-  for (const link of people.data ?? []) keys.add(`p:${link.person_id}:${link.tag_id}`);
-
+  for (const link of households) keys.add(`h:${link.household_id}:${link.tag_id}`);
+  for (const link of people) keys.add(`p:${link.person_id}:${link.tag_id}`);
   return keys;
 }
 

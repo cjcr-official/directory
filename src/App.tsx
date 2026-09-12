@@ -1,9 +1,10 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { LoginPage } from "@/auth/LoginPage";
 import { SecondStepPage } from "@/auth/SecondStepPage";
 import { AccountNotReady } from "@/auth/AccountNotReady";
 import { AppShell } from "@/components/AppShell";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { UpdateGate } from "@/components/UpdateGate";
 import { DirectoryProvider, useDirectory } from "@/data/DirectoryContext";
 import { LoadingScreen, Notice } from "@/components/ui";
@@ -22,6 +23,24 @@ import { ProjectPreviewPage } from "@/pages/ProjectPreviewPage";
 import { AdministratorsPage } from "@/pages/AdministratorsPage";
 import { BackupPage } from "@/pages/BackupPage";
 import { SettingsPage } from "@/pages/SettingsPage";
+
+/**
+ * The floor under the whole app.
+ *
+ * AppShell puts a second one of these around the page inside it, which is the
+ * one that catches almost everything and can recover without a reload. This one
+ * is for what is above that and cannot: the auth provider, the directory load,
+ * the sign-in and setup screens. Without it those throw straight past React
+ * into a blank page.
+ *
+ * Keyed on the path so that going somewhere else clears it - which is the only
+ * recovery available this high up, and is often enough, since the screens up
+ * here fail over a network rather than over their own state.
+ */
+function AppBoundary({ children }: { children: React.ReactNode }) {
+  const { pathname } = useLocation();
+  return <ErrorBoundary resetKey={pathname}>{children}</ErrorBoundary>;
+}
 
 /**
  * One label for the whole cold start.
@@ -126,18 +145,20 @@ export function App() {
       {/* Outside the auth gate: a browser running an old build should be
           moved onto the new one whether or not anyone is signed in. */}
       <UpdateGate />
-      {isConfigured ? (
-        <AuthProvider>
-          <Protected />
-        </AuthProvider>
-      ) : (
-        // No database yet: explain the setup, but still let anyone flip through
-        // a sample book to see what they are signing up for.
-        <Routes>
-          <Route path="/sample" element={<SamplePage />} />
-          <Route path="*" element={<SetupPage />} />
-        </Routes>
-      )}
+      <AppBoundary>
+        {isConfigured ? (
+          <AuthProvider>
+            <Protected />
+          </AuthProvider>
+        ) : (
+          // No database yet: explain the setup, but still let anyone flip through
+          // a sample book to see what they are signing up for.
+          <Routes>
+            <Route path="/sample" element={<SamplePage />} />
+            <Route path="*" element={<SetupPage />} />
+          </Routes>
+        )}
+      </AppBoundary>
     </BrowserRouter>
   );
 }

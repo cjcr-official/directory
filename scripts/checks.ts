@@ -18,6 +18,7 @@ import "./invariants";
 import "./restore-check";
 import "./batch-check";
 import "./names-check";
+import "./text-check";
 import "./contrast-check";
 import "./cover-check";
 import "./fields-check";

@@ -6,7 +6,7 @@ import { LoadingScreen, Notice } from "@/components/ui";
 import { buildDemoData } from "@/lib/demo";
 import { makeDemoPortrait } from "@/lib/demoPortraits";
 import { buildEntries } from "@/lib/entries";
-import { message } from "@/lib/format";
+import { failureMessage } from "@/lib/staleBuild";
 import { composeBook, type BookModel } from "@/lib/layout/compose";
 import { loadMetrics } from "@/lib/layout/metrics";
 import { DEFAULT_SETTINGS, normalizeSettings, recordsPerSheet } from "@/lib/layout/settings";
@@ -69,7 +69,7 @@ export function SamplePage() {
         setPhotoUrls(urls);
         setPhotoBlobs(blobs);
       } catch (cause) {
-        if (active) setError(message(cause));
+        if (active) setError(failureMessage(cause));
       }
     })();
 
@@ -100,7 +100,7 @@ export function SamplePage() {
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
     } catch (cause) {
-      setError(message(cause));
+      setError(failureMessage(cause));
     } finally {
       setBuilding(false);
     }

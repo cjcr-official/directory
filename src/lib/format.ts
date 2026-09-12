@@ -355,9 +355,30 @@ export function monthDayOrder(iso: string | null | undefined): number {
  * strip, so the accent fold below would otherwise turn it into "?". Accents are
  * then folded to their base letter, and only a character that survives neither
  * pass becomes "?", so an unusual name degrades instead of breaking the book.
+ *
+ * Control characters go first, and they are the reason this paragraph exists.
+ * WinAnsi has no glyph for any of them and pdf-lib does not skip them - it
+ * throws - so a single tab in a single surname stopped the whole directory
+ * composing, on the preview screen and in the PDF, with "WinAnsi cannot encode"
+ * where the book should have been. Not a hypothetical: an <input> strips the
+ * carriage returns out of anything pasted into it but leaves tabs alone, so a
+ * name copied out of a spreadsheet cell or off a web page arrives with one
+ * attached, and a restore writes whatever the backup file holds without asking.
+ * One invisible character, one unreadable message, no book.
+ *
+ * The ones that mean a gap become a gap and the rest are dropped, which is what
+ * they would have looked like had they been drawable. This is measured and
+ * drawn through the same function, so the two cannot disagree about the width.
  */
 export function toWinAnsi(text: string): string {
   const normalised = text
+    // Tab, the line breaks, and the two Unicode separators: all of them are a
+    // space where a PDF line is concerned, and wrapText has already split on
+    // the newlines of anything it is going to wrap.
+    .replace(/[\t\n\v\f\r\u0085\u2028\u2029]/g, " ")
+    // Everything else that is a control rather than a character - the C0 range
+    // below a space, delete, and the C1 range Latin-1 leaves empty.
+    .replace(/[\u0000-\u001f\u007f-\u009f]/g, "")
     .replace(/[\u2018\u2019\u201a\u201b]/g, "'")
     .replace(/[\u201c\u201d\u201e\u201f]/g, '"')
     .replace(/[\u2010-\u2015]/g, "-")

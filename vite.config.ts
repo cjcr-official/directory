@@ -66,7 +66,24 @@ export default defineConfig({
   },
   build: {
     outDir: "dist",
-    sourcemap: true,
+    /**
+     * Off for the build that goes out, on when somebody asks for it.
+     *
+     * A source map carries `sourcesContent` - the original TypeScript, comments
+     * and all - and Vite writes a `sourceMappingURL` into each chunk, so any
+     * browser that opens devtools fetches it. Deployed, that published 4.4 MB
+     * of this app's own source from /assets, behind a year-long immutable
+     * cache, for a directory whose whole purpose is keeping a congregation's
+     * addresses and phone numbers off the open web. The bundle is public by
+     * necessity; its source is not, and shipping the map is the same thing as
+     * shipping unminified code.
+     *
+     * Nothing is lost day to day: `npm run dev` has maps, and a production
+     * build worth stepping through is one command away -
+     * `VITE_SOURCEMAP=1 npm run build` - which keeps them local rather than
+     * putting them on the site.
+     */
+    sourcemap: process.env.VITE_SOURCEMAP === "1",
     rollupOptions: {
       output: {
         // pdf-lib is only needed on the preview and print screens, so it gets

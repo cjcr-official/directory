@@ -14,7 +14,7 @@
  */
 
 import { gzipSync } from "node:zlib";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { check } from "./check";
 
@@ -59,4 +59,26 @@ const within = totalKb <= BUDGET_KB;
 check(
   `first load is ${totalKb.toFixed(1)} kB gzipped, ${within ? "under" : "over"} the ${BUDGET_KB} kB budget`,
   within,
+);
+
+/*
+ * And that the build is not publishing its own source.
+ *
+ * A source map carries `sourcesContent`, which is every line of TypeScript in
+ * this project with its comments attached, and Vite writes a sourceMappingURL
+ * into each chunk so a browser fetches it without being asked. Deployed, that
+ * put 4.4 MB of source under /assets behind a year-long immutable cache, on an
+ * app whose whole job is keeping a congregation's addresses off the open web.
+ *
+ * It is one word in vite.config.ts and it was on for a long time without
+ * anybody noticing, which is exactly the sort of thing this file is for: the
+ * build succeeds either way and nothing on screen looks different.
+ */
+const maps = readdirSync(join(DIST, "assets")).filter((name) => name.endsWith(".map"));
+check(
+  maps.length
+    ? `${maps.length} source map(s) in dist/assets — the deploy would publish this app's source`
+    : "no source maps in the build, so the deploy publishes none",
+  maps.length === 0,
+  maps.join(", "),
 );
