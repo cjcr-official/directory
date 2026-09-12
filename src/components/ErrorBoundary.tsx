@@ -13,9 +13,9 @@ import { isStaleBuildError, reloadForStaleBuild } from "@/lib/staleBuild";
  * act on or report usefully.
  *
  * So the tree gets a floor. A crash becomes a screen that says the app hit a
- * problem, offers the reload that almost always fixes it, and - because a
- * crash on one screen is not a reason to lose the other thirteen - a way back
- * to the directory that resets the boundary rather than reloading.
+ * problem, offers the reload that almost always fixes it, and - because one
+ * screen failing is not a reason to lose the rest of them - a way back to the
+ * directory that resets the boundary rather than reloading.
  *
  * A class, because after nine years it is still the only way: there is no hook
  * for this, and React 19 did not add one. getDerivedStateFromError and
