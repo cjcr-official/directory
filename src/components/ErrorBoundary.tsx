@@ -44,16 +44,31 @@ interface State {
 export class ErrorBoundary extends Component<Props, State> {
   state: State = { error: null, reloading: false };
 
-  static getDerivedStateFromError(error: unknown): Partial<State> {
-    return { error: error instanceof Error ? error : new Error(String(error)) };
+  /**
+   * Which of the two screens this is, decided in the same render that catches.
+   *
+   * Deciding it here rather than in componentDidCatch is what stops a file the
+   * deploy replaced flashing "Something went wrong" for a frame on its way to
+   * the screen that says it is updating - React renders the state this returns
+   * before it calls componentDidCatch, so anything settled there is one frame
+   * late. Reading the message is a pure question about the error, which is all
+   * this method is allowed to be; the reload it implies is a side effect and
+   * waits below.
+   */
+  static getDerivedStateFromError(error: unknown): State {
+    const thrown = error instanceof Error ? error : new Error(String(error));
+    return { error: thrown, reloading: isStaleBuildError(thrown) };
   }
 
   componentDidCatch(error: unknown, info: ErrorInfo): void {
-    // A chunk that is no longer on the server is an old build, not a fault, and
-    // the fix is mechanical. Done here rather than in getDerivedStateFromError,
-    // which React also calls while rendering and which must stay pure.
-    if (isStaleBuildError(error) && reloadForStaleBuild()) {
-      this.setState({ reloading: true });
+    // A file that is no longer on the server is an old build, not a fault, and
+    // the fix is mechanical.
+    if (isStaleBuildError(error)) {
+      if (reloadForStaleBuild()) return;
+      // Already tried, and it did not help. Stop promising a reload and say
+      // what is actually the matter. Not logged: this is a deploy that moved
+      // underneath a browser, which is nobody's bug.
+      this.setState({ reloading: false });
       return;
     }
 
