@@ -15,6 +15,7 @@
     "restore:check": "node scripts/run.mjs scripts/restore-check.ts",
     "batch:check": "node scripts/run.mjs scripts/batch-check.ts",
     "names:check": "node scripts/run.mjs scripts/names-check.ts",
+    "text:check": "node scripts/run.mjs scripts/text-check.ts",
     "contrast:check": "node scripts/run.mjs scripts/contrast-check.ts",
     "cover:check": "node scripts/run.mjs scripts/cover-check.ts",
     "fields:check": "node scripts/run.mjs scripts/fields-check.ts",
