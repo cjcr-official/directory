@@ -1,0 +1,35 @@
+{
+  // The checks, the sample renderer and the seeder.
+  //
+  // Its own project rather than a few more entries in tsconfig.node.json,
+  // because these are not node-only files: they import the app's own modules to
+  // check them, and those modules are written for a browser - columns.ts reads
+  // localStorage, theme.ts asks matchMedia - so the DOM types have to be here
+  // for the imports to check at all. vite.config.ts is genuinely node-only and
+  // keeps its narrower project next door.
+  //
+  // Until this existed, `tsc -b` covered src and vite.config.ts and nothing
+  // else, so three and a half thousand lines - every check standing between a
+  // bad layout and a printed book - were compiled by esbuild at run time, which
+  // strips types without reading them. A script could name a field that no
+  // longer exists and say "nothing amiss" right up until the run it mattered.
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": ["scripts"]
+}
