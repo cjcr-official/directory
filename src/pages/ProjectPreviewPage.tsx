@@ -12,7 +12,7 @@ import { normalizeSettings, recordsPerSheet } from "@/lib/layout/settings";
 import { composeTags, tagsPerSheet } from "@/lib/layout/tags";
 import { resolveEntries } from "@/lib/projectEntries";
 import type { ProjectRow } from "@/lib/database.types";
-import { message } from "@/lib/format";
+import { failureMessage } from "@/lib/staleBuild";
 
 /** Sheets drawn on screen before the rest is left to the PDF. */
 const PREVIEW_SHEET_LIMIT = 40;
@@ -22,7 +22,18 @@ export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
   const { entries } = useDirectory();
 
   const [project, setProject] = useState<ProjectRow | null>(null);
-  const [book, setBook] = useState<BookModel | null>(null);
+  /**
+   * The composed document, together with which of the two views composed it.
+   *
+   * Both views are this one component - /projects/:id/preview and
+   * /projects/:id/tags differ only by a prop - and React Router reuses the
+   * instance when one replaces the other. So the model is stored with the
+   * answer to "which was this composed as", and `book` below is derived from
+   * the pair. A sheet composed for the other view cannot reach the screen,
+   * rather than reaching it until the effect happens to run again.
+   */
+  const [composed, setComposed] = useState<{ tags: boolean; model: BookModel } | null>(null);
+  const book = composed && composed.tags === tags ? composed.model : null;
   const [photoUrls, setPhotoUrls] = useState<Map<string, string>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [building, setBuilding] = useState(false);
@@ -39,6 +50,11 @@ export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
 
     (async () => {
       try {
+        // A failure belongs to the attempt that produced it. Switching views,
+        // or arriving at another project, is a fresh attempt and starts clean -
+        // otherwise the error screen outlives the thing that went wrong and
+        // there is no way back to a working page but a reload.
+        setError(null);
         const loaded = await fetchProject(id);
         if (!active) return;
         setProject(loaded.project);
@@ -57,24 +73,24 @@ export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
         // Both composers hand back the same model, so the preview, the photo
         // fetch, the download and the progress bar below need no opinion about
         // which one made it.
-        const composed = tags
+        const model = tags
           ? composeTags(included, settings, metrics)
           : composeBook(included, settings, metrics);
-        setBook(composed);
+        setComposed({ tags, model });
 
-        if (composed.photoPaths.length) {
-          const urls = await getPhotoUrls(composed.photoPaths);
+        if (model.photoPaths.length) {
+          const urls = await getPhotoUrls(model.photoPaths);
           if (active) setPhotoUrls(urls);
         }
       } catch (cause) {
-        if (active) setError(message(cause));
+        if (active) setError(failureMessage(cause));
       }
     })();
 
     return () => {
       active = false;
     };
-  }, [id, entries]);
+  }, [id, entries, tags]);
 
   const settings = useMemo(() => (project ? normalizeSettings(project.settings) : null), [project]);
 
@@ -119,7 +135,7 @@ export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
       // Give the browser a moment to start the download before releasing it.
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
     } catch (cause) {
-      setError(message(cause));
+      setError(failureMessage(cause));
     } finally {
       setBuilding(false);
       setProgress(null);
