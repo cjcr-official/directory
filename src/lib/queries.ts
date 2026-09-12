@@ -55,9 +55,18 @@ const PAGED_ORDER = {
   tags: ["name", "id"],
   household_tags: ["household_id", "tag_id"],
   person_tags: ["person_id", "tag_id"],
+  profiles: ["created_at", "id"],
 } as const;
 
-async function fetchAll<T>(table: keyof typeof PAGED_ORDER): Promise<T[]> {
+/**
+ * Every row of one table, a page at a time.
+ *
+ * Exported because the restore needs the two link tables by themselves, and
+ * reaching for `supabase.from(...).select()` there reintroduced exactly the
+ * silent thousand-row cap this function exists to defeat. One pager, used
+ * everywhere a whole table is read.
+ */
+export async function fetchAll<T>(table: keyof typeof PAGED_ORDER): Promise<T[]> {
   const rows: T[] = [];
 
   for (let from = 0; ; from += PAGE_SIZE) {
@@ -379,10 +388,31 @@ export interface ProjectWithSelection {
   entries: ProjectEntryRow[];
 }
 
+/**
+ * Every saved directory, newest first.
+ *
+ * Paged, and ordered on the primary key underneath the timestamp, for the
+ * reason the pager above gives: projects accumulate for as long as a church
+ * keeps printing, and an unpaged read would one day return the first thousand
+ * and let the backup quietly leave the rest out. created_at is not unique -
+ * two directories duplicated in one click share it - so it cannot page on its
+ * own.
+ */
 export async function fetchProjects(): Promise<ProjectRow[]> {
-  return unwrap(
-    await supabase.from("projects").select("*").order("created_at", { ascending: false }),
-  );
+  const rows: ProjectRow[] = [];
+
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const page = unwrap(
+      await supabase
+        .from("projects")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, from + PAGE_SIZE - 1),
+    ) as ProjectRow[];
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) return rows;
+  }
 }
 
 /**
@@ -498,8 +528,16 @@ export async function setProjectEntries(
 // Administrators
 // ---------------------------------------------------------------------------
 
+/**
+ * The roster, oldest account first.
+ *
+ * Through the pager like every other whole-table read. A church office is never
+ * going to have a thousand administrators, so this is consistency rather than a
+ * fix: there is now one way to read a table here, which is what stops the next
+ * one of these being written the short way and quietly stopping at a thousand.
+ */
 export async function fetchProfiles(): Promise<ProfileRow[]> {
-  return unwrap(await supabase.from("profiles").select("*").order("created_at"));
+  return fetchAll<ProfileRow>("profiles");
 }
 
 export async function updateProfile(id: string, patch: Partial<ProfileRow>): Promise<ProfileRow> {
