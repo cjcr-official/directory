@@ -993,6 +993,56 @@ input[type="radio"] {
   height: 15px;
 }
 
+/*
+ * A menu that draws its own caret.
+ *
+ * Every browser draws one and no two draw the same one: Chrome a small
+ * chevron, Firefox a triangle, iOS Safari a stacked pair with a wide inset of
+ * its own - and the inset is what matters here, because a menu standing in the
+ * corner of a list row pays for it out of the name beside it. This is a glyph
+ * in the hint colour, a third of the width, and the same on every phone the
+ * app is opened on.
+ *
+ * The wrapper is what the caret is positioned against: the cell around a menu
+ * is not always the shape of the menu, so the select's own right edge is the
+ * only thing worth measuring from.
+ */
+.chip-select {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+}
+.chip-select select {
+  appearance: none;
+  -webkit-appearance: none;
+  /* As wide as the word it is showing, not as wide as the cell it is in. */
+  width: auto;
+  padding: 0 19px 0 7px;
+  /* A tint rather than a border. A field is drawn with an outline because it
+     is an empty box waiting to be filled; this is never empty - it is showing
+     the answer, and it is doing it once a row. Twenty rows of outlined boxes
+     is a form, and this is a list. The border is kept and made transparent so
+     that focus can colour it without the control changing width. */
+  border-color: transparent;
+  background: var(--canvas);
+}
+.chip-select::after {
+  content: "⌄";
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  /* The glyph sits low in its own line box, so centring it centres the box
+     rather than the mark. */
+  transform: translateY(-68%);
+  font-size: 0.95rem;
+  color: var(--ink-3);
+  pointer-events: none;
+}
+/* Whatever the field beside it does. */
+.chip-select:has(select:disabled)::after {
+  opacity: 0.5;
+}
+
 .check {
   display: flex;
   align-items: flex-start;
@@ -3119,14 +3169,21 @@ th.num {
   }
 
   /*
-   * Administrators is four columns - name, email, role, access - and two of
-   * them hold a control, so nothing can be dropped the way a browse list drops
-   * a birthday. At 393px the name broke across two lines and the "You" pill
-   * fell onto a third, beside an email squeezed to nothing.
+   * Administrators, on a phone: who somebody is on the left, what they can do
+   * on the right, one line of each.
    *
-   * Each administrator is a small block instead: who they are, the address
-   * they sign in with, and the two things an owner can change sharing the last
-   * line - the role at the start, the access button at the end.
+   * Four columns - name, email, role, access - cannot be four columns at
+   * 393px, and the block they first became was still four lines tall: a name,
+   * an address, a menu and a Delete, each with a line of its own. That is
+   * ninety-five pixels for one administrator, and a church office has three or
+   * four of them, under two paragraphs of explanation that have not finished
+   * either.
+   *
+   * A name and the address beneath it are one thing - a person - so they are
+   * set as a pair in the left column, and the controls stand beside them
+   * rather than under them. The menu spans both lines, which is what makes the
+   * row as tall as its tallest control and no taller: about sixty pixels, and
+   * the whole list is on screen at once.
    */
   .admins-table thead {
     display: none;
@@ -3139,27 +3196,24 @@ th.num {
     display: block;
   }
 
-  /*
-   * Two lines a person, rather than four.
-   *
-   * A name, an address, a menu and a Delete each had a line of their own, and
-   * the menu's line carried the access word beside it saying what the menu
-   * already said. That is about 150px for one administrator: a church office
-   * has three or four between them, and they filled the screen under two
-   * paragraphs of explanation that had not finished either.
-   *
-   * The right-hand column is where the controls go and the left is who they
-   * are, so each line is a fact and the thing that changes it, side by side.
-   */
   .admins-table tr {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
-      "who role"
+      "who   role"
       "email access";
     align-items: center;
-    gap: 4px 12px;
-    padding: 10px 14px;
+    /* 1.5 is the measure for a paragraph. These two lines are a name and the
+       address belonging to it, and they are read as one thing. */
+    line-height: 1.35;
+    /* Every pixel of the column gaps is a pixel the name does not get, and a
+       name is what the row is for: at 375px - an SE, and any phone whose owner
+       has turned Display Zoom on - "Madison Suttorp" came six short of its
+       line and broke in half. The side padding holds at 12 regardless, because
+       the note under the last row is set to that and the two left edges have
+       to agree. */
+    gap: 2px 8px;
+    padding: 10px 12px;
     border-bottom: 1px solid var(--line);
   }
   .admins-table tbody tr:last-child {
@@ -3171,54 +3225,117 @@ th.num {
     border: none;
   }
 
-  .admins-table td:nth-child(1) {
+  .admins-who {
     grid-area: who;
     font-size: 0.97rem;
     font-weight: 560;
+    /* This column is what is left when the controls have taken what they need,
+       and a double-barrelled surname is wider than that. It wraps - a name cut
+       off at the edge of a phone is worse than a name on two lines - and it is
+       allowed to wrap mid-word, which is what stops one long enough to have no
+       break in it running out of the column and under the menu. */
+    overflow-wrap: anywhere;
   }
-  /* An address is longer than the width it has and has nowhere to break. */
-  .admins-table td:nth-child(2) {
+  .admins-you {
+    margin-left: 6px;
+  }
+  /* An address is longer than the width it has and has nowhere to break, so
+     it is set a size down from the desk table's: the usual gmail address then
+     fits the column whole rather than ending in an ellipsis, and the pair
+     reads as a name with its address under it rather than as two lines. */
+  .admins-email {
     grid-area: email;
+    font-size: 0.82rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .admins-table td:nth-child(3) {
+  /*
+   * A row is its own grid and nothing lines one up with the next, so what the
+   * rows are made to share is their right edge: the menu, the pill on the
+   * frozen row and the access word all end in the same place, whatever width
+   * each of them needs. Left to itself the pill floated off to the far right,
+   * over the column of Deletes, reading as though it were one.
+   */
+  .admins-role {
     grid-area: role;
+    justify-self: end;
   }
-  .admins-table td:nth-child(4) {
+  .admins-access {
     grid-area: access;
     justify-self: end;
   }
 
   /*
-   * An owner's table carries a Delete on every row, and it takes the corner
-   * the access word had.
-   *
-   * It can, because an owner is the one reader for whom that word is a
-   * repetition: they are looking at a menu that already reads "Editor" or "No
-   * access". A viewer has no menu, so their rows keep it - which is what the
-   * :has() is for, along with not giving a viewer a grid row that holds
-   * nothing but the gap above it.
-   *
-   * Armed, the Delete becomes "Delete this account" and a Cancel beside it,
-   * which is wider than this corner. It wraps within it, and the row grows
-   * for the five seconds that lasts - which is the right way round: a line
-   * per row, permanently, to hold a state almost nobody is in is what was
-   * being paid before.
+   * An owner's table carries a Delete on every row and no access column - the
+   * menu ends in "No access", so there was never anything for that column to
+   * add that the control beside it was not already saying. The two controls
+   * share the corner instead.
    */
-  .admins-table:has(td:nth-child(5)) tr {
+  .admins-table.owner tr {
+    /* Which the Delete column can only do if it is the same width on the row
+       that has no Delete on it: 3.3rem is what the word comes to, so the floor
+       costs the rows that do have one nothing at all. */
+    grid-template-columns: minmax(0, 1fr) auto minmax(3.3rem, auto);
     grid-template-areas:
-      "who role"
-      "email remove";
+      "who   role remove"
+      "email role remove";
   }
-  .admins-table:has(td:nth-child(5)) td:nth-child(4) {
-    display: none;
-  }
-  .admins-table td:nth-child(5) {
+  .admins-remove {
     grid-area: remove;
     justify-self: end;
   }
+
+  /*
+   * Delete, quietly.
+   *
+   * On a desk it is a bordered button that stays grey until the pointer is on
+   * it, and a pointer is exactly what a phone has not got: every row drew a
+   * second box beside the menu, as loud as the control somebody actually came
+   * here to use, for the rarest thing on the page.
+   *
+   * A word with a rule under it is the app's other way of saying a thing can
+   * be pressed - the group names do it - and it says it without a box. The
+   * target grows as the paint comes off: the full control height, level with
+   * the menu beside it, so the rarest thing on the row is also the easiest to
+   * hit and the last thing the eye stops on.
+   */
+  .admins-remove .row:not(.armed) .btn.ghost {
+    min-height: var(--control-h);
+    /* No padding of its own: what is left of the button is the word, so the
+       word is what lines up with the edge the card keeps. */
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-color: var(--line-strong);
+    text-underline-offset: 3px;
+  }
+
+  /*
+   * Armed, Delete becomes "Delete this account" with a Cancel beside it, which
+   * is most of the width of a phone and has no business in a corner: given one
+   * it squeezed the name it was asking about down to an ellipsis.
+   *
+   * So for the five seconds it lasts, the pair takes a line of its own under
+   * the address and the row grows. That is the right way round - holding a
+   * line open on every row, permanently, for a state almost nobody is in is
+   * what the old layout was paying.
+   */
+  .admins-table.owner tr:has(.armed) {
+    /* The empty third track is the Delete column standing where it was: take
+       it away and the menu slides sixty pixels right as the pair opens, which
+       is the whole row moving to answer a question about one button. */
+    grid-template-areas:
+      "who    role   ."
+      "email  role   ."
+      "remove remove remove";
+  }
+  .admins-table.owner tr:has(.armed) .admins-remove {
+    padding-top: 7px;
+  }
+
   /* Your own row has no Delete, and an em dash in the corner where one would
      be is a line of the row spent saying nothing. The desk table keeps it -
      there it sits in a column of buttons, where a blank cell reads as one
@@ -3230,6 +3347,40 @@ th.num {
   .role-key {
     grid-template-columns: minmax(0, 1fr);
     gap: 14px;
+  }
+
+  /*
+   * And where the phone says it is narrower than 360px.
+   *
+   * Which is rarely an old handset and usually a setting: iOS Display Zoom and
+   * Android's display size both scale the ratio the page is laid out at, and a
+   * 390pt iPhone turned up that way reports 320. Somebody who has asked for
+   * everything to be bigger is the last person to take a name off.
+   *
+   * A menu reading "No access" is about 110px and cannot be less - iOS zooms
+   * the page at any control under 16px - so beside a Delete it leaves 85px of
+   * those 320 for the name, and "Christabel" came apart in the middle. The
+   * Delete goes back under the menu below this width: a row thirty pixels
+   * taller, and a name in one piece.
+   */
+  @media (max-width: 359px) {
+    .admins-table.owner tr {
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas:
+        "who   role"
+        "email remove";
+    }
+    .admins-table.owner tr:has(.armed) {
+      grid-template-areas:
+        "who    role"
+        "email  role"
+        "remove remove";
+    }
+    /* It is standing on its own line here rather than beside the menu, so the
+       height it was given to match the menu would only be empty space. */
+    .admins-remove .row:not(.armed) .btn.ghost {
+      min-height: var(--control-h-sm);
+    }
   }
 
   td,

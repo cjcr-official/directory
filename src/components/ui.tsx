@@ -291,8 +291,11 @@ export function ConfirmButton({
     );
   }
 
+  /* The class is for the layout around it, not for anything here: a row that
+     holds one of these in a corner has to give it a line of its own while the
+     pair is showing, and "armed" is how it knows. */
   return (
-    <span className="row tight">
+    <span className="row tight armed">
       <button
         type="button"
         className={subtle ? "btn danger small" : "btn danger"}
