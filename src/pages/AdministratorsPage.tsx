@@ -113,14 +113,18 @@ export function AdministratorsPage() {
       ) : null}
 
       <div className="card" style={{ marginTop: 16 }}>
-        <table className="admins-table">
+        <table className={isOwner ? "admins-table owner" : "admins-table"}>
           <thead>
             <tr>
               <th>Name</th>
               <th>Email</th>
               <th>Role</th>
-              <th>Access</th>
-              {isOwner ? <th>Remove</th> : null}
+              {/* An owner's menu ends in "No access", which is the whole of what
+                  an access column had to say - it stood beside a control
+                  already saying it, on every row. Somebody who cannot change
+                  anything has no such menu, so for them it is the only place
+                  access is stated and it stays. */}
+              {isOwner ? <th>Remove</th> : <th>Access</th>}
             </tr>
           </thead>
           <tbody>
@@ -134,38 +138,33 @@ export function AdministratorsPage() {
               const lastOwner = row.role === "owner" && row.is_active && owners <= 1;
               return (
                 <tr key={row.id}>
-                  <td>
+                  <td className="admins-who">
                     {row.full_name || <span className="muted">—</span>}
-                    {isMe ? (
-                      <span className="pill" style={{ marginLeft: 6 }}>
-                        You
-                      </span>
-                    ) : null}
+                    {isMe ? <span className="pill admins-you">You</span> : null}
                   </td>
-                  <td className="small muted">{row.email}</td>
-                  <td>
+                  <td className="admins-email small muted">{row.email}</td>
+                  <td className="admins-role">
                     {isOwner && !lastOwner ? (
-                      <select
-                        value={row.is_active ? row.role : NO_ACCESS}
-                        disabled={busy === row.id}
-                        style={{ width: "auto" }}
-                        onChange={(event) => void change(row.id, levelPatch(event.target.value))}
-                      >
-                        {LEVELS.map((level) => (
-                          <option key={level.value} value={level.value}>
-                            {level.label}
-                          </option>
-                        ))}
-                      </select>
+                      <span className="chip-select">
+                        <select
+                          value={row.is_active ? row.role : NO_ACCESS}
+                          disabled={busy === row.id}
+                          aria-label={`Role for ${row.full_name || row.email}`}
+                          onChange={(event) => void change(row.id, levelPatch(event.target.value))}
+                        >
+                          {LEVELS.map((level) => (
+                            <option key={level.value} value={level.value}>
+                              {level.label}
+                            </option>
+                          ))}
+                        </select>
+                      </span>
                     ) : (
                       <span className="pill role">{row.role}</span>
                     )}
                   </td>
-                  <td>
-                    <span className="muted small">{row.is_active ? "Active" : "No access"}</span>
-                  </td>
                   {isOwner ? (
-                    <td>
+                    <td className="admins-remove">
                       {/* Never on your own row. An owner deleting themselves is
                           how a directory ends up with nobody who can grant a
                           role, and it is the one deletion the database refuses
@@ -182,7 +181,11 @@ export function AdministratorsPage() {
                         />
                       )}
                     </td>
-                  ) : null}
+                  ) : (
+                    <td className="admins-access small muted">
+                      {row.is_active ? "Active" : "No access"}
+                    </td>
+                  )}
                 </tr>
               );
             })}
