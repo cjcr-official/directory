@@ -5,6 +5,7 @@ import { truncate, wrapText, type FontWeight, type Metrics } from "./metrics";
 import {
   PAGE_SIZES,
   TAG_HEADING_SHARES,
+  TAG_NAME_SIZES,
   TAG_SIZES,
   type ProjectSettings,
   type TagLogoSize,
@@ -53,6 +54,11 @@ const HEAD_MAX_SHARE = 0.32;
  * The ceiling is a share of the tag so a 4x3 badge sets a short name larger
  * than an Avery 5395 can, and the floor is where shrinking stops and the name
  * breaks instead. Nine is about as small as a name tag is worth printing.
+ *
+ * The ceiling is the largest this app will set a name, not the size it sets:
+ * tagNameSize takes a share of it, and every name is fitted under whatever that
+ * comes to. The floor is not for lowering - a tag nobody can read across a
+ * table is not a smaller tag, it is a wasted one.
  */
 const NAME_MAX_SHARE = 0.22;
 const NAME_MAX = 44;
@@ -178,7 +184,20 @@ export function planTag(settings: ProjectSettings, metrics: Metrics): TagPlan {
     tagline: tagline ? { ...tagline, color: inkOn(accent, COLORS.paper) } : null,
     nameTop,
     nameBottom,
-    nameMax: Math.min(NAME_MAX, height * NAME_MAX_SHARE),
+    // To the hundredth of a point, which is finer than any printer resolves and
+    // stops a share of a share of a rectangle writing 25.129209600000003 into
+    // the font size of every tag on the sheet.
+    //
+    // Never under the floor the fitting stops at: below it fitName's loop would
+    // not run at all and the fallback would set the name larger than the
+    // ceiling that was asked for, which is the one direction this must not
+    // fail in.
+    nameMax: Math.max(
+      NAME_MIN,
+      round2(
+        Math.min(NAME_MAX, height * NAME_MAX_SHARE) * TAG_NAME_SIZES[settings.tagNameSize].share,
+      ),
+    ),
   };
 }
 
@@ -573,4 +592,8 @@ function darken(hex: string, by: number): string {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
 }

@@ -45,6 +45,22 @@ export type TagLogoSize = "none" | "small" | "medium" | "large";
 export type TagHeadingSize = "small" | "medium" | "large";
 
 /**
+ * How large the person's name is allowed to be set.
+ *
+ * A ceiling on the fitting rather than a size, because a size cannot be
+ * promised: the name is set as large as the tag will take it and then shrunk
+ * until it fits, so a fixed point size would either clip the longest name in
+ * the congregation or set the whole run to whatever that name allows. This
+ * lowers where the fitting starts, which quietly does nothing to the long names
+ * - they were already below it - and brings the short ones down to meet them.
+ *
+ * Wanted because the fitted maximum is deliberately generous: forty-four point
+ * across a 4in badge is right for a hall and reads as shouting on a tag that is
+ * mostly worn at a table.
+ */
+export type TagNameSize = "fit" | "smaller" | "smallest";
+
+/**
  * Everything about how one project prints. Stored as JSON in projects.settings,
  * so adding a field here only needs a default below - no migration.
  */
@@ -76,6 +92,8 @@ export type ProjectSettings = {
   tagNameFont: Typeface;
   tagSmallFont: Typeface;
   tagHeadingSize: TagHeadingSize;
+  /** How large the name is allowed to be set, as a ceiling on the fitting. */
+  tagNameSize: TagNameSize;
   /**
    * A hairline between the heading and the name.
    *
@@ -161,6 +179,10 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   tagNameFont: "sans",
   tagSmallFont: "sans",
   tagHeadingSize: "medium",
+  // As large as the tag will take it, which is what every tag printed before
+  // this setting existed did - so nothing already saved prints differently for
+  // the field having been added.
+  tagNameSize: "fit",
   tagHeadRule: false,
   tagAccent: "#2f6d63",
   tagLogoSize: "medium",
@@ -231,6 +253,7 @@ export function normalizeSettings(raw: unknown): ProjectSettings {
     merged.tagLogoSize = "medium";
   if (!["small", "medium", "large"].includes(merged.tagHeadingSize))
     merged.tagHeadingSize = "medium";
+  if (!["fit", "smaller", "smallest"].includes(merged.tagNameSize)) merged.tagNameSize = "fit";
   merged.tagAccent = normalizeHex(merged.tagAccent, DEFAULT_SETTINGS.tagAccent);
   if (!["letter", "a4", "legal"].includes(merged.pageSize)) merged.pageSize = "letter";
   if (!["fill", "fit"].includes(merged.photoFit)) merged.photoFit = "fill";
@@ -311,6 +334,24 @@ export const TAG_HEADING_SHARES: Record<TagHeadingSize, number> = {
   small: 0.037,
   medium: 0.05,
   large: 0.063,
+};
+
+/**
+ * The name's ceiling, as a share of the largest the tag would allow.
+ *
+ * Shares rather than points, because the largest a tag allows is already a
+ * share of the tag - so these hold their proportions across all three sizes
+ * instead of setting an Avery 5395 to a size a 4x3 badge was measured for.
+ *
+ * On a 4in badge they come to about 44, 36 and 30 point. Thirty is where this
+ * app set every name before the tag was given its own fitting, and 36 is the
+ * middle of a run of tags that is being read at a table rather than across a
+ * hall; both were worth being able to get back to.
+ */
+export const TAG_NAME_SIZES: Record<TagNameSize, { label: string; share: number }> = {
+  fit: { label: "As large as it fits", share: 1 },
+  smaller: { label: "A little smaller", share: 0.82 },
+  smallest: { label: "Smaller still", share: 0.68 },
 };
 
 /**
