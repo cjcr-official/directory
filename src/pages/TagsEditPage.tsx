@@ -421,9 +421,8 @@ export function TagsEditPage() {
             where it is. Every setting here is a question the drawing answers -
             is that name still readable, does the church name still fit beside
             the logo - and answering it should not mean scrolling back up. On
-            a phone the two stack and the drawing leads, since there is nothing
-            else on this screen it could lead with. */}
-        <div className="desk lead-stage">
+            a phone the two stack and the drawing leads. */}
+        <div className="desk">
           <div className="desk-settings">
             <section className="card" aria-labelledby="tags-tag">
               <div className="card-head">
