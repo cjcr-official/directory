@@ -490,7 +490,11 @@ export function ProjectEditPage() {
 
             The three panels that open are kept together and kept last: opening
             one then only lengthens the column below what has already been
-            read, rather than moving anything beside it. */}
+            read, rather than moving anything beside it.
+
+            On a phone the two stack and the cover leads: the stylesheet lifts
+            it, so that a form this long does not have to be scrolled past to
+            reach the picture of what it is making. */}
         <div className="desk">
           <div className="desk-settings">
             <div className="card">

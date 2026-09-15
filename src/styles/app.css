@@ -2420,8 +2420,9 @@ th.num {
  * whatever height the window is. Nothing below the fold, nothing to scroll
  * back up to, and no column height for another column to have to match.
  *
- * On anything narrower they are one column again, in the order the page reads
- * in - which is the phone, and is also a desk window too short to split.
+ * On anything narrower they are one column again, the drawing leading and the
+ * settings under it - which is the phone, and is also a desk window too short
+ * to split.
  */
 .desk {
   display: grid;
@@ -2433,11 +2434,17 @@ th.num {
   max-width: 820px;
 }
 
-/* The drawing leads on the name tags screen, where every setting is a question
-   about it and there is nothing else on the page to lead with. The directory's
-   cover preview does not: its form opens with what the directory is called and
-   who is in it, neither of which the cover can answer. */
-.desk.lead-stage .desk-stage {
+/*
+ * Stacked, the drawing goes first on both screens.
+ *
+ * It is second in the markup because that is where it belongs on a desk, and
+ * last in a single column is the one place it is no use at all: a phone would
+ * have to be scrolled past the whole form to reach the thing the form is
+ * about. Leading, it says what is being edited before anything asks you to
+ * edit it - and it puts the end of the form back at the end of the page,
+ * which is where Delete should be found.
+ */
+.desk-stage {
   order: -1;
 }
 
@@ -2491,12 +2498,6 @@ th.num {
        held open by whichever pane is taller and take the page with it. */
     grid-template-rows: minmax(0, 1fr);
   }
-  /* Order is the grid's on a desk - the stage is the right-hand column on both
-     screens, whatever each of them leads with when stacked. */
-  .desk.lead-stage .desk-stage {
-    order: 0;
-  }
-
   /* The one scroller on the page. The padding is for the scrollbar, which
      would otherwise be drawn over the right edge of every card. */
   .desk-settings {
@@ -2507,8 +2508,12 @@ th.num {
   }
 
   /* The pane that does not scroll: the card fills it, and the drawing inside
-     takes whatever is left once the head and the caption have had theirs. */
+     takes whatever is left once the head and the caption have had theirs.
+
+     Order is the markup's again here - the settings take the left-hand column
+     and the stage the right, where leading is neither needed nor wanted. */
   .desk-stage {
+    order: 0;
     min-height: 0;
   }
   .desk-stage > .card {
