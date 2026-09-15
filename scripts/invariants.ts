@@ -929,7 +929,7 @@ async function main() {
           churchName: "Plains Alliance Church",
           tagLine: "We are a Christ-centered Acts 1:8 Family",
           coverLogoPath: "covers/logo.jpg",
-          tagHeadingSize: "large",
+          tagHeadingPt: 18,
           tagLogoSize: "large",
         },
       },
@@ -967,7 +967,7 @@ async function main() {
           churchName: "Plains Alliance Church",
           tagLine: "We are a Christ-centered Acts 1:8 Family",
           coverLogoPath: "covers/logo.jpg",
-          tagNameSize: "smallest",
+          tagNamePt: 30,
         },
       },
     ];
@@ -1144,33 +1144,69 @@ async function main() {
       last_name: "Vandersteen-Fotheringay",
     });
 
+    /*
+     * Eighteen point means eighteen point.
+     *
+     * This is the whole of what a size typed in points promises, and it is two
+     * promises rather than one. A name that fits at the size asked for is set
+     * at exactly that size - not near it, not at the nearest half point the
+     * fitting happened to step on. A name that does not fit is set smaller,
+     * never larger, and is still said in full: a tag reading "Bartholomew
+     * Vanderst..." is a tag nobody can use, and would be the tempting way to
+     * keep the first promise.
+     *
+     * Six and eight point are in the list because they are under the floor the
+     * fitting used to stop at, which would have quietly printed them at nine.
+     */
     for (const size of Object.keys(TAG_SIZES) as TagSizeName[]) {
-      const steps = (["fit", "smaller", "smallest"] as const).map((tagNameSize) =>
-        nameSizeFor(short, { tagSize: size, tagNameSize }),
-      );
-      ok(
-        steps[0].size > steps[1].size && steps[1].size > steps[2].size,
-        `tags ${size}: the name ceiling does not step down (${steps.map((s) => s.size).join(" > ")})`,
-      );
-      for (const step of steps) {
+      const set: string[] = [];
+      for (const tagNamePt of [6, 8, 12, 18, 24, 36]) {
+        const fits = nameSizeFor(short, { tagSize: size, tagNamePt });
         ok(
-          step.size <= step.ceiling + 0.01,
-          `tags ${size}: a name set at ${step.size}pt over a ceiling of ${round(step.ceiling)}pt`,
+          Math.abs(fits.size - tagNamePt) < 0.01,
+          `tags ${size}: a short name asked for ${tagNamePt}pt was set at ${fits.size}pt`,
+        );
+        set.push(`${fits.size}`);
+
+        const long = nameSizeFor(longest, { tagSize: size, tagNamePt });
+        ok(
+          long.size <= tagNamePt + 0.01,
+          `tags ${size}: a long name asked for ${tagNamePt}pt was set at ${long.size}pt`,
+        );
+        ok(
+          long.text === longName,
+          `tags ${size}: a long name at ${tagNamePt}pt was cut short: "${long.text}"`,
         );
       }
-      console.log(`tags ${size}: a short name sets at ${steps.map((s) => s.size).join(" / ")}pt`);
-
-      const full = nameSizeFor(longest, { tagSize: size, tagNameSize: "fit" });
-      const held = nameSizeFor(longest, { tagSize: size, tagNameSize: "smallest" });
-      ok(
-        held.size <= full.size + 0.01,
-        `tags ${size}: a lowered ceiling set a long name larger, ${held.size}pt over ${full.size}pt`,
-      );
-      ok(
-        held.text === longName,
-        `tags ${size}: a lowered ceiling cut a long name short: "${held.text}"`,
-      );
+      console.log(`tags ${size}: 6/8/12/18/24/36pt asked, ${set.join("/")}pt set`);
     }
+
+    /*
+     * And that a project saved before the sizes were points still prints as it
+     * did. The words were shares of the tag, so what they came to depended on
+     * which tag - which is exactly the sort of conversion that is written once,
+     * looks right, and is never exercised again.
+     */
+    // Deliberately not spread over DEFAULT_SETTINGS: a row saved by the old
+    // code carries the old keys and none of the new ones, and supplying the new
+    // ones here would be a test of the spread rather than of the conversion.
+    const converted = (over: Record<string, unknown>) => normalizeSettings(over);
+
+    const asPoints = converted({ tagSize: "badge4x3", tagNameSize: "smaller" });
+    ok(asPoints.tagNamePt === 36, `a "smaller" name on a 4x3 came back as ${asPoints.tagNamePt}pt`);
+    const stillLarge = converted({ tagSize: "badge4x3", tagHeadingSize: "large" });
+    ok(
+      stillLarge.tagHeadingPt === 18,
+      `a "large" heading on a 4x3 came back as ${stillLarge.tagHeadingPt}pt`,
+    );
+    const avery = converted({ tagSize: "avery5395" });
+    ok(
+      avery.tagNamePt === 37 && avery.tagLinePt === 7.5,
+      `an untouched Avery came back as ${avery.tagNamePt}pt / ${avery.tagLinePt}pt`,
+    );
+    // A number that was actually stored always wins over any of that.
+    const typed = converted({ tagSize: "badge4x3", tagNameSize: "smallest", tagNamePt: 21.5 });
+    ok(typed.tagNamePt === 21.5, `a typed 21.5pt came back as ${typed.tagNamePt}pt`);
 
     /*
      * The one setting a person picks by eye.

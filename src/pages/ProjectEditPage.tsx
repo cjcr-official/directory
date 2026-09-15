@@ -25,7 +25,6 @@ import type { ProjectKind, SelectionMode } from "@/lib/database.types";
 import {
   DEFAULT_SETTINGS,
   PAGE_SIZES,
-  TAG_NAME_SIZES,
   TAG_SIZES,
   TAG_STYLES,
   normalizeSettings,
@@ -279,10 +278,7 @@ export function ProjectEditPage() {
     `${tagsPerSheet(safeSettings)} to a sheet`,
     TAG_STYLES[safeSettings.tagStyle].label.toLowerCase(),
     TYPEFACE_LABELS[safeSettings.tagNameFont].toLowerCase(),
-    // Only when it has been moved: "as large as it fits" is what every tag does
-    // unless asked otherwise, and a summary saying so says nothing.
-    safeSettings.tagNameSize !== "fit" &&
-      TAG_NAME_SIZES[safeSettings.tagNameSize].label.toLowerCase(),
+    `${safeSettings.tagNamePt}pt names`,
     safeSettings.tagLine.trim() !== "" && "a line underneath",
   ]
     .filter(Boolean)

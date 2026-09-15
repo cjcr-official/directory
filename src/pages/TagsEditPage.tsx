@@ -13,15 +13,15 @@ import { TYPEFACES, TYPEFACE_LABELS, loadMetrics, type Metrics } from "@/lib/lay
 import {
   PAGE_SIZES,
   TAG_ACCENTS,
-  TAG_NAME_SIZES,
+  TAG_PT_MAX,
+  TAG_PT_MIN,
+  TAG_PT_STEPS,
   TAG_SIZES,
   TAG_STYLES,
   normalizeSettings,
   type PageSizeName,
   type ProjectSettings,
-  type TagHeadingSize,
   type TagLogoSize,
-  type TagNameSize,
   type TagSizeName,
   type TagStyle,
   type Typeface,
@@ -192,17 +192,22 @@ export function TagsEditPage() {
   }, [metrics, drawnSettings, people]);
 
   /**
-   * What the name's ceiling comes to on this tag, in points.
+   * What the drawn name actually came out at, in points.
    *
-   * The three choices are a share of a share, which is the right way to store
-   * them and a poor way to read them - and the number moves with the tag's
-   * size, the mark and the line underneath, so it cannot be written down beside
-   * the words. Asked of the same plan the sheet is drawn from.
+   * The number in the box is the size when the name fits at it and the most it
+   * will be set when it does not, so the one thing worth saying back is which
+   * of those just happened. Found by where the run sits rather than by what it
+   * says: a church name long enough to be shrunk is also long enough to be cut
+   * short, and then it no longer matches the field that set it.
    */
-  const nameCeiling = useMemo(
-    () => (metrics && drawnSettings ? Math.round(planTag(drawnSettings, metrics).nameMax) : null),
-    [metrics, drawnSettings],
-  );
+  const drawnNamePt = useMemo(() => {
+    if (!tagPreview || !drawnSettings || !metrics) return null;
+    const plan = planTag(drawnSettings, metrics);
+    const run = tagPreview.page.cards[0]?.runs.find(
+      (candidate) => candidate.y >= plan.nameTop - 0.5 && candidate.y < plan.nameBottom,
+    );
+    return run ? run.size : null;
+  }, [tagPreview, drawnSettings, metrics]);
 
   if (!settings || !safeSettings || !project) {
     if (error) {
@@ -222,11 +227,20 @@ export function TagsEditPage() {
 
   const perSheet = tagsPerSheet(safeSettings);
   const sheets = Math.ceil(people.length / perSheet);
-  // Said as a ceiling rather than a size, because that is what it is: a short
-  // name reaches it and a long one is still shrunk under it.
-  const nameSizeHint = nameCeiling
-    ? `About ${nameCeiling}pt on this tag — longer names still shrink to fit.`
-    : "Longer names still shrink to fit.";
+  /*
+   * What the box did, said back.
+   *
+   * A size is a promise this app keeps until it cannot: the name is stepped
+   * down when it would otherwise run off the card. That is worth knowing at the
+   * moment it happens rather than at the guillotine, and it is the one thing
+   * the drawing above cannot say on its own - a tag that reads well gives no
+   * sign that it was asked for something larger.
+   */
+  const askedNamePt = safeSettings.tagNamePt;
+  const shrunk = drawnNamePt !== null && drawnNamePt < askedNamePt - 0.01;
+  const nameSizeHint = shrunk
+    ? `Shrunk to ${drawnNamePt}pt for this name — it is too long for ${askedNamePt}pt on this tag.`
+    : "A name too long for the tag is shrunk until it fits.";
   const hasLogo = Boolean(logoRemoved ? false : logoBlob || safeSettings.coverLogoPath);
 
   /*
@@ -385,6 +399,15 @@ export function TagsEditPage() {
       {savedAt ? <Notice kind="ok">Saved. Open the preview to see the sheet.</Notice> : null}
 
       <form onSubmit={save}>
+        {/* Offered by all three boxes. Once per page rather than once per box:
+            it is the same ladder every time, and three copies of it would be
+            three copies of it in the DOM. */}
+        <datalist id="tag-pt-steps">
+          {TAG_PT_STEPS.map((pt) => (
+            <option key={pt} value={pt} />
+          ))}
+        </datalist>
+
         {/* Down the tag, in the order it is read: the rectangle itself, then
             what is above the name, then the name and the line under it, then
             the paper it is all cut out of. Two columns on a desk, one on a
@@ -551,22 +574,16 @@ export function TagsEditPage() {
 
                 <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <Field
-                    label="The church's name"
-                    htmlFor="tag_heading_size"
+                    label="Church name size"
+                    htmlFor="tag_heading_pt"
                     hint="How big it prints above the name."
                   >
-                    <select
-                      id="tag_heading_size"
-                      value={settings.tagHeadingSize}
+                    <PointSize
+                      id="tag_heading_pt"
+                      value={settings.tagHeadingPt}
                       disabled={!canEdit || settings.tagStyle === "plain"}
-                      onChange={(event) =>
-                        set({ tagHeadingSize: event.target.value as TagHeadingSize })
-                      }
-                    >
-                      <option value="small">Small</option>
-                      <option value="medium">Medium</option>
-                      <option value="large">Large</option>
-                    </select>
+                      onChange={(pt) => set({ tagHeadingPt: pt })}
+                    />
                   </Field>
 
                   <Field
@@ -604,23 +621,13 @@ export function TagsEditPage() {
                 {/* First in the card, because it is the one question about the
                     name that is asked in points rather than in taste - and the
                     drawing above answers it while it is being asked. */}
-                <Field
-                  label="How large"
-                  htmlFor="tag_name_size"
-                  hint={`The most it will be set. ${nameSizeHint}`}
-                >
-                  <select
-                    id="tag_name_size"
-                    value={settings.tagNameSize}
+                <Field label="Name size" htmlFor="tag_name_pt" hint={nameSizeHint}>
+                  <PointSize
+                    id="tag_name_pt"
+                    value={settings.tagNamePt}
                     disabled={!canEdit}
-                    onChange={(event) => set({ tagNameSize: event.target.value as TagNameSize })}
-                  >
-                    {(Object.keys(TAG_NAME_SIZES) as TagNameSize[]).map((key) => (
-                      <option key={key} value={key}>
-                        {TAG_NAME_SIZES[key].label}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(pt) => set({ tagNamePt: pt })}
+                  />
                 </Field>
 
                 <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -663,20 +670,33 @@ export function TagsEditPage() {
                   face the book is set in.
                 </p>
 
-                <Field
-                  label="The line underneath"
-                  hint="Printed small under the name. Leave it empty for none."
-                  htmlFor="tag_line"
-                >
-                  <input
-                    id="tag_line"
-                    type="text"
-                    value={settings.tagLine}
-                    placeholder="We are a Christ-centered Acts 1:8 Family"
-                    disabled={!canEdit}
-                    onChange={(event) => set({ tagLine: event.target.value })}
-                  />
-                </Field>
+                {/* The words and their size on one line, because they are one
+                    decision: the line that is too long is the line that wants
+                    to be a point smaller. */}
+                <div className="grid" style={{ gridTemplateColumns: "1fr 108px", gap: 12 }}>
+                  <Field
+                    label="The line underneath"
+                    hint="Printed small under the name. Leave it empty for none."
+                    htmlFor="tag_line"
+                  >
+                    <input
+                      id="tag_line"
+                      type="text"
+                      value={settings.tagLine}
+                      placeholder="We are a Christ-centered Acts 1:8 Family"
+                      disabled={!canEdit}
+                      onChange={(event) => set({ tagLine: event.target.value })}
+                    />
+                  </Field>
+                  <Field label="Line size" htmlFor="tag_line_pt">
+                    <PointSize
+                      id="tag_line_pt"
+                      value={settings.tagLinePt}
+                      disabled={!canEdit || !settings.tagLine.trim()}
+                      onChange={(pt) => set({ tagLinePt: pt })}
+                    />
+                  </Field>
+                </div>
 
                 <p className="hint">
                   A long name breaks over two lines and shrinks until it fits, so every tag in a run
@@ -749,6 +769,53 @@ export function TagsEditPage() {
           </p>
         </div>
       </form>
+    </div>
+  );
+}
+
+/**
+ * A type size in points, the way Word asks for one.
+ *
+ * A number rather than a list of words, because a church that prints its own
+ * badges has them in Word already and "medium" is not something anybody can
+ * hold up against the thing on their desk. Word's own ladder is offered as
+ * suggestions rather than as the choices, so fourteen point is one tap and
+ * thirteen and a half is still allowed.
+ *
+ * The unit is drawn beside the box rather than typed into it: a number input
+ * that says "14pt" holds no number at all, and the arrows and the phone's
+ * keypad are worth more than the two letters.
+ *
+ * Half-typed values are left alone here and clamped where they are used, which
+ * is what the rows and columns boxes on the directory's own form do - a field
+ * that corrects itself between two keystrokes cannot be typed into.
+ */
+function PointSize({
+  id,
+  value,
+  disabled,
+  onChange,
+}: {
+  id: string;
+  value: number;
+  disabled?: boolean;
+  onChange: (points: number) => void;
+}) {
+  return (
+    <div className="pt-field">
+      <input
+        id={id}
+        type="number"
+        inputMode="decimal"
+        min={TAG_PT_MIN}
+        max={TAG_PT_MAX}
+        step={0.5}
+        list="tag-pt-steps"
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+      <span className="pt-unit">pt</span>
     </div>
   );
 }

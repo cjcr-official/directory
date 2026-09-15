@@ -2399,6 +2399,28 @@ th.num {
   text-align: center;
 }
 
+/* A type size and its unit. The unit is drawn beside the box rather than typed
+   into it: a number input holding "14pt" holds no number at all, and the
+   stepper arrows and the phone's own numeric keypad are worth more than two
+   letters inside the field. */
+.pt-field {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+/* min-width because a number input reports an intrinsic width of its own, and
+   in a narrow grid track that would hold the track open rather than shrink -
+   the same thing the date inputs do to a phone, three hundred lines up. */
+.pt-field input[type="number"] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.pt-unit {
+  flex: 0 0 auto;
+  font-size: 0.82rem;
+  color: var(--ink-3);
+}
+
 /* The colour well and the handful of colours a church badge is usually
    printed in, on one line that wraps on a phone. */
 .colour-field {

@@ -154,17 +154,27 @@ as it will fit, and under that the tag's own line. A long name breaks over two
 lines and shrinks until it fits, so every tag in a run is cut to the same size
 whatever the name on it.
 
-**How large** sets the most the name will be — as large as it fits, a little
-smaller, or smaller still, which on a 4" badge is about 44, 36 and 30 point. It
-is a ceiling rather than a size, because a size cannot be promised: a fixed one
-would either clip the longest name in the congregation or set the whole run to
-whatever that name allows. So lowering it does nothing to the long names, which
-were already underneath it, and brings the short ones down to meet them. The
-screen says what the ceiling comes to in points on the tag you have chosen,
-since the same three choices are smaller on a smaller badge. Forty-four point
-is right for a name read across a hall and reads as shouting on a tag worn at a
-table — and a name that broke over two lines at the top setting will often come
-back onto one a step down.
+### Type sizes
+
+All three texts on a tag are set in points, typed into a box the way Word asks
+for a font size — **Name size**, **Church name size** and **Line size**. Word's
+own ladder (8, 9, 10 … 36, 48, 72) is offered as suggestions, and any other
+number is allowed, in half points, from 6 to 96.
+
+The number is the size. The one exception is a name too long for it: rather
+than run "Bartholomew Vanderst…" off the card, the name breaks over two lines
+and then steps down until it fits, and the screen says so while you are setting
+it — _shrunk to 28pt for this name_. So a long name is never cut short and
+never overflows, and every other size is exactly what you asked for.
+
+Forty-four point is about as large as a name goes on a 4" badge, which is right
+read across a hall and reads as shouting on a tag worn at a table; thirty is
+quieter. A name that breaks over two lines at one size often comes back onto
+one a few points down.
+
+Directories set up before the sizes were points keep printing at the size they
+were: the old Small / Medium / Large and the three name choices are read back as
+the points they came to on that directory's own tag.
 
 **Style** decides what sits above the name:
 
@@ -174,9 +184,9 @@ back onto one a step down.
 | Banner        | The same on a band of colour, the church's name reversed out of it. |
 | Just the name | Neither — for holders that already carry the church's own artwork.  |
 
-**The church's name** prints small, medium or large. Large is about eighteen
-point across a 4" badge, which is the size a church that has been printing its
-own tags in Word usually has; small is a caption under the name rather than a
+**Church name size** is eighteen point on the tags this was measured against,
+which is the size a church that has been printing its own in Word usually has.
+Ten point beside a thirty-six point name is a caption under it rather than a
 masthead over it.
 
 **The mark** is the logo, added here or on the cover, printed small, medium or
@@ -188,7 +198,9 @@ from the wheel beside them.
 
 The line under the name prints bold: at seven or eight point in a colour,
 regular weight goes thin enough on a laser printer to read as a smudge rather
-than as words.
+than as words. It is the one text that is never broken over two lines — it
+shrinks to stay on one, and is cut short only when it has run out of
+shrinking.
 
 ### Fonts
 

@@ -35,30 +35,26 @@ export type TagStyle = "classic" | "banner" | "plain";
 export type TagLogoSize = "none" | "small" | "medium" | "large";
 
 /**
- * How big the church's name is printed, as a share of the tag's width.
+ * Type sizes on a tag, in points, as they are typed in.
  *
- * Its own setting rather than a constant because this is the line that decides
- * whether a tag reads as the church's or as the app's. Ten point is a caption
- * under a forty point name; eighteen is a masthead, which is what a church that
- * has been printing its own tags in Word tends to have.
+ * Every text on a tag is set in points now, because that is the unit the
+ * person setting it already has: a church that has been printing its own
+ * badges has them in Word, in points, and "medium" is not a size anybody can
+ * compare against the thing on their desk.
+ *
+ * Points are a promise this app can nearly keep and not quite. The name is
+ * still fitted - a size that would run a long surname off the card is stepped
+ * down until it fits, because a tag that reads "Bartholomew Vanderst..." is a
+ * tag nobody can use. So the number is the size when the name fits at it, and
+ * the largest it will be set when it does not; the screen says which happened.
+ *
+ * Half a point is the smallest step, as it is in Word's own box.
  */
-export type TagHeadingSize = "small" | "medium" | "large";
+export const TAG_PT_MIN = 6;
+export const TAG_PT_MAX = 96;
 
-/**
- * How large the person's name is allowed to be set.
- *
- * A ceiling on the fitting rather than a size, because a size cannot be
- * promised: the name is set as large as the tag will take it and then shrunk
- * until it fits, so a fixed point size would either clip the longest name in
- * the congregation or set the whole run to whatever that name allows. This
- * lowers where the fitting starts, which quietly does nothing to the long names
- * - they were already below it - and brings the short ones down to meet them.
- *
- * Wanted because the fitted maximum is deliberately generous: forty-four point
- * across a 4in badge is right for a hall and reads as shouting on a tag that is
- * mostly worn at a table.
- */
-export type TagNameSize = "fit" | "smaller" | "smallest";
+/** Word's own ladder, offered beside the box that any number can be typed into. */
+export const TAG_PT_STEPS = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72];
 
 /**
  * Everything about how one project prints. Stored as JSON in projects.settings,
@@ -91,9 +87,16 @@ export type ProjectSettings = {
    */
   tagNameFont: Typeface;
   tagSmallFont: Typeface;
-  tagHeadingSize: TagHeadingSize;
-  /** How large the name is allowed to be set, as a ceiling on the fitting. */
-  tagNameSize: TagNameSize;
+  /**
+   * The three type sizes on a tag, in points.
+   *
+   * The name's is the size it is set at when it fits, and the largest it will
+   * be set when it does not - see TAG_PT_MIN above. The other two are simply
+   * the size, shrunk only to keep one line on one line.
+   */
+  tagNamePt: number;
+  tagHeadingPt: number;
+  tagLinePt: number;
   /**
    * A hairline between the heading and the name.
    *
@@ -178,11 +181,13 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   // one job Helvetica is better at than Times.
   tagNameFont: "sans",
   tagSmallFont: "sans",
-  tagHeadingSize: "medium",
-  // As large as the tag will take it, which is what every tag printed before
-  // this setting existed did - so nothing already saved prints differently for
-  // the field having been added.
-  tagNameSize: "fit",
+  // The sizes a 4x3 badge - the default tag - was already printing before these
+  // were typed in rather than chosen from three words. A project on another tag
+  // size gets its own, worked out in normalizeSettings, so nothing already
+  // saved prints differently for the change.
+  tagNamePt: 44,
+  tagHeadingPt: 14.5,
+  tagLinePt: 8.5,
   tagHeadRule: false,
   tagAccent: "#2f6d63",
   tagLogoSize: "medium",
@@ -251,9 +256,29 @@ export function normalizeSettings(raw: unknown): ProjectSettings {
   if (!TYPEFACES.includes(merged.tagSmallFont)) merged.tagSmallFont = DEFAULT_SETTINGS.tagSmallFont;
   if (!["none", "small", "medium", "large"].includes(merged.tagLogoSize))
     merged.tagLogoSize = "medium";
-  if (!["small", "medium", "large"].includes(merged.tagHeadingSize))
-    merged.tagHeadingSize = "medium";
-  if (!["fit", "smaller", "smallest"].includes(merged.tagNameSize)) merged.tagNameSize = "fit";
+  // The three type sizes, in points.
+  //
+  // A project saved before they were points carries the words they used to be
+  // chosen from, or nothing at all, and both have to come back as the size that
+  // project was actually printing - which depended on its tag, since the words
+  // were shares of the rectangle. So the old arithmetic is kept below, frozen,
+  // and used only for reading those projects once.
+  const tag = TAG_SIZES[merged.tagSize];
+  const asked = input as Record<string, unknown>;
+
+  if (!given(asked.tagNamePt)) {
+    const was = LEGACY_NAME_SHARES[String(asked.tagNameSize)] ?? 1;
+    merged.tagNamePt = Math.min(LEGACY_NAME_MAX, tag.h * LEGACY_NAME_SHARE) * was;
+  }
+  if (!given(asked.tagHeadingPt)) {
+    const was = LEGACY_HEADING_SHARES[String(asked.tagHeadingSize)] ?? LEGACY_HEADING_SHARES.medium;
+    merged.tagHeadingPt = clamp(tag.w * was, 8, 22);
+  }
+  if (!given(asked.tagLinePt)) merged.tagLinePt = clamp(tag.w * LEGACY_LINE_SHARE, 6.5, 10);
+
+  merged.tagNamePt = toHalfPoint(merged.tagNamePt);
+  merged.tagHeadingPt = toHalfPoint(merged.tagHeadingPt);
+  merged.tagLinePt = toHalfPoint(merged.tagLinePt);
   merged.tagAccent = normalizeHex(merged.tagAccent, DEFAULT_SETTINGS.tagAccent);
   if (!["letter", "a4", "legal"].includes(merged.pageSize)) merged.pageSize = "letter";
   if (!["fill", "fit"].includes(merged.photoFit)) merged.photoFit = "fill";
@@ -269,6 +294,41 @@ function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
   return Math.min(max, Math.max(min, value));
 }
+
+/** A number somebody actually stored, as opposed to one this file supplied. */
+function given(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+/**
+ * To the nearest half point, and inside what a tag can carry.
+ *
+ * Half points because that is the step Word's own box takes and the step the
+ * name is fitted in, so a size typed here is a size that can actually be
+ * arrived at. It also keeps a share of a rectangle from writing 14.399999 into
+ * a field somebody is about to read.
+ */
+function toHalfPoint(value: number): number {
+  if (!Number.isFinite(value)) return TAG_PT_MIN;
+  return clamp(Math.round(value * 2) / 2, TAG_PT_MIN, TAG_PT_MAX);
+}
+
+/*
+ * What the tag composer worked these out as, before they were typed in.
+ *
+ * Frozen on purpose: this is not how anything prints now, it is only how a
+ * project saved under the old settings is read once, so it must go on saying
+ * what that code said rather than following what tags.ts does next.
+ */
+const LEGACY_NAME_MAX = 44;
+const LEGACY_NAME_SHARE = 0.22;
+const LEGACY_LINE_SHARE = 0.03;
+const LEGACY_NAME_SHARES: Record<string, number> = { fit: 1, smaller: 0.82, smallest: 0.68 };
+const LEGACY_HEADING_SHARES: Record<string, number> = {
+  small: 0.037,
+  medium: 0.05,
+  large: 0.063,
+};
 
 /**
  * A colour the renderers can actually draw with.
@@ -320,38 +380,6 @@ export const TAG_STYLES: Record<TagStyle, { label: string; hint: string }> = {
     label: "Just the name",
     hint: "No mark and no heading — for holders that already carry the church's own.",
   },
-};
-
-/**
- * The church's name, as a share of the tag's width.
- *
- * Measured off a tag this app was asked to match: "Plains Alliance Church"
- * across a 4in badge sets at about eighteen point, which is `large`. The old
- * fixed size was `small`, and beside a thirty-six point name it read as a
- * footnote rather than as whose tag this is.
- */
-export const TAG_HEADING_SHARES: Record<TagHeadingSize, number> = {
-  small: 0.037,
-  medium: 0.05,
-  large: 0.063,
-};
-
-/**
- * The name's ceiling, as a share of the largest the tag would allow.
- *
- * Shares rather than points, because the largest a tag allows is already a
- * share of the tag - so these hold their proportions across all three sizes
- * instead of setting an Avery 5395 to a size a 4x3 badge was measured for.
- *
- * On a 4in badge they come to about 44, 36 and 30 point. Thirty is where this
- * app set every name before the tag was given its own fitting, and 36 is the
- * middle of a run of tags that is being read at a table rather than across a
- * hall; both were worth being able to get back to.
- */
-export const TAG_NAME_SIZES: Record<TagNameSize, { label: string; share: number }> = {
-  fit: { label: "As large as it fits", share: 1 },
-  smaller: { label: "A little smaller", share: 0.82 },
-  smallest: { label: "Smaller still", share: 0.68 },
 };
 
 /**
