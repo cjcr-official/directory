@@ -154,6 +154,18 @@ as it will fit, and under that the tag's own line. A long name breaks over two
 lines and shrinks until it fits, so every tag in a run is cut to the same size
 whatever the name on it.
 
+**How large** sets the most the name will be — as large as it fits, a little
+smaller, or smaller still, which on a 4" badge is about 44, 36 and 30 point. It
+is a ceiling rather than a size, because a size cannot be promised: a fixed one
+would either clip the longest name in the congregation or set the whole run to
+whatever that name allows. So lowering it does nothing to the long names, which
+were already underneath it, and brings the short ones down to meet them. The
+screen says what the ceiling comes to in points on the tag you have chosen,
+since the same three choices are smaller on a smaller badge. Forty-four point
+is right for a name read across a hall and reads as shouting on a tag worn at a
+table — and a name that broke over two lines at the top setting will often come
+back onto one a step down.
+
 **Style** decides what sits above the name:
 
 | Style         | What it looks like                                                  |

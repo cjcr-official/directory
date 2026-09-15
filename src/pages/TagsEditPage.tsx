@@ -8,11 +8,12 @@ import { PhotoInput } from "@/components/PhotoInput";
 import { fetchProject, isStaleWrite, updateProject } from "@/lib/queries";
 import { getPhotoUrls, removePhoto, uploadPhoto } from "@/lib/photos";
 import { resolveEntries } from "@/lib/projectEntries";
-import { bandContrast, composeTagPreview, tagsPerSheet } from "@/lib/layout/tags";
+import { bandContrast, composeTagPreview, planTag, tagsPerSheet } from "@/lib/layout/tags";
 import { TYPEFACES, TYPEFACE_LABELS, loadMetrics, type Metrics } from "@/lib/layout/metrics";
 import {
   PAGE_SIZES,
   TAG_ACCENTS,
+  TAG_NAME_SIZES,
   TAG_SIZES,
   TAG_STYLES,
   normalizeSettings,
@@ -20,6 +21,7 @@ import {
   type ProjectSettings,
   type TagHeadingSize,
   type TagLogoSize,
+  type TagNameSize,
   type TagSizeName,
   type TagStyle,
   type Typeface,
@@ -189,6 +191,19 @@ export function TagsEditPage() {
     return composeTagPreview(drawnSettings, metrics, name || "Madison Johnston");
   }, [metrics, drawnSettings, people]);
 
+  /**
+   * What the name's ceiling comes to on this tag, in points.
+   *
+   * The three choices are a share of a share, which is the right way to store
+   * them and a poor way to read them - and the number moves with the tag's
+   * size, the mark and the line underneath, so it cannot be written down beside
+   * the words. Asked of the same plan the sheet is drawn from.
+   */
+  const nameCeiling = useMemo(
+    () => (metrics && drawnSettings ? Math.round(planTag(drawnSettings, metrics).nameMax) : null),
+    [metrics, drawnSettings],
+  );
+
   if (!settings || !safeSettings || !project) {
     if (error) {
       return (
@@ -207,6 +222,11 @@ export function TagsEditPage() {
 
   const perSheet = tagsPerSheet(safeSettings);
   const sheets = Math.ceil(people.length / perSheet);
+  // Said as a ceiling rather than a size, because that is what it is: a short
+  // name reaches it and a long one is still shrunk under it.
+  const nameSizeHint = nameCeiling
+    ? `About ${nameCeiling}pt on this tag — longer names still shrink to fit.`
+    : "Longer names still shrink to fit.";
   const hasLogo = Boolean(logoRemoved ? false : logoBlob || safeSettings.coverLogoPath);
 
   /*
@@ -581,6 +601,28 @@ export function TagsEditPage() {
                 <h2>The name and the line under it</h2>
               </div>
               <div className="card-body">
+                {/* First in the card, because it is the one question about the
+                    name that is asked in points rather than in taste - and the
+                    drawing above answers it while it is being asked. */}
+                <Field
+                  label="How large"
+                  htmlFor="tag_name_size"
+                  hint={`The most it will be set. ${nameSizeHint}`}
+                >
+                  <select
+                    id="tag_name_size"
+                    value={settings.tagNameSize}
+                    disabled={!canEdit}
+                    onChange={(event) => set({ tagNameSize: event.target.value as TagNameSize })}
+                  >
+                    {(Object.keys(TAG_NAME_SIZES) as TagNameSize[]).map((key) => (
+                      <option key={key} value={key}>
+                        {TAG_NAME_SIZES[key].label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
                 <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <Field label="The name" htmlFor="tag_name_font">
                     <select

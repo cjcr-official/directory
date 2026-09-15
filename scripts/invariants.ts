@@ -957,6 +957,19 @@ async function main() {
           tagLine: "Welcome",
         },
       },
+      {
+        // The lowered ceiling, with everything else on the tag at once: the
+        // name band is what the head and the foot leave, and a smaller name is
+        // centred in it rather than sitting where the larger one did.
+        label: "name held down",
+        over: {
+          tagStyle: "classic",
+          churchName: "Plains Alliance Church",
+          tagLine: "We are a Christ-centered Acts 1:8 Family",
+          coverLogoPath: "covers/logo.jpg",
+          tagNameSize: "smallest",
+        },
+      },
     ];
 
     for (const size of Object.keys(TAG_SIZES) as TagSizeName[]) {
@@ -1087,6 +1100,77 @@ async function main() {
     console.log(
       `tags: the longest name sets at ${nameRuns[0]?.size}pt over ${nameRuns.length} line(s)`,
     );
+
+    /*
+     * The ceiling on the name, which promises two different things.
+     *
+     * To a short name it promises a size: "Ann Lee" reaches whatever ceiling it
+     * is given, so the three choices have to come out strictly in order. Two of
+     * them landing on the same size would be a control that does nothing, and
+     * nothing about the arithmetic says they cannot - they are a share of a
+     * share of a rectangle, and the Avery is the small end of all three.
+     *
+     * To a long name it promises only that it will not be made worse. It is
+     * already below the lower ceilings, so lowering one must not set it larger
+     * and must never cut it short - the whole name is the point of the tag.
+     */
+    const nameSizeFor = (person: PersonRow, over: Partial<typeof DEFAULT_SETTINGS>) => {
+      const settings = normalizeSettings({ ...DEFAULT_SETTINGS, ...over });
+      const sheet = composeTags(
+        buildEntries({
+          households: [],
+          people: [person],
+          tags: [],
+          householdTags: [],
+          personTags: [],
+        }),
+        settings,
+        metrics,
+      );
+      const card = sheet.sheets[0].pages[0].cards[0];
+      const furniture = [settings.churchName, settings.tagLine];
+      const runs = card.runs.filter((run) => !furniture.includes(run.text));
+      return {
+        size: runs[0].size,
+        text: runs.map((run) => run.text).join(" "),
+        ceiling: planTag(settings, metrics).nameMax,
+      };
+    };
+
+    const short = blankPerson({ id: "short", first_name: "Ann", last_name: "Lee" });
+    const longest = blankPerson({
+      id: "longest",
+      first_name: "Bartholomew",
+      last_name: "Vandersteen-Fotheringay",
+    });
+
+    for (const size of Object.keys(TAG_SIZES) as TagSizeName[]) {
+      const steps = (["fit", "smaller", "smallest"] as const).map((tagNameSize) =>
+        nameSizeFor(short, { tagSize: size, tagNameSize }),
+      );
+      ok(
+        steps[0].size > steps[1].size && steps[1].size > steps[2].size,
+        `tags ${size}: the name ceiling does not step down (${steps.map((s) => s.size).join(" > ")})`,
+      );
+      for (const step of steps) {
+        ok(
+          step.size <= step.ceiling + 0.01,
+          `tags ${size}: a name set at ${step.size}pt over a ceiling of ${round(step.ceiling)}pt`,
+        );
+      }
+      console.log(`tags ${size}: a short name sets at ${steps.map((s) => s.size).join(" / ")}pt`);
+
+      const full = nameSizeFor(longest, { tagSize: size, tagNameSize: "fit" });
+      const held = nameSizeFor(longest, { tagSize: size, tagNameSize: "smallest" });
+      ok(
+        held.size <= full.size + 0.01,
+        `tags ${size}: a lowered ceiling set a long name larger, ${held.size}pt over ${full.size}pt`,
+      );
+      ok(
+        held.text === longName,
+        `tags ${size}: a lowered ceiling cut a long name short: "${held.text}"`,
+      );
+    }
 
     /*
      * The one setting a person picks by eye.
