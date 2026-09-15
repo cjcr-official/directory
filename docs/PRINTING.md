@@ -124,9 +124,14 @@ directories you already have; pick one and everybody in it gets a tag. Change
 who is in the directory — add a family, drop a group — and the tags follow,
 because there is no second list to keep in step.
 
-How the tags look is set on the directory's own page, under **Name tags**. One
-tag is drawn at the top of that panel, at the size it prints, on somebody the
-directory actually prints — it redraws as you change anything below it, so the
+Picking one opens how its tags look — the size, the style, the colour, the two
+faces, the church's name and the mark — and a **Preview & print** button beside
+them. That is the whole of it: nobody has to open the book's own form, past its
+cover and its index, to move a badge's heading down a size. The directory's page
+still says what its tags currently come to, and leads here.
+
+One tag is drawn at the top of that screen, at the size it prints, on somebody
+the directory actually prints — it redraws as you change anything, so the
 question "will that name still fit" is answered on the screen rather than at
 the guillotine.
 
@@ -142,11 +147,12 @@ the cupboard rather than the paper:
 
 ### What is on a tag
 
-The mark and the church's name come from **The cover**, so a book and its tags
-carry the same one. Under them goes the person's name, as large as it will fit,
-and under that the tag's own line. A long name breaks over two lines and shrinks
-until it fits, so every tag in a run is cut to the same size whatever the name
-on it.
+The mark and the church's name are the book's as well — a directory and its tags
+carry the same one, and typing either here changes the cover too, which the
+screen says where it asks for them. Under them goes the person's name, as large
+as it will fit, and under that the tag's own line. A long name breaks over two
+lines and shrinks until it fits, so every tag in a run is cut to the same size
+whatever the name on it.
 
 **Style** decides what sits above the name:
 
@@ -161,12 +167,12 @@ point across a 4" badge, which is the size a church that has been printing its
 own tags in Word usually has; small is a caption under the name rather than a
 masthead over it.
 
-**The mark** is the logo from The cover, printed small, medium or large — or
-not at all. **Colour** sets the band, the line under the name, and the hairline
-under the heading if you turn that on — most printed badges have none, so it is
-off unless asked for. Five of the colours a church badge is usually printed in
-are there to pick from, and any other colour can be chosen from the wheel
-beside them.
+**The mark** is the logo, added here or on the cover, printed small, medium or
+large — or not at all. **Colour** sets the band, the line under the name, and
+the hairline under the heading if you turn that on — most printed badges have
+none, so it is off unless asked for. Five of the colours a church badge is
+usually printed in are there to pick from, and any other colour can be chosen
+from the wheel beside them.
 
 The line under the name prints bold: at seven or eight point in a colour,
 regular weight goes thin enough on a laser printer to read as a smudge rather

@@ -25,28 +25,23 @@ import type { ProjectKind, SelectionMode } from "@/lib/database.types";
 import {
   DEFAULT_SETTINGS,
   PAGE_SIZES,
-  TAG_ACCENTS,
   TAG_SIZES,
   TAG_STYLES,
   normalizeSettings,
   recordsPerSheet,
   type CardStyle,
   type PageSizeName,
-  type TagHeadingSize,
-  type TagLogoSize,
-  type TagSizeName,
-  type TagStyle,
   type ProjectSettings,
   type TextScale,
   type Typeface,
 } from "@/lib/layout/settings";
 import { resolveEntries, type Selection } from "@/lib/projectEntries";
-import { firstName, labelledHouseholdName, message } from "@/lib/format";
+import { labelledHouseholdName, message } from "@/lib/format";
 import { getPhotoUrls, removePhoto, uploadPhoto } from "@/lib/photos";
 import { CoverCanvas } from "@/components/BookPreview";
 import { composeCoverPage } from "@/lib/layout/compose";
-import { bandContrast, composeTagPreview, tagsPerSheet } from "@/lib/layout/tags";
-import { TYPEFACES, TYPEFACE_LABELS, loadMetrics, type Metrics } from "@/lib/layout/metrics";
+import { tagsPerSheet } from "@/lib/layout/tags";
+import { TYPEFACE_LABELS, loadMetrics, type Metrics } from "@/lib/layout/metrics";
 import { PhotoInput } from "@/components/PhotoInput";
 
 /*
@@ -240,22 +235,6 @@ export function ProjectEditPage() {
     return composeCoverPage(drawnSettings, metrics);
   }, [metrics, safeSettings.includeCover, drawnSettings]);
 
-  /**
-   * One name tag, drawn beside the settings that make it.
-   *
-   * On somebody the directory actually prints, because the first thing anyone
-   * checks is whether their own name fits - and the longest name in the
-   * congregation is the one that decides how big every tag in the run is set.
-   */
-  const tagPreview = useMemo(() => {
-    if (!metrics) return null;
-    const person = included.flatMap((entry) =>
-      entry.type === "household" ? entry.household.members : [entry.person],
-    )[0];
-    const name = person ? `${firstName(person)} ${person.last_name}`.trim() : "Madison Johnston";
-    return composeTagPreview(drawnSettings, metrics, name || "Madison Johnston");
-  }, [metrics, drawnSettings, included]);
-
   // Saved photographs, fetched once per set of paths rather than per keystroke.
   const [savedCoverUrls, setSavedCoverUrls] = useState<Map<string, string>>(new Map());
   const storedCoverPaths = [safeSettings.coverLogoPath, safeSettings.coverPhotoPath]
@@ -293,17 +272,7 @@ export function ProjectEditPage() {
     .filter(Boolean)
     .join(" · ");
 
-  /*
-   * Whether the band could carry the church's name at all.
-   *
-   * Only white and the app's ink are available to reverse out of it, and a
-   * mid-tone is too dark for one and too pale for the other - the composer takes
-   * the better of the two, and on some colours the better of the two is still
-   * not good. Nothing can fix that but a different colour, so it is said here
-   * rather than quietly printed.
-   */
-  const paleBand = safeSettings.tagStyle === "banner" && bandContrast(safeSettings.tagAccent) < 4.5;
-
+  // What the name tags currently come to, for the card that leads to them.
   const tagSummary = [
     TAG_SIZES[safeSettings.tagSize].label,
     `${tagsPerSheet(safeSettings)} to a sheet`,
@@ -635,211 +604,31 @@ export function ProjectEditPage() {
               </div>
             </div>
 
-            <Disclosure title="Name tags" summary={tagSummary}>
-              {tagPreview ? (
-                <figure className="tag-figure">
-                  <CoverCanvas
-                    page={tagPreview.page}
-                    width={tagPreview.width}
-                    height={tagPreview.height}
-                    photoUrls={coverUrls}
-                    typeface={tagPreview.typeface}
-                    maxHeight={260}
-                  />
-                  <figcaption className="hint">
-                    {TAG_SIZES[safeSettings.tagSize].label}, at the size it prints. Redraws as you
-                    change anything below.
-                  </figcaption>
-                </figure>
-              ) : null}
+            {/* Name tags are set under Name tags, not here.
 
-              <Field
-                label="Size"
-                hint="Match the holders you have. As many as fit go on a sheet, centred, to be cut apart."
-                htmlFor="tag_size"
-              >
-                <select
-                  id="tag_size"
-                  value={settings.tagSize}
-                  disabled={!canEdit}
-                  onChange={(event) => set({ tagSize: event.target.value as TagSizeName })}
-                >
-                  {(Object.keys(TAG_SIZES) as TagSizeName[]).map((key) => (
-                    <option key={key} value={key}>
-                      {TAG_SIZES[key].label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field
-                label="Style"
-                htmlFor="tag_style"
-                hint={TAG_STYLES[safeSettings.tagStyle].hint}
-              >
-                <select
-                  id="tag_style"
-                  value={settings.tagStyle}
-                  disabled={!canEdit}
-                  onChange={(event) => set({ tagStyle: event.target.value as TagStyle })}
-                >
-                  {(Object.keys(TAG_STYLES) as TagStyle[]).map((key) => (
-                    <option key={key} value={key}>
-                      {TAG_STYLES[key].label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <Field label="The name" htmlFor="tag_name_font">
-                  <select
-                    id="tag_name_font"
-                    value={settings.tagNameFont}
-                    disabled={!canEdit}
-                    onChange={(event) => set({ tagNameFont: event.target.value as Typeface })}
-                  >
-                    {TYPEFACES.map((face) => (
-                      <option key={face} value={face}>
-                        {TYPEFACE_LABELS[face]}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="The small print" htmlFor="tag_small_font">
-                  <select
-                    id="tag_small_font"
-                    value={settings.tagSmallFont}
-                    disabled={!canEdit}
-                    onChange={(event) => set({ tagSmallFont: event.target.value as Typeface })}
-                  >
-                    {TYPEFACES.map((face) => (
-                      <option key={face} value={face}>
-                        {TYPEFACE_LABELS[face]}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                They were a panel on this form, which meant the one screen in
+                the app that is only ever opened to print badges sent you to
+                the book's form to change how a badge looks - past the cover,
+                the index and the page count, none of which a tag has. The
+                settings live on this same row either way, so what is left here
+                is what they currently come to and the way over. */}
+            {!isNew && id ? (
+              <div className="card">
+                <div className="card-head">
+                  <h2>Name tags</h2>
+                </div>
+                <div className="card-body">
+                  <p className="muted small">{tagSummary}</p>
+                  <p className="hint">
+                    The same people, printed as badges rather than as a book — one each, a family
+                    included. How they look is set under Name tags.
+                  </p>
+                  <Link className="btn" to={`/tags/${id}`}>
+                    Name tags for this directory
+                  </Link>
+                </div>
               </div>
-              <p className="hint" style={{ marginTop: -4 }}>
-                The name is set in the first, the church's name and the line underneath in the
-                second. Sans serif is the one to beat across a hall; a serif church name over a sans
-                serif name is the printed-badge look.
-              </p>
-
-              <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <Field
-                  label="The church's name"
-                  htmlFor="tag_heading_size"
-                  hint="How big it prints above the name."
-                >
-                  <select
-                    id="tag_heading_size"
-                    value={settings.tagHeadingSize}
-                    disabled={!canEdit || settings.tagStyle === "plain"}
-                    onChange={(event) =>
-                      set({ tagHeadingSize: event.target.value as TagHeadingSize })
-                    }
-                  >
-                    <option value="small">Small</option>
-                    <option value="medium">Medium</option>
-                    <option value="large">Large</option>
-                  </select>
-                </Field>
-
-                <Field
-                  label="The mark"
-                  htmlFor="tag_logo_size"
-                  hint={
-                    safeSettings.tagStyle === "plain"
-                      ? "Just the name prints no mark."
-                      : safeSettings.coverLogoPath || coverBlobs.logo
-                        ? "The logo from The cover."
-                        : "Add a logo under The cover to use this."
-                  }
-                >
-                  <select
-                    id="tag_logo_size"
-                    value={settings.tagLogoSize}
-                    disabled={!canEdit || settings.tagStyle === "plain"}
-                    onChange={(event) => set({ tagLogoSize: event.target.value as TagLogoSize })}
-                  >
-                    <option value="none">No mark</option>
-                    <option value="small">Small</option>
-                    <option value="medium">Medium</option>
-                    <option value="large">Large</option>
-                  </select>
-                </Field>
-
-                <Field
-                  label="Colour"
-                  htmlFor="tag_accent"
-                  hint={paleBand ? undefined : "The band, the rule and the line under the name."}
-                >
-                  <div className="colour-field">
-                    <input
-                      id="tag_accent"
-                      type="color"
-                      value={safeSettings.tagAccent}
-                      disabled={!canEdit}
-                      onChange={(event) => set({ tagAccent: event.target.value })}
-                    />
-                    {TAG_ACCENTS.map((accent) => (
-                      <button
-                        key={accent.value}
-                        type="button"
-                        className={`swatch${safeSettings.tagAccent === accent.value ? " on" : ""}`}
-                        style={{ background: accent.value }}
-                        title={accent.label}
-                        aria-label={accent.label}
-                        aria-pressed={safeSettings.tagAccent === accent.value}
-                        disabled={!canEdit}
-                        onClick={() => set({ tagAccent: accent.value })}
-                      />
-                    ))}
-                  </div>
-                  {paleBand ? (
-                    <span className="hint warn-hint">
-                      Neither white nor black reads well on this colour, so the church's name on the
-                      band will be hard to make out. A darker or paler one fixes it — or use the
-                      Classic style, which prints on the paper instead.
-                    </span>
-                  ) : null}
-                </Field>
-              </div>
-
-              {safeSettings.tagStyle === "classic" ? (
-                <Checkbox
-                  label="A line under the heading"
-                  hint="A hairline in the colour above, between the church's name and the person's. Most printed badges have none."
-                  checked={settings.tagHeadRule}
-                  disabled={!canEdit}
-                  onChange={(value) => set({ tagHeadRule: value })}
-                />
-              ) : null}
-
-              <Field
-                label="The line underneath"
-                hint="Printed small under the name. Leave it empty for none."
-                htmlFor="tag_line"
-              >
-                <input
-                  id="tag_line"
-                  type="text"
-                  value={settings.tagLine}
-                  disabled={!canEdit}
-                  onChange={(event) => set({ tagLine: event.target.value })}
-                />
-              </Field>
-
-              <p className="hint">
-                A tag carries the mark and the church's name from <strong>The cover</strong>, then
-                the person's name as large as it will go, then the line above. Every person prints
-                one tag — a family prints one for each of its members, not one for the household. A
-                colour too pale to read is darkened for the small print, so the band keeps the
-                colour you picked and the words on the paper stay legible.
-              </p>
-            </Disclosure>
+            ) : null}
 
             <Disclosure title="The page" summary={pageSummary}>
               <Field label="Paper" htmlFor="page_size">

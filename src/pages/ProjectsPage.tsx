@@ -20,7 +20,7 @@ const WORDS = {
   },
   tags: {
     title: "Name tags",
-    sub: "Tags for the people in a directory — pick which one, and everybody in it gets a tag. Change who is in the directory and the tags follow.",
+    sub: "Tags for the people in a directory — pick which one, and everybody in it gets a tag. How they look is set here; change who is in the directory and the tags follow.",
     add: "New directory",
     empty: "No directories yet",
     first: "Create the main directory",
@@ -72,7 +72,7 @@ export function ProjectsPage({ tags = false }: { tags?: boolean }) {
             return (
               <Link
                 key={project.id}
-                to={tags ? `/projects/${project.id}/tags` : `/projects/${project.id}`}
+                to={tags ? `/tags/${project.id}` : `/projects/${project.id}`}
                 className="card"
                 style={{ textDecoration: "none", color: "inherit", display: "block" }}
               >
