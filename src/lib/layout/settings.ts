@@ -1,11 +1,38 @@
+import { TYPEFACES, type Typeface } from "./metrics";
+
 export type PageSizeName = "letter" | "a4" | "legal";
 export type PhotoFit = "fill" | "fit";
 export type MemberStyle = "compact" | "detailed";
 export type TextScale = "compact" | "normal" | "large";
-export type Typeface = "sans" | "serif";
+/**
+ * Passed along rather than written out again.
+ *
+ * It was declared here and in metrics.ts, a copy each, and the two had to agree
+ * for the composer to hand the renderer a face it could find. Type-only, so
+ * nothing about what this module costs to import changes.
+ */
+export type { Typeface };
 /** How one record is set off from the next on the page. */
 export type CardStyle = "rule" | "box" | "none";
 export type TagSizeName = "badge4x3" | "badge3x4" | "avery5395";
+
+/**
+ * How a name tag is furnished above the name.
+ *
+ * Only the head changes: every style leaves the name the same band in the
+ * middle of the tag and the same line at the foot, so switching between them
+ * cannot make a name that fitted stop fitting.
+ *
+ *  - `classic` the mark at the left, the church's name at the right, a hairline
+ *    under both.
+ *  - `banner`  the same two on a band of colour across the top, reversed out.
+ *  - `plain`   neither: the name has the whole tag. For holders and lanyards
+ *    that already carry the church's own artwork.
+ */
+export type TagStyle = "classic" | "banner" | "plain";
+
+/** How big the mark is printed, as a share of the tag's height. */
+export type TagLogoSize = "none" | "small" | "medium" | "large";
 
 /**
  * Everything about how one project prints. Stored as JSON in projects.settings,
@@ -24,6 +51,23 @@ export type ProjectSettings = {
   tagSize: TagSizeName;
   /** The line under the name. Its own field: a book's footer says something else. */
   tagLine: string;
+  /** What sits above the name, and whether it sits on a band of colour. */
+  tagStyle: TagStyle;
+  /**
+   * The name's own family, and the small print's.
+   *
+   * Two fields rather than one, because a tag is the one thing this app prints
+   * where mixing them is the point: a big sans-serif name reads across a hall,
+   * and the church's name above it does not have to be in the same face to do
+   * its job. They are also kept apart from `typeface`, which sets the book - a
+   * congregation can want a serif directory and plain sans tags, and before
+   * this it could not have both.
+   */
+  tagNameFont: Typeface;
+  tagSmallFont: Typeface;
+  /** The band, the hairline and the line under the name, as #rrggbb. */
+  tagAccent: string;
+  tagLogoSize: TagLogoSize;
   pageSize: PageSizeName;
   /** Records stacked down each half of the sheet. */
   rows: number;
@@ -92,6 +136,14 @@ export type ProjectSettings = {
 export const DEFAULT_SETTINGS: ProjectSettings = {
   tagSize: "badge4x3",
   tagLine: "",
+  tagStyle: "classic",
+  // Sans on both, whatever the book is set in. A name tag is read at a glance
+  // from across a room by someone who is trying to place a face, which is the
+  // one job Helvetica is better at than Times.
+  tagNameFont: "sans",
+  tagSmallFont: "sans",
+  tagAccent: "#2f6d63",
+  tagLogoSize: "medium",
   pageSize: "letter",
   rows: 3,
   columns: 2,
@@ -152,12 +204,18 @@ export function normalizeSettings(raw: unknown): ProjectSettings {
   merged.rows = clamp(Math.round(merged.rows), 1, 8);
   merged.columns = clamp(Math.round(merged.columns), 1, 3);
   if (!["badge4x3", "badge3x4", "avery5395"].includes(merged.tagSize)) merged.tagSize = "badge4x3";
+  if (!["classic", "banner", "plain"].includes(merged.tagStyle)) merged.tagStyle = "classic";
+  if (!TYPEFACES.includes(merged.tagNameFont)) merged.tagNameFont = DEFAULT_SETTINGS.tagNameFont;
+  if (!TYPEFACES.includes(merged.tagSmallFont)) merged.tagSmallFont = DEFAULT_SETTINGS.tagSmallFont;
+  if (!["none", "small", "medium", "large"].includes(merged.tagLogoSize))
+    merged.tagLogoSize = "medium";
+  merged.tagAccent = normalizeHex(merged.tagAccent, DEFAULT_SETTINGS.tagAccent);
   if (!["letter", "a4", "legal"].includes(merged.pageSize)) merged.pageSize = "letter";
   if (!["fill", "fit"].includes(merged.photoFit)) merged.photoFit = "fill";
   if (!["compact", "detailed"].includes(merged.memberStyle)) merged.memberStyle = "compact";
   if (!["compact", "normal", "large"].includes(merged.textScale)) merged.textScale = "normal";
   if (!["rule", "box", "none"].includes(merged.cardStyle)) merged.cardStyle = "rule";
-  if (!["sans", "serif"].includes(merged.typeface)) merged.typeface = "serif";
+  if (!TYPEFACES.includes(merged.typeface)) merged.typeface = "serif";
 
   return merged;
 }
@@ -165,6 +223,21 @@ export function normalizeSettings(raw: unknown): ProjectSettings {
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
   return Math.min(max, Math.max(min, value));
+}
+
+/**
+ * A colour the renderers can actually draw with.
+ *
+ * Both of them parse #rrggbb by hand, so anything else - a colour name, a
+ * half-typed "#2f6", the empty string a cleared input leaves behind - would
+ * reach pdf-lib as NaN and paint the band black. Three-digit hex is expanded
+ * rather than refused, since that is what a person types.
+ */
+function normalizeHex(value: string, fallback: string): string {
+  const raw = value.trim().replace(/^#/, "");
+  if (/^[0-9a-f]{3}$/i.test(raw)) return `#${raw.replace(/./g, "$&$&").toLowerCase()}`;
+  if (/^[0-9a-f]{6}$/i.test(raw)) return `#${raw.toLowerCase()}`;
+  return fallback;
 }
 
 /** Landscape dimensions in PDF points (72 per inch). */
@@ -187,6 +260,37 @@ export const TAG_SIZES: Record<TagSizeName, { w: number; h: number; label: strin
   badge3x4: { w: 3 * 72, h: 4 * 72, label: '3" x 4" portrait' },
   avery5395: { w: 3.375 * 72, h: 2.333 * 72, label: 'Avery 5395 (3⅜" x 2⅓")' },
 };
+
+/** The styles, as they are offered on screen. */
+export const TAG_STYLES: Record<TagStyle, { label: string; hint: string }> = {
+  classic: {
+    label: "Classic",
+    hint: "The mark and the church's name across the top, a hairline under them.",
+  },
+  banner: {
+    label: "Banner",
+    hint: "The same on a band of colour, with the church's name reversed out of it.",
+  },
+  plain: {
+    label: "Just the name",
+    hint: "No mark and no heading — for holders that already carry the church's own.",
+  },
+};
+
+/**
+ * A few colours to hand, so nobody has to fight a colour wheel on a phone.
+ *
+ * Any colour at all can be typed or picked; these are only the ones a church
+ * badge is usually printed in, and the first is the app's own green so that the
+ * default is on the list rather than being the one swatch missing from it.
+ */
+export const TAG_ACCENTS: { label: string; value: string }[] = [
+  { label: "Green", value: "#2f6d63" },
+  { label: "Maroon", value: "#7b2430" },
+  { label: "Navy", value: "#26405e" },
+  { label: "Plum", value: "#5a3a63" },
+  { label: "Charcoal", value: "#333c3b" },
+];
 
 export const TEXT_SCALES: Record<TextScale, number> = {
   compact: 0.9,

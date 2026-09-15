@@ -15,12 +15,22 @@ import {
 import { toWinAnsi } from "../format";
 import { COLORS, type BookModel, type Box, type PhotoSlot, type TextRun } from "./compose";
 import {
-  STANDARD_FONTS,
+  embedFamilies,
   makeMetrics,
   type FontWeight,
   type Metrics,
   type Typeface,
 } from "./metrics";
+
+/**
+ * Every weight of every family the document might set text in.
+ *
+ * A book uses one family and reaches into one of these; a name tag sets its
+ * name and its small print in two, and each run says which. They are standard
+ * fonts, so the ones nobody draws with cost the finished file about seventy
+ * bytes between them.
+ */
+type Families = Record<Typeface, Record<FontWeight, PDFFont>>;
 
 /** Loads the bytes for one photo, or null when it cannot be fetched. */
 export type PhotoLoader = (path: string) => Promise<Uint8Array | null>;
@@ -48,10 +58,11 @@ function hexToRgb(hex: string) {
 function drawRun(
   page: PDFPage,
   run: TextRun,
-  fonts: Record<FontWeight, PDFFont>,
+  families: Families,
+  base: Typeface,
   pageHeight: number,
 ) {
-  const font = fonts[run.weight];
+  const font = families[run.face ?? base][run.weight];
   const text = toWinAnsi(run.text);
   if (!text) return;
 
@@ -133,15 +144,9 @@ function drawPhoto(page: PDFPage, slot: PhotoSlot, image: PDFImage, pageHeight: 
   }
 }
 
-function drawPlaceholder(
-  page: PDFPage,
-  slot: PhotoSlot,
-  fonts: Record<FontWeight, PDFFont>,
-  pageHeight: number,
-): void {
+function drawPlaceholder(page: PDFPage, slot: PhotoSlot, font: PDFFont, pageHeight: number): void {
   drawBox(page, slot.box, pageHeight, { color: hexToRgb(COLORS.placeholder) });
   const size = Math.min(slot.box.w, slot.box.h) * 0.32;
-  const font = fonts.bold;
   const text = toWinAnsi(slot.initials || "?");
   const width = font.widthOfTextAtSize(text, size);
   page.drawText(text, {
@@ -169,12 +174,8 @@ export async function renderPdf(
   doc.setProducer("Church Directory");
   doc.setCreator("Church Directory");
 
-  const family = STANDARD_FONTS[book.typeface];
-  const fonts: Record<FontWeight, PDFFont> = {
-    regular: await doc.embedFont(family.regular),
-    bold: await doc.embedFont(family.bold),
-    italic: await doc.embedFont(family.italic),
-  };
+  const families = await embedFamilies(doc);
+  const base = book.typeface;
 
   const images = new Map<string, PDFImage | null>();
   const total = book.photoPaths.length + book.sheets.length;
@@ -254,14 +255,14 @@ export async function renderPdf(
         if (card.photo) {
           const image = card.photo.path ? images.get(card.photo.path) : null;
           if (image) drawPhoto(page, card.photo, image, h);
-          else drawPlaceholder(page, card.photo, fonts, h);
+          else drawPlaceholder(page, card.photo, families[base].bold, h);
           // A hairline so a pale portrait does not float on white paper.
           drawBox(page, card.photo.box, h, {
             borderColor: hexToRgb(COLORS.photoEdge),
             borderWidth: 0.4,
           });
         }
-        for (const run of card.runs) drawRun(page, run, fonts, h);
+        for (const run of card.runs) drawRun(page, run, families, base, h);
       }
 
       // No hairline around these, unlike a card's portrait: a logo is artwork
@@ -271,7 +272,7 @@ export async function renderPdf(
         if (image) drawPhoto(page, slot, image, h);
       }
 
-      for (const run of bookPage.runs) drawRun(page, run, fonts, h);
+      for (const run of bookPage.runs) drawRun(page, run, families, base, h);
     }
 
     done += 1;
@@ -294,10 +295,5 @@ function isPng(bytes: Uint8Array): boolean {
 /** Metrics backed by a fresh document - used by tests and scripts. */
 export async function pdfMetrics(typeface: Typeface = "sans"): Promise<Metrics> {
   const doc = await PDFDocument.create();
-  const family = STANDARD_FONTS[typeface];
-  return makeMetrics({
-    regular: await doc.embedFont(family.regular),
-    bold: await doc.embedFont(family.bold),
-    italic: await doc.embedFont(family.italic),
-  });
+  return makeMetrics(await embedFamilies(doc), typeface);
 }

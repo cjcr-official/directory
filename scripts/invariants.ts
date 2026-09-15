@@ -11,14 +11,20 @@
  * print. None of them raise an error on their own - they just come out wrong
  * on paper, which is the expensive place to find them.
  */
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, type PDFFont } from "pdf-lib";
 import { buildEntries } from "../src/lib/entries";
 import { resolveEntries } from "../src/lib/projectEntries";
-import { composeBook } from "../src/lib/layout/compose";
-import { composeTags, tagsPerSheet } from "../src/lib/layout/tags";
-import { TAG_SIZES, type TagSizeName } from "../src/lib/layout/settings";
+import { COLORS, composeBook } from "../src/lib/layout/compose";
+import { composeTags, contrastRatio, planTag, tagsPerSheet } from "../src/lib/layout/tags";
+import { TAG_ACCENTS, TAG_SIZES, type TagSizeName } from "../src/lib/layout/settings";
 import { pdfMetrics } from "../src/lib/layout/pdf";
-import { STANDARD_FONTS, type Metrics } from "../src/lib/layout/metrics";
+import {
+  STANDARD_FONTS,
+  TYPEFACES,
+  type FontWeight,
+  type Metrics,
+  type Typeface,
+} from "../src/lib/layout/metrics";
 import { toWinAnsi } from "../src/lib/format";
 import { DEFAULT_SETTINGS, normalizeSettings, recordsPerSheet } from "../src/lib/layout/settings";
 import { buildDemoData } from "../src/lib/demo";
@@ -52,6 +58,11 @@ function blankHousehold(over: Partial<HouseholdRow>): HouseholdRow {
     ...over,
   } as HouseholdRow;
 }
+/** To the hundredth of a point, which is finer than any printer resolves. */
+function round(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 function blankPerson(over: Partial<PersonRow>): PersonRow {
   return {
     id: "p1",
@@ -845,17 +856,20 @@ async function main() {
     ];
 
     /** What makeMetrics did before it cached anything: measure every time. */
-    async function uncachedMetrics(typeface: "sans" | "serif"): Promise<Metrics> {
+    async function uncachedMetrics(base: Typeface): Promise<Metrics> {
       const doc = await PDFDocument.create();
-      const family = STANDARD_FONTS[typeface];
-      const fonts = {
-        regular: await doc.embedFont(family.regular),
-        bold: await doc.embedFont(family.bold),
-        italic: await doc.embedFont(family.italic),
-      };
+      const families = {} as Record<Typeface, Record<FontWeight, PDFFont>>;
+      for (const face of TYPEFACES) {
+        const family = STANDARD_FONTS[face];
+        families[face] = {
+          regular: await doc.embedFont(family.regular),
+          bold: await doc.embedFont(family.bold),
+          italic: await doc.embedFont(family.italic),
+        };
+      }
       return {
-        widthOf: (text, size, weight) =>
-          text ? fonts[weight].widthOfTextAtSize(toWinAnsi(text), size) : 0,
+        widthOf: (text, size, weight, face) =>
+          text ? families[face ?? base][weight].widthOfTextAtSize(toWinAnsi(text), size) : 0,
         lineHeight: (size) => size * 1.22,
       };
     }
@@ -886,60 +900,142 @@ async function main() {
       entry.type === "household" ? entry.household.members : [entry.person],
     );
 
+    /**
+     * Every shape of tag, against every size it can be cut to.
+     *
+     * The styles are where this earns its keep: they move the head about, and
+     * the name is fitted into whatever is left over, so a band half a point too
+     * deep does not fail anywhere - it prints a name with its descenders in the
+     * cut line.
+     */
+    const looks: { label: string; over: Partial<typeof DEFAULT_SETTINGS> }[] = [
+      { label: "bare", over: {} },
+      {
+        label: "classic",
+        over: {
+          tagStyle: "classic",
+          churchName: "Plains Alliance Church",
+          tagLine: "We are a Christ-centered Acts 1:8 Family",
+          coverLogoPath: "covers/logo.jpg",
+        },
+      },
+      {
+        label: "banner",
+        over: {
+          tagStyle: "banner",
+          churchName: "Plains Alliance Church",
+          tagLine: "We are a Christ-centered Acts 1:8 Family",
+          coverLogoPath: "covers/logo.jpg",
+          tagLogoSize: "large",
+          tagAccent: "#7b2430",
+        },
+      },
+      {
+        label: "plain",
+        over: { tagStyle: "plain", churchName: "Plains Alliance Church", tagLogoSize: "none" },
+      },
+      {
+        label: "mixed faces",
+        over: {
+          churchName: "St Mary's of the Immaculate Conception of Our Lady",
+          tagNameFont: "mono",
+          tagSmallFont: "serif",
+          tagLine: "Welcome",
+        },
+      },
+    ];
+
     for (const size of Object.keys(TAG_SIZES) as TagSizeName[]) {
-      const settings = normalizeSettings({ ...DEFAULT_SETTINGS, tagSize: size });
-      const book = composeTags(entries, settings, metrics);
-      const cards = book.sheets.flatMap((sheet) => sheet.pages.flatMap((page) => page.cards));
-      const perSheet = tagsPerSheet(settings);
+      for (const look of looks) {
+        const settings = normalizeSettings({ ...DEFAULT_SETTINGS, ...look.over, tagSize: size });
+        const book = composeTags(entries, settings, metrics);
+        const cards = book.sheets.flatMap((sheet) => sheet.pages.flatMap((page) => page.cards));
+        const perSheet = tagsPerSheet(settings);
+        const where = `tags ${size}/${look.label}`;
 
-      ok(
-        cards.length === expected.length,
-        `tags ${size}: ${cards.length} tags for ${expected.length} people`,
-      );
-      ok(
-        new Set(cards.map((card) => card.entryId)).size === cards.length,
-        `tags ${size}: somebody is printed twice`,
-      );
-      ok(
-        book.sheets.every((sheet) => sheet.pages[0].cards.length <= perSheet),
-        `tags ${size}: a sheet holds more tags than it has room for`,
-      );
-      ok(
-        book.sheets.length === Math.ceil(expected.length / perSheet),
-        `tags ${size}: ${book.sheets.length} sheets for ${expected.length} at ${perSheet} a sheet`,
-      );
+        ok(
+          cards.length === expected.length,
+          `${where}: ${cards.length} tags for ${expected.length} people`,
+        );
+        ok(
+          new Set(cards.map((card) => card.entryId)).size === cards.length,
+          `${where}: somebody is printed twice`,
+        );
+        ok(
+          book.sheets.every((sheet) => sheet.pages[0].cards.length <= perSheet),
+          `${where}: a sheet holds more tags than it has room for`,
+        );
+        ok(
+          book.sheets.length === Math.ceil(expected.length / perSheet),
+          `${where}: ${book.sheets.length} sheets for ${expected.length} at ${perSheet} a sheet`,
+        );
 
-      let spilling = 0;
-      let offPaper = 0;
-      for (const card of cards) {
-        if (
-          card.box.x < -0.01 ||
-          card.box.y < -0.01 ||
-          card.box.x + card.box.w > book.width + 0.01 ||
-          card.box.y + card.box.h > book.height + 0.01
-        ) {
-          offPaper += 1;
-        }
-        for (const run of card.runs) {
-          const inked = metrics.widthOf(run.text, run.size, run.weight);
+        let spilling = 0;
+        let offPaper = 0;
+        for (const card of cards) {
           if (
-            run.x < card.box.x - 0.01 ||
-            run.x + run.w > card.box.x + card.box.w + 0.01 ||
-            run.y < card.box.y - 0.01 ||
-            run.y + metrics.lineHeight(run.size) > card.box.y + card.box.h + 0.01 ||
-            inked > run.w + 0.01
+            card.box.x < -0.01 ||
+            card.box.y < -0.01 ||
+            card.box.x + card.box.w > book.width + 0.01 ||
+            card.box.y + card.box.h > book.height + 0.01
           ) {
-            spilling += 1;
+            offPaper += 1;
+          }
+          for (const run of card.runs) {
+            // Measured in the run's own family. A name set in Courier and
+            // measured in Helvetica is a third again as wide as this thinks,
+            // which is exactly the sort of thing that only shows up in print.
+            const inked = metrics.widthOf(run.text, run.size, run.weight, run.face);
+            if (
+              run.x < card.box.x - 0.01 ||
+              run.x + run.w > card.box.x + card.box.w + 0.01 ||
+              run.y < card.box.y - 0.01 ||
+              run.y + metrics.lineHeight(run.size) > card.box.y + card.box.h + 0.01 ||
+              inked > run.w + 0.01
+            ) {
+              spilling += 1;
+            }
           }
         }
+        ok(spilling === 0, `${where}: ${spilling} lines run outside their tag`);
+        ok(offPaper === 0, `${where}: ${offPaper} tags fall off the paper`);
+
+        // Every tag on the sheet is the same rectangle, so the name is the only
+        // thing that may differ between them: a head that moved with the name
+        // under it would print a sheet that cannot be cut in one pass.
+        const heads = new Set(
+          cards.map((card) =>
+            JSON.stringify(
+              card.runs
+                .filter((run) => run.text === settings.churchName.trim())
+                // Rounded: these are a position minus the corner it was added
+                // to, and the same offset at two different corners is the same
+                // offset to a printer and not to a float.
+                .map((run) => [
+                  round(run.x - card.box.x),
+                  round(run.y - card.box.y),
+                  round(run.size),
+                ]),
+            ),
+          ),
+        );
+        ok(heads.size <= 1, `${where}: the heading sits in ${heads.size} different places`);
       }
-      ok(spilling === 0, `tags ${size}: ${spilling} lines run outside their tag`);
-      ok(offPaper === 0, `tags ${size}: ${offPaper} tags fall off the paper`);
     }
 
     // The awkward one: the longest name in the congregation on the smallest
     // tag, with a church name above it and a line below. It has to shrink and
-    // break rather than run over the edge.
+    // break rather than run over the edge - and it must still say the whole
+    // name, because a tag that reads "Bartholomew Vanderst..." is a tag nobody
+    // can use.
+    const longName = "Bartholomew Vandersteen-Fotheringay";
+    const longSettings = normalizeSettings({
+      ...DEFAULT_SETTINGS,
+      tagSize: "avery5395",
+      churchName: "Plains Alliance Church",
+      tagLine: "We are a Christ-centered Acts 1:8 Family",
+      coverLogoPath: "covers/logo.jpg",
+    });
     const long = composeTags(
       buildEntries({
         households: [],
@@ -954,23 +1050,102 @@ async function main() {
         householdTags: [],
         personTags: [],
       }),
-      normalizeSettings({
-        ...DEFAULT_SETTINGS,
-        tagSize: "avery5395",
-        churchName: "Plains Alliance Church",
-        tagLine: "We are a Christ-centered Acts 1:8 Family",
-      }),
+      longSettings,
       metrics,
     );
     const longCard = long.sheets[0].pages[0].cards[0];
-    const nameRuns = longCard.runs.filter((run) => run.weight === "bold" && run.align === "center");
+    // The name is what is left once the two pieces of furniture are accounted
+    // for. Told apart by what they say rather than by how they are set, which
+    // is the only thing that stays true as the styles move them about.
+    const furniture = [longSettings.churchName, longSettings.tagLine];
+    const nameRuns = longCard.runs.filter((run) => !furniture.includes(run.text));
     ok(nameRuns.length > 0 && nameRuns.length <= 2, "a very long name did not fit in two lines");
     ok(
-      nameRuns.every((run) => metrics.widthOf(run.text, run.size, run.weight) <= run.w + 0.01),
+      nameRuns.map((run) => run.text).join(" ") === longName,
+      `a very long name was cut short: "${nameRuns.map((run) => run.text).join(" ")}"`,
+    );
+    ok(
+      nameRuns.every(
+        (run) => metrics.widthOf(run.text, run.size, run.weight, run.face) <= run.w + 0.01,
+      ),
       "a very long name runs past the edge of the smallest tag",
     );
     console.log(
       `tags: the longest name sets at ${nameRuns[0]?.size}pt over ${nameRuns.length} line(s)`,
+    );
+
+    /*
+     * The one setting a person picks by eye.
+     *
+     * Two different promises, because only one of them can be kept for every
+     * colour there is. On paper the line under the name is darkened until it
+     * passes, so any colour at all is safe. On a band the only choice is white
+     * or ink, and a mid grey is too dark for one and too pale for the other -
+     * so what is promised there is that the better of the two is taken, and
+     * that the colours this app actually offers are all well clear of the line.
+     * The settings screen says so out loud for the ones it does not offer.
+     */
+    const tagFor = (accent: string) =>
+      planTag(
+        normalizeSettings({
+          ...DEFAULT_SETTINGS,
+          tagStyle: "banner",
+          tagAccent: accent,
+          churchName: "Plains Alliance Church",
+          tagLine: "We are a Christ-centered Acts 1:8 Family",
+        }),
+        metrics,
+      );
+
+    let paperFails = 0;
+    let wrongPick = 0;
+    for (const accent of ["#7b2430", "#ffe8a3", "#111111", "#ffffff", "#8bd8c4", "#808080"]) {
+      const plan = tagFor(accent);
+      const onPaper = contrastRatio(plan.tagline?.color ?? "#000000", "#ffffff");
+      if (onPaper < 4.5) {
+        paperFails += 1;
+        console.log(
+          `  ${accent}: the line under the name comes to ${onPaper.toFixed(2)}:1 on paper`,
+        );
+      }
+      const picked = plan.church?.color ?? "#000000";
+      const other = picked === "#ffffff" ? COLORS.ink : "#ffffff";
+      if (contrastRatio(picked, accent) < contrastRatio(other, accent) - 0.001) wrongPick += 1;
+    }
+    ok(
+      paperFails === 0,
+      `${paperFails} accent colour(s) print a line that cannot be read on paper`,
+    );
+    ok(wrongPick === 0, `${wrongPick} band(s) took the less readable of white and ink`);
+
+    const palePresets = TAG_ACCENTS.filter((accent) => {
+      const plan = tagFor(accent.value);
+      const onBand = contrastRatio(plan.church?.color ?? "#000000", accent.value);
+      if (onBand < 4.5) console.log(`  ${accent.label}: ${onBand.toFixed(2)}:1 on the band`);
+      return onBand < 4.5;
+    });
+    ok(
+      palePresets.length === 0,
+      `${palePresets.length} of the colours this app offers cannot carry the church's name`,
+    );
+
+    // And that a colour the renderers cannot parse never reaches them: both
+    // read #rrggbb by hand, and anything else would paint the band black.
+    const colours = [
+      ["#7B2430", "#7b2430"],
+      ["7b2430", "#7b2430"],
+      ["#abc", "#aabbcc"],
+      ["", DEFAULT_SETTINGS.tagAccent],
+      ["rebeccapurple", DEFAULT_SETTINGS.tagAccent],
+      ["#12345", DEFAULT_SETTINGS.tagAccent],
+    ] as const;
+    const kept = colours.filter(
+      ([given, want]) =>
+        normalizeSettings({ ...DEFAULT_SETTINGS, tagAccent: given }).tagAccent === want,
+    );
+    ok(
+      kept.length === colours.length,
+      `${colours.length - kept.length} accent colour(s) were stored in a shape nothing can draw`,
     );
   }
 

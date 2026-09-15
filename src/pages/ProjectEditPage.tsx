@@ -25,23 +25,27 @@ import type { ProjectKind, SelectionMode } from "@/lib/database.types";
 import {
   DEFAULT_SETTINGS,
   PAGE_SIZES,
+  TAG_ACCENTS,
   TAG_SIZES,
+  TAG_STYLES,
   normalizeSettings,
   recordsPerSheet,
   type CardStyle,
   type PageSizeName,
+  type TagLogoSize,
   type TagSizeName,
+  type TagStyle,
   type ProjectSettings,
   type TextScale,
   type Typeface,
 } from "@/lib/layout/settings";
 import { resolveEntries, type Selection } from "@/lib/projectEntries";
-import { labelledHouseholdName, message } from "@/lib/format";
+import { firstName, labelledHouseholdName, message } from "@/lib/format";
 import { getPhotoUrls, removePhoto, uploadPhoto } from "@/lib/photos";
 import { CoverCanvas } from "@/components/BookPreview";
 import { composeCoverPage } from "@/lib/layout/compose";
-import { tagsPerSheet } from "@/lib/layout/tags";
-import { loadMetrics, type Metrics } from "@/lib/layout/metrics";
+import { bandContrast, composeTagPreview, tagsPerSheet } from "@/lib/layout/tags";
+import { TYPEFACES, TYPEFACE_LABELS, loadMetrics, type Metrics } from "@/lib/layout/metrics";
 import { PhotoInput } from "@/components/PhotoInput";
 
 /*
@@ -205,26 +209,51 @@ export function ProjectEditPage() {
     [pendingCoverUrls],
   );
 
+  /**
+   * The settings as they would print this second, artwork and all.
+   *
+   * The cover and the name tag are both drawn from these, and both carry the
+   * same mark, so the substitution of a picture chosen a moment ago for one
+   * that has been saved belongs here rather than in each of them.
+   */
+  const drawnSettings = useMemo(
+    () => ({
+      ...safeSettings,
+      coverLogoPath: coverRemoved.logo
+        ? ""
+        : coverBlobs.logo
+          ? PENDING_LOGO
+          : safeSettings.coverLogoPath,
+      coverPhotoPath: coverRemoved.photo
+        ? ""
+        : coverBlobs.photo
+          ? PENDING_PHOTO
+          : safeSettings.coverPhotoPath,
+    }),
+    [safeSettings, coverBlobs, coverRemoved],
+  );
+
   /** What the cover would be if it were saved and printed exactly now. */
   const coverPage = useMemo(() => {
     if (!metrics || !safeSettings.includeCover) return null;
-    return composeCoverPage(
-      {
-        ...safeSettings,
-        coverLogoPath: coverRemoved.logo
-          ? ""
-          : coverBlobs.logo
-            ? PENDING_LOGO
-            : safeSettings.coverLogoPath,
-        coverPhotoPath: coverRemoved.photo
-          ? ""
-          : coverBlobs.photo
-            ? PENDING_PHOTO
-            : safeSettings.coverPhotoPath,
-      },
-      metrics,
-    );
-  }, [metrics, safeSettings, coverBlobs, coverRemoved]);
+    return composeCoverPage(drawnSettings, metrics);
+  }, [metrics, safeSettings.includeCover, drawnSettings]);
+
+  /**
+   * One name tag, drawn beside the settings that make it.
+   *
+   * On somebody the directory actually prints, because the first thing anyone
+   * checks is whether their own name fits - and the longest name in the
+   * congregation is the one that decides how big every tag in the run is set.
+   */
+  const tagPreview = useMemo(() => {
+    if (!metrics) return null;
+    const person = included.flatMap((entry) =>
+      entry.type === "household" ? entry.household.members : [entry.person],
+    )[0];
+    const name = person ? `${firstName(person)} ${person.last_name}`.trim() : "Madison Johnston";
+    return composeTagPreview(drawnSettings, metrics, name || "Madison Johnston");
+  }, [metrics, drawnSettings, included]);
 
   // Saved photographs, fetched once per set of paths rather than per keystroke.
   const [savedCoverUrls, setSavedCoverUrls] = useState<Map<string, string>>(new Map());
@@ -256,16 +285,29 @@ export function ProjectEditPage() {
   const pageSummary = [
     `${PAGE_SIZES[safeSettings.pageSize].label} landscape`,
     `${recordsPerSheet(safeSettings)} to a sheet`,
-    safeSettings.typeface === "serif" ? "serif" : "sans serif",
+    TYPEFACE_LABELS[safeSettings.typeface].toLowerCase(),
     safeSettings.textScale === "large" ? "large text" : "normal text",
     safeSettings.bookletOrder && "booklet order",
   ]
     .filter(Boolean)
     .join(" · ");
 
+  /*
+   * Whether the band could carry the church's name at all.
+   *
+   * Only white and the app's ink are available to reverse out of it, and a
+   * mid-tone is too dark for one and too pale for the other - the composer takes
+   * the better of the two, and on some colours the better of the two is still
+   * not good. Nothing can fix that but a different colour, so it is said here
+   * rather than quietly printed.
+   */
+  const paleBand = safeSettings.tagStyle === "banner" && bandContrast(safeSettings.tagAccent) < 4.5;
+
   const tagSummary = [
     TAG_SIZES[safeSettings.tagSize].label,
     `${tagsPerSheet(safeSettings)} to a sheet`,
+    TAG_STYLES[safeSettings.tagStyle].label.toLowerCase(),
+    TYPEFACE_LABELS[safeSettings.tagNameFont].toLowerCase(),
     safeSettings.tagLine.trim() !== "" && "a line underneath",
   ]
     .filter(Boolean)
@@ -593,6 +635,23 @@ export function ProjectEditPage() {
             </div>
 
             <Disclosure title="Name tags" summary={tagSummary}>
+              {tagPreview ? (
+                <figure className="tag-figure">
+                  <CoverCanvas
+                    page={tagPreview.page}
+                    width={tagPreview.width}
+                    height={tagPreview.height}
+                    photoUrls={coverUrls}
+                    typeface={tagPreview.typeface}
+                    maxHeight={260}
+                  />
+                  <figcaption className="hint">
+                    {TAG_SIZES[safeSettings.tagSize].label}, at the size it prints. Redraws as you
+                    change anything below.
+                  </figcaption>
+                </figure>
+              ) : null}
+
               <Field
                 label="Size"
                 hint="Match the holders you have. As many as fit go on a sheet, centred, to be cut apart."
@@ -613,6 +672,123 @@ export function ProjectEditPage() {
               </Field>
 
               <Field
+                label="Style"
+                htmlFor="tag_style"
+                hint={TAG_STYLES[safeSettings.tagStyle].hint}
+              >
+                <select
+                  id="tag_style"
+                  value={settings.tagStyle}
+                  disabled={!canEdit}
+                  onChange={(event) => set({ tagStyle: event.target.value as TagStyle })}
+                >
+                  {(Object.keys(TAG_STYLES) as TagStyle[]).map((key) => (
+                    <option key={key} value={key}>
+                      {TAG_STYLES[key].label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <Field label="The name" htmlFor="tag_name_font">
+                  <select
+                    id="tag_name_font"
+                    value={settings.tagNameFont}
+                    disabled={!canEdit}
+                    onChange={(event) => set({ tagNameFont: event.target.value as Typeface })}
+                  >
+                    {TYPEFACES.map((face) => (
+                      <option key={face} value={face}>
+                        {TYPEFACE_LABELS[face]}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="The small print" htmlFor="tag_small_font">
+                  <select
+                    id="tag_small_font"
+                    value={settings.tagSmallFont}
+                    disabled={!canEdit}
+                    onChange={(event) => set({ tagSmallFont: event.target.value as Typeface })}
+                  >
+                    {TYPEFACES.map((face) => (
+                      <option key={face} value={face}>
+                        {TYPEFACE_LABELS[face]}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+              <p className="hint" style={{ marginTop: -4 }}>
+                The name is set in the first, the church's name and the line underneath in the
+                second. Sans serif is the one to beat across a hall; a serif church name over a sans
+                serif name is the printed-badge look.
+              </p>
+
+              <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <Field
+                  label="The mark"
+                  htmlFor="tag_logo_size"
+                  hint={
+                    safeSettings.tagStyle === "plain"
+                      ? "Just the name prints no mark."
+                      : safeSettings.coverLogoPath || coverBlobs.logo
+                        ? "The logo from The cover."
+                        : "Add a logo under The cover to use this."
+                  }
+                >
+                  <select
+                    id="tag_logo_size"
+                    value={settings.tagLogoSize}
+                    disabled={!canEdit || settings.tagStyle === "plain"}
+                    onChange={(event) => set({ tagLogoSize: event.target.value as TagLogoSize })}
+                  >
+                    <option value="none">No mark</option>
+                    <option value="small">Small</option>
+                    <option value="medium">Medium</option>
+                    <option value="large">Large</option>
+                  </select>
+                </Field>
+
+                <Field
+                  label="Colour"
+                  htmlFor="tag_accent"
+                  hint={paleBand ? undefined : "The band, the rule and the line under the name."}
+                >
+                  <div className="colour-field">
+                    <input
+                      id="tag_accent"
+                      type="color"
+                      value={safeSettings.tagAccent}
+                      disabled={!canEdit}
+                      onChange={(event) => set({ tagAccent: event.target.value })}
+                    />
+                    {TAG_ACCENTS.map((accent) => (
+                      <button
+                        key={accent.value}
+                        type="button"
+                        className={`swatch${safeSettings.tagAccent === accent.value ? " on" : ""}`}
+                        style={{ background: accent.value }}
+                        title={accent.label}
+                        aria-label={accent.label}
+                        aria-pressed={safeSettings.tagAccent === accent.value}
+                        disabled={!canEdit}
+                        onClick={() => set({ tagAccent: accent.value })}
+                      />
+                    ))}
+                  </div>
+                  {paleBand ? (
+                    <span className="hint warn-hint">
+                      Neither white nor black reads well on this colour, so the church's name on the
+                      band will be hard to make out. A darker or paler one fixes it — or use the
+                      Classic style, which prints on the paper instead.
+                    </span>
+                  ) : null}
+                </Field>
+              </div>
+
+              <Field
                 label="The line underneath"
                 hint="Printed small under the name. Leave it empty for none."
                 htmlFor="tag_line"
@@ -629,7 +805,9 @@ export function ProjectEditPage() {
               <p className="hint">
                 A tag carries the mark and the church's name from <strong>The cover</strong>, then
                 the person's name as large as it will go, then the line above. Every person prints
-                one tag — a family prints one for each of its members, not one for the household.
+                one tag — a family prints one for each of its members, not one for the household. A
+                colour too pale to read is darkened for the small print, so the band keeps the
+                colour you picked and the words on the paper stay legible.
               </p>
             </Disclosure>
 
@@ -690,6 +868,7 @@ export function ProjectEditPage() {
                 >
                   <option value="serif">Serif — traditional, best for a book</option>
                   <option value="sans">Sans serif — plainer, a little more compact</option>
+                  <option value="mono">Typewriter — every letter the same width</option>
                 </select>
               </Field>
 
@@ -1006,8 +1185,7 @@ export function ProjectEditPage() {
                     />
                     <figcaption className="hint">
                       {PAGE_SIZES[safeSettings.pageSize].label}, set in{" "}
-                      {safeSettings.typeface === "serif" ? "serif" : "sans serif"}. Redraws as you
-                      type.
+                      {TYPEFACE_LABELS[safeSettings.typeface].toLowerCase()}. Redraws as you type.
                     </figcaption>
                   </figure>
                 ) : safeSettings.includeCover ? (

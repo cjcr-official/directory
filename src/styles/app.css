@@ -2379,6 +2379,70 @@ th.num {
   margin-top: 8px;
 }
 
+/* --- the name tag, on the panel that sets it ----------------------------- */
+
+/*
+ * Drawn inside the panel rather than out in the cover's column, because a tag
+ * is small enough to sit above its own settings and that is where it is being
+ * looked at: the colour, the two faces and the size are all things you change
+ * and then look straight back at.
+ */
+.tag-figure {
+  margin: 0 0 18px;
+  padding: 14px;
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.tag-figure figcaption {
+  margin-top: 10px;
+  text-align: center;
+}
+
+/* The colour well and the handful of colours a church badge is usually
+   printed in, on one line that wraps on a phone. */
+.colour-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.colour-field input[type="color"] {
+  width: 46px;
+  height: 38px;
+  padding: 2px;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+.swatch {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1px solid rgb(20 32 31 / 22%);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.swatch.on {
+  /* Ringed rather than recoloured: the swatch is the colour, so the mark that
+     says which one is chosen has to sit outside it. The gap is the card it sits
+     on rather than white, or the ring would float on a lit rectangle after
+     dark. */
+  box-shadow:
+    0 0 0 2px var(--raised),
+    0 0 0 4px var(--accent);
+}
+.swatch:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+/* A hint that is telling you something is wrong rather than how it works. */
+.warn-hint {
+  display: block;
+  margin-top: 6px;
+  color: var(--warn-deep);
+}
+
 @media (max-width: 820px) {
   /* Two rows: what this is, then what you can do to it. One row of six
      controls is what turned this screen into a heap. */

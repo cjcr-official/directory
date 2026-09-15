@@ -124,9 +124,11 @@ directories you already have; pick one and everybody in it gets a tag. Change
 who is in the directory — add a family, drop a group — and the tags follow,
 because there is no second list to keep in step.
 
-How the tags look is set on the directory's own page, under **Name tags**: the
-size, and the line under the name. The mark and the church's name come from
-**The cover**, so a book and its tags carry the same one.
+How the tags look is set on the directory's own page, under **Name tags**. One
+tag is drawn at the top of that panel, at the size it prints, on somebody the
+directory actually prints — it redraws as you change anything below it, so the
+question "will that name still fit" is answered on the screen rather than at
+the guillotine.
 
 Tags print portrait, as many to a sheet as the paper holds, centred, with a
 pale line round each one to cut along. Pick the size to match the holders in
@@ -138,11 +140,56 @@ the cupboard rather than the paper:
 | 3" × 4" portrait       | 4                    |
 | Avery 5395 (3⅜" × 2⅓") | 8                    |
 
-Each tag carries the mark and the church's name from **The cover**, the
-person's name as large as it will fit, and its own line underneath. A long
-name breaks over two lines and shrinks until it fits, so every tag in a run is
-cut to the same size whatever the name on it.
+### What is on a tag
+
+The mark and the church's name come from **The cover**, so a book and its tags
+carry the same one. Under them goes the person's name, as large as it will fit,
+and under that the tag's own line. A long name breaks over two lines and shrinks
+until it fits, so every tag in a run is cut to the same size whatever the name
+on it.
+
+**Style** decides what sits above the name:
+
+| Style         | What it looks like                                                      |
+| ------------- | ----------------------------------------------------------------------- |
+| Classic       | The mark at the left, the church's name at the right, a hairline under. |
+| Banner        | The same on a band of colour, the church's name reversed out of it.     |
+| Just the name | Neither — for holders that already carry the church's own artwork.      |
+
+**The mark** is the logo from The cover, printed small, medium or large — or
+not at all. **Colour** sets the band, the hairline and the line under the name;
+five of the colours a church badge is usually printed in are there to pick
+from, and any other colour can be chosen from the wheel beside them.
+
+### Fonts
+
+The name and the small print are set separately, in any of three faces:
+
+| Face       | What prints |
+| ---------- | ----------- |
+| Sans serif | Helvetica   |
+| Serif      | Times       |
+| Typewriter | Courier     |
+
+A tag is the one thing this app prints where mixing two faces is the point: a
+sans serif name reads across a hall better than anything else, and the church's
+name above it does not have to match. Tags are set apart from the book — a
+serif directory and plain sans serif tags is a perfectly ordinary thing to want,
+and the two settings no longer argue about it.
+
+All three are among the fonts every PDF reader already has, so nothing is
+downloaded, nothing is embedded, and a tag prints the same on the office laser
+printer as it does at the copy shop. That is also why there are three and not
+thirty.
+
+A colour too pale to read as small print is darkened for the line under the
+name, and the church's name on a band goes white or dark depending on what the
+band is — so a colour picked for how it looks cannot quietly produce a tag
+nobody can read.
 
 One tag per person: a family prints one for each of its members, not one for
 the household. Print on card if you have it — ordinary paper curls inside a
 holder.
+
+Nothing to type in yet? **/sample/tags** prints a sheet of tags for an invented
+congregation, with no database and no account, beside the sample book.

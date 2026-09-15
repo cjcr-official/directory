@@ -28,7 +28,9 @@ function runStyle(run: TextRun, fontStack: string): React.CSSProperties {
     width: `${run.w}pt`,
     fontSize: `${run.size}pt`,
     lineHeight: 1,
-    fontFamily: fontStack,
+    // A run that names its own family gets it - which is how a name tag shows
+    // its name and its small print in the two faces it will print in.
+    fontFamily: run.face ? (CSS_FONT_STACKS[run.face] ?? fontStack) : fontStack,
     fontWeight: run.weight === "bold" ? 700 : 400,
     fontStyle: run.weight === "italic" ? "italic" : "normal",
     color: run.color,

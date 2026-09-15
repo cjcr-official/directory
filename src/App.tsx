@@ -132,6 +132,7 @@ function Protected() {
           <Route path="projects/:id/preview" element={<ProjectPreviewPage />} />
           <Route path="projects/:id/tags" element={<ProjectPreviewPage tags />} />
           <Route path="sample" element={<SamplePage />} />
+          <Route path="sample/tags" element={<SamplePage tags />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </DirectoryGate>
@@ -155,6 +156,7 @@ export function App() {
           // a sample book to see what they are signing up for.
           <Routes>
             <Route path="/sample" element={<SamplePage />} />
+            <Route path="/sample/tags" element={<SamplePage tags />} />
             <Route path="*" element={<SetupPage />} />
           </Routes>
         )}
