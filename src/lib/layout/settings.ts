@@ -23,7 +23,7 @@ export type TagSizeName = "badge4x3" | "badge3x4" | "avery5395";
  * middle of the tag and the same line at the foot, so switching between them
  * cannot make a name that fitted stop fitting.
  *
- *  - `classic` the mark at the left, the church's name at the right, a hairline
+ *  - `classic` the logo at the left, the church's name at the right, a hairline
  *    under both.
  *  - `banner`  the same two on a band of colour across the top, reversed out.
  *  - `plain`   neither: the name has the whole tag. For holders and lanyards
@@ -31,7 +31,7 @@ export type TagSizeName = "badge4x3" | "badge3x4" | "avery5395";
  */
 export type TagStyle = "classic" | "banner" | "plain";
 
-/** How big the mark is printed, as a share of the tag's height. */
+/** How big the logo is printed, as a share of the tag's height. */
 export type TagLogoSize = "none" | "small" | "medium" | "large";
 
 /**
@@ -368,18 +368,9 @@ export const TAG_SIZES: Record<TagSizeName, { w: number; h: number; label: strin
 
 /** The styles, as they are offered on screen. */
 export const TAG_STYLES: Record<TagStyle, { label: string; hint: string }> = {
-  classic: {
-    label: "Classic",
-    hint: "The mark at the left, the church's name at the right, on the paper.",
-  },
-  banner: {
-    label: "Banner",
-    hint: "The same on a band of colour, with the church's name reversed out of it.",
-  },
-  plain: {
-    label: "Just the name",
-    hint: "No mark and no heading — for holders that already carry the church's own.",
-  },
+  classic: { label: "Classic", hint: "Logo left, church name right, on the paper." },
+  banner: { label: "Banner", hint: "The same on a coloured band, reversed out." },
+  plain: { label: "Name only", hint: "No logo, no church name." },
 };
 
 /**
