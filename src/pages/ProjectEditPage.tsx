@@ -32,6 +32,7 @@ import {
   recordsPerSheet,
   type CardStyle,
   type PageSizeName,
+  type TagHeadingSize,
   type TagLogoSize,
   type TagSizeName,
   type TagStyle,
@@ -728,6 +729,25 @@ export function ProjectEditPage() {
 
               <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <Field
+                  label="The church's name"
+                  htmlFor="tag_heading_size"
+                  hint="How big it prints above the name."
+                >
+                  <select
+                    id="tag_heading_size"
+                    value={settings.tagHeadingSize}
+                    disabled={!canEdit || settings.tagStyle === "plain"}
+                    onChange={(event) =>
+                      set({ tagHeadingSize: event.target.value as TagHeadingSize })
+                    }
+                  >
+                    <option value="small">Small</option>
+                    <option value="medium">Medium</option>
+                    <option value="large">Large</option>
+                  </select>
+                </Field>
+
+                <Field
                   label="The mark"
                   htmlFor="tag_logo_size"
                   hint={
@@ -787,6 +807,16 @@ export function ProjectEditPage() {
                   ) : null}
                 </Field>
               </div>
+
+              {safeSettings.tagStyle === "classic" ? (
+                <Checkbox
+                  label="A line under the heading"
+                  hint="A hairline in the colour above, between the church's name and the person's. Most printed badges have none."
+                  checked={settings.tagHeadRule}
+                  disabled={!canEdit}
+                  onChange={(value) => set({ tagHeadRule: value })}
+                />
+              ) : null}
 
               <Field
                 label="The line underneath"

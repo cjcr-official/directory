@@ -35,6 +35,16 @@ export type TagStyle = "classic" | "banner" | "plain";
 export type TagLogoSize = "none" | "small" | "medium" | "large";
 
 /**
+ * How big the church's name is printed, as a share of the tag's width.
+ *
+ * Its own setting rather than a constant because this is the line that decides
+ * whether a tag reads as the church's or as the app's. Ten point is a caption
+ * under a forty point name; eighteen is a masthead, which is what a church that
+ * has been printing its own tags in Word tends to have.
+ */
+export type TagHeadingSize = "small" | "medium" | "large";
+
+/**
  * Everything about how one project prints. Stored as JSON in projects.settings,
  * so adding a field here only needs a default below - no migration.
  */
@@ -65,6 +75,14 @@ export type ProjectSettings = {
    */
   tagNameFont: Typeface;
   tagSmallFont: Typeface;
+  tagHeadingSize: TagHeadingSize;
+  /**
+   * A hairline between the heading and the name.
+   *
+   * Off by default. It tidies a tag that has a lot of white in the middle of
+   * it, and it is one more thing on a tag that most churches print without.
+   */
+  tagHeadRule: boolean;
   /** The band, the hairline and the line under the name, as #rrggbb. */
   tagAccent: string;
   tagLogoSize: TagLogoSize;
@@ -142,6 +160,8 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   // one job Helvetica is better at than Times.
   tagNameFont: "sans",
   tagSmallFont: "sans",
+  tagHeadingSize: "medium",
+  tagHeadRule: false,
   tagAccent: "#2f6d63",
   tagLogoSize: "medium",
   pageSize: "letter",
@@ -209,6 +229,8 @@ export function normalizeSettings(raw: unknown): ProjectSettings {
   if (!TYPEFACES.includes(merged.tagSmallFont)) merged.tagSmallFont = DEFAULT_SETTINGS.tagSmallFont;
   if (!["none", "small", "medium", "large"].includes(merged.tagLogoSize))
     merged.tagLogoSize = "medium";
+  if (!["small", "medium", "large"].includes(merged.tagHeadingSize))
+    merged.tagHeadingSize = "medium";
   merged.tagAccent = normalizeHex(merged.tagAccent, DEFAULT_SETTINGS.tagAccent);
   if (!["letter", "a4", "legal"].includes(merged.pageSize)) merged.pageSize = "letter";
   if (!["fill", "fit"].includes(merged.photoFit)) merged.photoFit = "fill";
@@ -265,7 +287,7 @@ export const TAG_SIZES: Record<TagSizeName, { w: number; h: number; label: strin
 export const TAG_STYLES: Record<TagStyle, { label: string; hint: string }> = {
   classic: {
     label: "Classic",
-    hint: "The mark and the church's name across the top, a hairline under them.",
+    hint: "The mark at the left, the church's name at the right, on the paper.",
   },
   banner: {
     label: "Banner",
@@ -275,6 +297,20 @@ export const TAG_STYLES: Record<TagStyle, { label: string; hint: string }> = {
     label: "Just the name",
     hint: "No mark and no heading — for holders that already carry the church's own.",
   },
+};
+
+/**
+ * The church's name, as a share of the tag's width.
+ *
+ * Measured off a tag this app was asked to match: "Plains Alliance Church"
+ * across a 4in badge sets at about eighteen point, which is `large`. The old
+ * fixed size was `small`, and beside a thirty-six point name it read as a
+ * footnote rather than as whose tag this is.
+ */
+export const TAG_HEADING_SHARES: Record<TagHeadingSize, number> = {
+  small: 0.037,
+  medium: 0.05,
+  large: 0.063,
 };
 
 /**

@@ -4,6 +4,7 @@ import type { DirectoryEntry } from "../entries";
 import { truncate, wrapText, type FontWeight, type Metrics } from "./metrics";
 import {
   PAGE_SIZES,
+  TAG_HEADING_SHARES,
   TAG_SIZES,
   type ProjectSettings,
   type TagLogoSize,
@@ -116,7 +117,7 @@ export function planTag(settings: ProjectSettings, metrics: Metrics): TagPlan {
           // Beside a mark the church's name has what is left of the width; on
           // its own it has all of it.
           inner - (logo ? logo + pad * 0.6 : 0),
-          clamp(width * 0.037, 8, 13),
+          clamp(width * TAG_HEADING_SHARES[settings.tagHeadingSize], 8, 22),
           6.5,
           "bold",
           smallFace,
@@ -129,13 +130,16 @@ export function planTag(settings: ProjectSettings, metrics: Metrics): TagPlan {
     height * HEAD_MAX_SHARE,
   );
 
+  // Bold, like the line on every printed badge this was measured against: at
+  // seven or eight point in a colour, regular weight goes thin enough on a
+  // laser printer to read as a smudge rather than as words.
   const tagline = settings.tagLine.trim()
     ? fitOneLine(
         settings.tagLine.trim(),
         inner,
         clamp(width * 0.03, 6.5, 10),
         5.5,
-        "regular",
+        "bold",
         smallFace,
         metrics,
       )
@@ -167,9 +171,9 @@ export function planTag(settings: ProjectSettings, metrics: Metrics): TagPlan {
     headHeight,
     banner:
       banner && headHeight ? { x: bleed, y: bleed, w: width - 2 * bleed, h: bandHeight } : null,
-    // A hairline only where there is something above it to underline, and never
+    // Asked for, and only where there is something above it to underline. Never
     // under a band - the band is already the line.
-    rule: headHeight && !banner ? headBottom + pad * 0.42 : null,
+    rule: headHeight && !banner && settings.tagHeadRule ? headBottom + pad * 0.42 : null,
     church: church ? { ...church, color: churchColor } : null,
     tagline: tagline ? { ...tagline, color: inkOn(accent, COLORS.paper) } : null,
     nameTop,
@@ -313,7 +317,7 @@ function placeTag(
       y: y + height - pad - metrics.lineHeight(plan.tagline.size),
       w: inner,
       size: plan.tagline.size,
-      weight: "regular",
+      weight: "bold",
       color: plan.tagline.color,
       align: "center",
       text: plan.tagline.text,
