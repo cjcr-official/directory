@@ -52,6 +52,16 @@ export interface TextRun {
   color: string;
   align: Align;
   text: string;
+  /**
+   * The family this run is set in, when it is not the document's own.
+   *
+   * A book is one family throughout and leaves this alone. A name tag sets the
+   * name in one and the small print in another, and both renderers read it from
+   * here - so the line was measured, drawn on screen and printed in the same
+   * face, rather than measured in one and printed in whichever the document
+   * happened to carry.
+   */
+  face?: Typeface;
 }
 
 export interface PhotoSlot {
@@ -133,6 +143,9 @@ export interface BookModel {
 }
 
 export const COLORS = {
+  /** The paper. Named, because a tag reverses text out of a band and has to
+      know what white it is putting back. */
+  paper: "#ffffff",
   ink: "#14201f",
   strong: "#0f1a19",
   muted: "#4a5a58",

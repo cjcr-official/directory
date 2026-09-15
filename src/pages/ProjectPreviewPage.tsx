@@ -67,7 +67,10 @@ export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
           wholeFamily: settings.groupWholeFamily,
         });
 
-        const metrics = await loadMetrics(settings.typeface);
+        // Tags are set in their own faces, and can be set in two at once, so
+        // the family the measurements default to is the tag's rather than the
+        // book's. Either way the loaded metrics can measure in any of them.
+        const metrics = await loadMetrics(tags ? settings.tagNameFont : settings.typeface);
         if (!active) return;
 
         // Both composers hand back the same model, so the preview, the photo
