@@ -917,6 +917,20 @@ async function main() {
           churchName: "Plains Alliance Church",
           tagLine: "We are a Christ-centered Acts 1:8 Family",
           coverLogoPath: "covers/logo.jpg",
+          tagHeadRule: true,
+        },
+      },
+      {
+        // The biggest heading over the longest line, which is where the name
+        // band gets squeezed from both ends at once.
+        label: "masthead",
+        over: {
+          tagStyle: "classic",
+          churchName: "Plains Alliance Church",
+          tagLine: "We are a Christ-centered Acts 1:8 Family",
+          coverLogoPath: "covers/logo.jpg",
+          tagHeadingSize: "large",
+          tagLogoSize: "large",
         },
       },
       {

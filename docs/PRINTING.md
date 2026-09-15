@@ -150,16 +150,27 @@ on it.
 
 **Style** decides what sits above the name:
 
-| Style         | What it looks like                                                      |
-| ------------- | ----------------------------------------------------------------------- |
-| Classic       | The mark at the left, the church's name at the right, a hairline under. |
-| Banner        | The same on a band of colour, the church's name reversed out of it.     |
-| Just the name | Neither — for holders that already carry the church's own artwork.      |
+| Style         | What it looks like                                                  |
+| ------------- | ------------------------------------------------------------------- |
+| Classic       | The mark at the left, the church's name at the right, on the paper. |
+| Banner        | The same on a band of colour, the church's name reversed out of it. |
+| Just the name | Neither — for holders that already carry the church's own artwork.  |
+
+**The church's name** prints small, medium or large. Large is about eighteen
+point across a 4" badge, which is the size a church that has been printing its
+own tags in Word usually has; small is a caption under the name rather than a
+masthead over it.
 
 **The mark** is the logo from The cover, printed small, medium or large — or
-not at all. **Colour** sets the band, the hairline and the line under the name;
-five of the colours a church badge is usually printed in are there to pick
-from, and any other colour can be chosen from the wheel beside them.
+not at all. **Colour** sets the band, the line under the name, and the hairline
+under the heading if you turn that on — most printed badges have none, so it is
+off unless asked for. Five of the colours a church badge is usually printed in
+are there to pick from, and any other colour can be chosen from the wheel
+beside them.
+
+The line under the name prints bold: at seven or eight point in a colour,
+regular weight goes thin enough on a laser printer to read as a smudge rather
+than as words.
 
 ### Fonts
 
