@@ -271,7 +271,7 @@ export function BookPreview({
 const PX_PER_PT = 96 / 72;
 
 /**
- * One page, drawn on its own, sized to whatever width it is given.
+ * One page, drawn on its own, fitted to the box it is given.
  *
  * The book preview draws sheets - a whole piece of paper, six records on it,
  * fold lines down the middle, captioned "Sheet 1 of 4". That is the right
@@ -289,51 +289,54 @@ export function CoverCanvas({
   height,
   photoUrls,
   typeface,
-  maxHeight,
 }: {
   page: BookPage;
   width: number;
   height: number;
   photoUrls: Map<string, string>;
   typeface: Typeface;
-  /**
-   * A ceiling in CSS pixels. A cover is a tall portrait page, so filling the
-   * width of the column it sits in makes it about 740px of paper - taller than
-   * everything else on the page put together, and enough to push its own column
-   * a long way past the ones beside it. Whichever of width and this is the
-   * tighter constraint decides the scale.
-   */
-  maxHeight?: number;
 }) {
   const holder = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.5);
   const fontStack = CSS_FONT_STACKS[typeface] ?? CSS_FONT_STACKS.sans;
 
   /*
-   * Measured, not assumed. This sits in a column that is three across on a desk
-   * monitor, two on a laptop and one on a phone, so the width it is given is
-   * not knowable here - only askable. The holder is a full-width block, so its
-   * own width never depends on the page inside it and this cannot chase itself.
+   * Measured, not assumed - in both directions.
+   *
+   * The holder is drawn a box by the stylesheet and the paper is fitted inside
+   * it, whichever of the two edges is the tighter. That is what lets the same
+   * canvas be a column-wide picture on a phone and fill a pinned preview pane
+   * on a desk without either of them naming a number of pixels here: on a
+   * phone the box carries the paper's own proportions and the width decides,
+   * and in a pane that is as tall as the window the height does.
+   *
+   * It matters that the box is never sized by what is in it - `aspect-ratio`
+   * on a phone, a stretched flex item in a pane - because this reads the box
+   * back to decide what to put in it. A box that hugged its contents would
+   * only ever confirm the scale it already had.
    */
   useEffect(() => {
+    const box = holder.current;
+    if (!box) return;
     const measure = () => {
-      const available = holder.current?.clientWidth ?? 0;
-      if (available <= 0) return;
-      setScale(
-        Math.min(
-          1,
-          available / (width * PX_PER_PT),
-          maxHeight ? maxHeight / (height * PX_PER_PT) : Infinity,
-        ),
-      );
+      const room = { width: box.clientWidth, height: box.clientHeight };
+      if (room.width <= 0 || room.height <= 0) return;
+      setScale(Math.min(1, room.width / (width * PX_PER_PT), room.height / (height * PX_PER_PT)));
     };
     measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, [width, height, maxHeight]);
+    const watch = new ResizeObserver(measure);
+    watch.observe(box);
+    return () => watch.disconnect();
+  }, [width, height]);
 
   return (
-    <div ref={holder} className="cover-canvas">
+    <div
+      ref={holder}
+      className="cover-canvas"
+      /* The paper's own proportions, for the stylesheet to shape the box with
+         where nothing else is deciding its height. */
+      style={{ "--paper": `${width} / ${height}` } as React.CSSProperties}
+    >
       <div
         className="cover-canvas-paper"
         style={{

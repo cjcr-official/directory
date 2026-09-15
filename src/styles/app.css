@@ -2331,42 +2331,48 @@ th.num {
   border-left: 1px dashed rgb(20 32 31 / 26%);
 }
 
-/* --- the cover, on the page that edits it -------------------------------- */
+/* --- the cover and the tag, on the pages that edit them ------------------ */
 
+.cover-figure {
+  margin: 0 0 16px;
+}
+
+/*
+ * The box the paper is fitted into.
+ *
+ * It is drawn first and the sheet is scaled to whatever it turns out to be -
+ * so this must never be a box that hugs its own contents, or the measurement
+ * inside would only ever confirm the scale it already had. Where nothing else
+ * is deciding, the paper's own proportions do: the canvas takes the width it
+ * is given and this makes it exactly as tall as a sheet that wide, which is
+ * what it came to when it was sized by the sheet itself.
+ *
+ * Centred both ways for when the other edge is the tighter one and the sheet
+ * comes out smaller than the box holding it. Nothing is clipped here - the
+ * paper's own shadow falls outside this box on whichever edge it is touching,
+ * and the card around it has the padding to take it.
+ */
+.cover-canvas {
+  width: 100%;
+  aspect-ratio: var(--paper);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* How much of a column a page may take before it stops growing with it. A
+   cover is a tall portrait page, so filling the width of a column makes it
+   about 740px of paper - taller than everything else on the page put
+   together. Lifted in the pinned pane below, which has a height of its own to
+   fill and no column beneath it to push out of line. */
+.cover-figure .cover-canvas {
+  max-height: 640px;
+}
 /*
  * The same paper as the preview screen, lit differently. That shadow is built
  * for a sheet lying on a near-black canvas and would be a bruise on a white
  * card; here the paper only has to be told apart from the card behind it, which
  * a hairline and a hint of lift do.
  */
-/*
- * The cover holds the last column, and holds it while the settings beside it
- * are scrolled: the point of drawing it on this page is that it can be watched
- * while the fields that change it are being filled in, and a preview that has
- * scrolled off the top is a preview you have to go and find.
- *
- * Sticky sits on the card, not on the column. A sticky box can only travel
- * inside the box that contains it, and a grid item that is only as tall as its
- * own contents contains nothing to travel through - so the column stretches to
- * the row (which is why the grid no longer sets align-items: start) and the
- * card moves within it.
- */
-.cover-stage > .card {
-  position: sticky;
-  top: 16px;
-}
-
-.cover-figure {
-  margin: 0 0 16px;
-}
-/* Full width so the measurement inside can never chase its own content, and the
-   paper centred within it for when the height is what limits the scale and the
-   sheet comes out narrower than the column holding it. */
-.cover-canvas {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-}
 .cover-canvas-paper {
   position: relative;
   overflow: hidden;
@@ -2379,13 +2385,10 @@ th.num {
   margin-top: 8px;
 }
 
-/* --- the name tag, on the panel that sets it ----------------------------- */
-
 /*
- * Drawn inside the panel rather than out in the cover's column, because a tag
- * is small enough to sit above its own settings and that is where it is being
- * looked at: the colour, the two faces and the size are all things you change
- * and then look straight back at.
+ * The tag, on its own little ground: a badge is a small rectangle and a small
+ * rectangle floating on a white card reads as an icon rather than as a thing
+ * that will be cut out of paper.
  */
 .tag-figure {
   margin: 0 0 18px;
@@ -2394,27 +2397,147 @@ th.num {
   border: 1px solid var(--line);
   border-radius: 10px;
 }
+.tag-figure .cover-canvas {
+  max-height: 300px;
+}
 .tag-figure figcaption {
   margin-top: 10px;
   text-align: center;
 }
 
-/*
- * The drawn tag, staying put while the settings beside it scroll.
+/* --- two columns on a desk: settings that scroll, a preview that does not --
  *
- * Every setting on this screen is a question the drawing answers - is that
- * name still readable, does the church name still fit beside the logo - and
- * answering it should not mean scrolling back up. It can be pinned where the
- * cover cannot: a tag is small, so the panel is well short of a window's
- * height and nothing inside it can end up out of reach.
+ * The directory's form and the name tags' form are the same screen twice: a
+ * long run of settings, and one drawing that answers every question they ask.
+ * Laid out as ordinary cards flowing into an auto-fit grid, the two of them
+ * took turns being the taller column and the page reshuffled itself whenever a
+ * panel was opened - and the drawing, being the tallest single thing on the
+ * page, dragged its column past everything beside it.
  *
- * Only once there are two columns. Stuck in a single-column phone layout it
- * would travel the height of the settings below it and sit over them.
+ * So on a desk these two pages stop being a document that scrolls and become
+ * two panes that do not. The window holds the page, the settings scroll inside
+ * their own column on the left, and the preview keeps the right-hand column at
+ * whatever height the window is. Nothing below the fold, nothing to scroll
+ * back up to, and no column height for another column to have to match.
+ *
+ * On anything narrower they are one column again, in the order the page reads
+ * in - which is the phone, and is also a desk window too short to split.
  */
-@media (min-width: 900px) {
-  .tag-stage > .card {
-    position: sticky;
-    top: 16px;
+.desk {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr);
+  margin-top: 16px;
+  /* A form stacked into one column has no second column to spend a wide
+     screen on, and a 1200px-wide single-line field helps nobody. */
+  max-width: 820px;
+}
+
+/* The drawing leads on the name tags screen, where every setting is a question
+   about it and there is nothing else on the page to lead with. The directory's
+   cover preview does not: its form opens with what the directory is called and
+   who is in it, neither of which the cover can answer. */
+.desk.lead-stage .desk-stage {
+  order: -1;
+}
+
+/*
+ * A desk, said three ways: wide enough for two columns, tall enough that the
+ * shorter of them is still worth having, and driven by a mouse.
+ *
+ * The last is the one that needs explaining. A page pinned to the height of
+ * the window is the thing this app has been bitten by most often on iOS -
+ * where the window is not the height it says it is, and where the browser's
+ * own chrome comes and goes as you scroll. A tablet keeps the page that
+ * flows, which is the layout that has been proven on it. Short of either
+ * measure, so does a desk: nothing is lost but the split.
+ */
+@media (min-width: 1000px) and (min-height: 560px) and (pointer: fine) {
+  /*
+   * The page becomes the window: a head that stays put, and under it two
+   * panes that divide what is left. Nothing here scrolls but the settings.
+   */
+  .page.desk-page {
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 22px;
+    overflow: hidden;
+  }
+  .desk-page > form {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  /*
+   * The settings take a column's worth and stop; the stage takes the rest.
+   *
+   * Capped rather than 1fr because the settings are the half made of single
+   * lines of text, and an 800px-wide "Footer note" is not what the width of a
+   * desk monitor should be spent on - 660 is about the measure the form's own
+   * cards were already coming out at. What is over goes to the stage, where it
+   * becomes the mat around the paper rather than empty page: the sheet is
+   * nearly always as tall as the pane will allow by then, so extra width there
+   * buys no more drawing, only somewhere to put it.
+   */
+  .desk {
+    flex: 1;
+    min-height: 0;
+    max-width: none;
+    grid-template-columns: minmax(0, 660px) minmax(320px, 1fr);
+    /* minmax(0, 1fr), not auto: a single row sized by its content would be
+       held open by whichever pane is taller and take the page with it. */
+    grid-template-rows: minmax(0, 1fr);
+  }
+  /* Order is the grid's on a desk - the stage is the right-hand column on both
+     screens, whatever each of them leads with when stacked. */
+  .desk.lead-stage .desk-stage {
+    order: 0;
+  }
+
+  /* The one scroller on the page. The padding is for the scrollbar, which
+     would otherwise be drawn over the right edge of every card. */
+  .desk-settings {
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 14px;
+    padding-bottom: 24px;
+  }
+
+  /* The pane that does not scroll: the card fills it, and the drawing inside
+     takes whatever is left once the head and the caption have had theirs. */
+  .desk-stage {
+    min-height: 0;
+  }
+  .desk-stage > .card {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .desk-stage > .card > .card-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .desk-stage .cover-figure,
+  .desk-stage .tag-figure {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0;
+  }
+  /* Stretched to the pane rather than shaped by the paper, and with the
+     ceiling lifted: the pane's own height is the ceiling now. */
+  .desk-stage .cover-canvas {
+    flex: 1;
+    min-height: 0;
+    aspect-ratio: auto;
+    max-height: none;
   }
 }
 

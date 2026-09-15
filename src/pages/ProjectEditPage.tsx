@@ -423,7 +423,7 @@ export function ProjectEditPage() {
   }
 
   return (
-    <div className="page form">
+    <div className="page form desk-page">
       <div className="page-head">
         <div className="grow">
           <h1>{isNew ? "New directory" : name}</h1>
@@ -481,18 +481,18 @@ export function ProjectEditPage() {
       {savedAt ? <Notice kind="ok">Saved. Open the preview to see it laid out.</Notice> : null}
 
       <form onSubmit={save}>
-        <div className="grid two" style={{ marginTop: 16 }}>
-          {/* Two columns of settings and the cover in the third. The three
-              panels that open are kept together and kept last in this column
-              on purpose: opening one then only lengthens the column it is in,
-              downwards, past everything already read. Split between the two
-              columns they would take turns being the longer one, and the page
-              would reshuffle itself every time somebody looked inside a panel.
+        {/* Everything that sets the book on the left, the book itself on the
+            right. The settings scroll inside their own column and the drawing
+            stays where it is - which is the whole point of drawing it here,
+            since every field on this form is described in words ("the big
+            line", "the foot of the cover") and words are a poor way to know
+            whether a title has come out too long for its own page.
 
-              It is also why the grid no longer holds its items to the top -
-              stretching them is what gives the sticky cover a column tall
-              enough to travel in. */}
-          <div>
+            The three panels that open are kept together and kept last: opening
+            one then only lengthens the column below what has already been
+            read, rather than moving anything beside it. */}
+        <div className="desk">
+          <div className="desk-settings">
             <div className="card">
               <div className="card-head">
                 <h2>About this directory</h2>
@@ -602,6 +602,133 @@ export function ProjectEditPage() {
                     Everyone marked “include in printed directories” prints, in alphabetical order.
                   </p>
                 ) : null}
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="card-head">
+                <h2>The cover</h2>
+              </div>
+              {/* In the order it prints, top of the cover to the bottom, so
+                  filling the form in reads down the page it makes. */}
+              <div className="card-body">
+                <div className="grid two">
+                  {/* One hint apiece: PhotoInput carries its own, so a hint on
+                      the Field as well just stacks two paragraphs under every
+                      picture. */}
+                  <Field label="Logo">
+                    <PhotoInput
+                      path={coverRemoved.logo ? null : settings.coverLogoPath || null}
+                      initials=""
+                      shape="square"
+                      hint="Sits at the very top, any shape — fitted whole, never cropped."
+                      disabled={!canEdit}
+                      onChange={(blob, removed) => {
+                        setCoverBlobs((current) => ({ ...current, logo: blob }));
+                        setCoverRemoved((current) => ({ ...current, logo: removed }));
+                      }}
+                    />
+                  </Field>
+                  <Field label="Photograph">
+                    <PhotoInput
+                      path={coverRemoved.photo ? null : settings.coverPhotoPath || null}
+                      initials=""
+                      shape="wide"
+                      hint="Under the title — the building, or the sign. Landscape prints best, and large photos are shrunk automatically."
+                      disabled={!canEdit}
+                      onChange={(blob, removed) => {
+                        setCoverBlobs((current) => ({ ...current, photo: blob }));
+                        setCoverRemoved((current) => ({ ...current, photo: removed }));
+                      }}
+                    />
+                  </Field>
+                </div>
+
+                {/* The three short lines across the top of the cover: a
+                    name, a title, a season. Three across because there
+                    are three of them and none is longer than a few
+                    words - a row of the thing being described. */}
+                <div className="grid three">
+                  <Field
+                    label="Church name"
+                    hint="Small, above the title — and along the top of every page inside."
+                    htmlFor="church_name"
+                  >
+                    <input
+                      id="church_name"
+                      type="text"
+                      value={settings.churchName}
+                      placeholder="Fairhaven Community Church"
+                      disabled={!canEdit}
+                      onChange={(event) => set({ churchName: event.target.value })}
+                    />
+                  </Field>
+
+                  <Field label="Title" hint="The big line." htmlFor="cover_title">
+                    <input
+                      id="cover_title"
+                      type="text"
+                      value={settings.coverTitle}
+                      placeholder="Church Directory"
+                      disabled={!canEdit}
+                      onChange={(event) => set({ coverTitle: event.target.value })}
+                    />
+                  </Field>
+                  <Field label="Subtitle" hint="A season or a year." htmlFor="cover_subtitle">
+                    <input
+                      id="cover_subtitle"
+                      type="text"
+                      value={settings.coverSubtitle}
+                      placeholder="Spring 2026"
+                      disabled={!canEdit}
+                      onChange={(event) => set({ coverSubtitle: event.target.value })}
+                    />
+                  </Field>
+                </div>
+
+                {/* The two paragraphs, which want the room the short
+                    lines above do not. */}
+                <div className="grid two">
+                  <Field
+                    label="In your own words"
+                    hint="A vision, a welcome, a verse. Its own paragraph, under the photograph."
+                    htmlFor="cover_statement"
+                  >
+                    <textarea
+                      id="cover_statement"
+                      rows={4}
+                      value={settings.coverStatement}
+                      placeholder={"OUR MISSION\nTo know Christ, and to make him known."}
+                      disabled={!canEdit}
+                      onChange={(event) => set({ coverStatement: event.target.value })}
+                    />
+                  </Field>
+
+                  <Field
+                    label="How to reach the church"
+                    hint="The foot of the cover. One line here is one line there."
+                    htmlFor="cover_contact"
+                  >
+                    <textarea
+                      id="cover_contact"
+                      rows={5}
+                      value={settings.coverContact}
+                      placeholder={
+                        "123 Main Street\nPO Box 100\nFairhaven, OH 44092\n(216) 555-0142\noffice@example.org"
+                      }
+                      disabled={!canEdit}
+                      onChange={(event) => set({ coverContact: event.target.value })}
+                    />
+                  </Field>
+                </div>
+
+                <Checkbox
+                  label="Print a cover page"
+                  hint="Off prints the records straight away, with no cover."
+                  checked={settings.includeCover}
+                  disabled={!canEdit}
+                  onChange={(value) => set({ includeCover: value })}
+                />
               </div>
             </div>
 
@@ -851,143 +978,45 @@ export function ProjectEditPage() {
                 onChange={(value) => set({ showPageNumbers: value })}
               />
             </Disclosure>
-          </div>
 
-          <div>
-            <div className="card">
-              <div className="card-head">
-                <h2>The cover</h2>
+            {canEdit ? (
+              <div className="row" style={{ marginTop: 18 }}>
+                <button type="submit" className="btn primary" disabled={saving}>
+                  {saving ? "Saving…" : isNew ? "Create directory" : "Save changes"}
+                </button>
+                {!isNew ? (
+                  <Link className="btn" to={`/projects/${id}/preview`}>
+                    Preview &amp; print
+                  </Link>
+                ) : null}
+                <Link className="btn ghost" to="/projects">
+                  Back
+                </Link>
               </div>
-              {/* In the order it prints, top of the cover to the bottom, so
-                  filling the form in reads down the page it makes. */}
-              <div className="card-body">
-                <div className="grid two">
-                  {/* One hint apiece: PhotoInput carries its own, so a hint on
-                      the Field as well just stacks two paragraphs under every
-                      picture. */}
-                  <Field label="Logo">
-                    <PhotoInput
-                      path={coverRemoved.logo ? null : settings.coverLogoPath || null}
-                      initials=""
-                      shape="square"
-                      hint="Sits at the very top, any shape — fitted whole, never cropped."
-                      disabled={!canEdit}
-                      onChange={(blob, removed) => {
-                        setCoverBlobs((current) => ({ ...current, logo: blob }));
-                        setCoverRemoved((current) => ({ ...current, logo: removed }));
-                      }}
-                    />
-                  </Field>
-                  <Field label="Photograph">
-                    <PhotoInput
-                      path={coverRemoved.photo ? null : settings.coverPhotoPath || null}
-                      initials=""
-                      shape="wide"
-                      hint="Under the title — the building, or the sign. Landscape prints best, and large photos are shrunk automatically."
-                      disabled={!canEdit}
-                      onChange={(blob, removed) => {
-                        setCoverBlobs((current) => ({ ...current, photo: blob }));
-                        setCoverRemoved((current) => ({ ...current, photo: removed }));
-                      }}
-                    />
-                  </Field>
-                </div>
+            ) : (
+              <Notice kind="warn">
+                You have read-only access. You can still preview and print.
+              </Notice>
+            )}
 
-                {/* The three short lines across the top of the cover: a
-                    name, a title, a season. Three across because there
-                    are three of them and none is longer than a few
-                    words - a row of the thing being described. */}
-                <div className="grid three">
-                  <Field
-                    label="Church name"
-                    hint="Small, above the title — and along the top of every page inside."
-                    htmlFor="church_name"
-                  >
-                    <input
-                      id="church_name"
-                      type="text"
-                      value={settings.churchName}
-                      placeholder="Fairhaven Community Church"
-                      disabled={!canEdit}
-                      onChange={(event) => set({ churchName: event.target.value })}
-                    />
-                  </Field>
-
-                  <Field label="Title" hint="The big line." htmlFor="cover_title">
-                    <input
-                      id="cover_title"
-                      type="text"
-                      value={settings.coverTitle}
-                      placeholder="Church Directory"
-                      disabled={!canEdit}
-                      onChange={(event) => set({ coverTitle: event.target.value })}
-                    />
-                  </Field>
-                  <Field label="Subtitle" hint="A season or a year." htmlFor="cover_subtitle">
-                    <input
-                      id="cover_subtitle"
-                      type="text"
-                      value={settings.coverSubtitle}
-                      placeholder="Spring 2026"
-                      disabled={!canEdit}
-                      onChange={(event) => set({ coverSubtitle: event.target.value })}
-                    />
-                  </Field>
-                </div>
-
-                {/* The two paragraphs, which want the room the short
-                    lines above do not. */}
-                <div className="grid two">
-                  <Field
-                    label="In your own words"
-                    hint="A vision, a welcome, a verse. Its own paragraph, under the photograph."
-                    htmlFor="cover_statement"
-                  >
-                    <textarea
-                      id="cover_statement"
-                      rows={4}
-                      value={settings.coverStatement}
-                      placeholder={"OUR MISSION\nTo know Christ, and to make him known."}
-                      disabled={!canEdit}
-                      onChange={(event) => set({ coverStatement: event.target.value })}
-                    />
-                  </Field>
-
-                  <Field
-                    label="How to reach the church"
-                    hint="The foot of the cover. One line here is one line there."
-                    htmlFor="cover_contact"
-                  >
-                    <textarea
-                      id="cover_contact"
-                      rows={5}
-                      value={settings.coverContact}
-                      placeholder={
-                        "123 Main Street\nPO Box 100\nFairhaven, OH 44092\n(216) 555-0142\noffice@example.org"
-                      }
-                      disabled={!canEdit}
-                      onChange={(event) => set({ coverContact: event.target.value })}
-                    />
-                  </Field>
-                </div>
-
-                <Checkbox
-                  label="Print a cover page"
-                  hint="Off prints the records straight away, with no cover."
-                  checked={settings.includeCover}
-                  disabled={!canEdit}
-                  onChange={(value) => set({ includeCover: value })}
+            {/* Deleting is not one of the ways to leave this page, so it does
+                not sit in the row that saves and goes back. */}
+            {canEdit && !isNew && id ? (
+              <div className="form-decision">
+                <ConfirmButton
+                  label="Delete directory"
+                  confirmLabel="Delete permanently"
+                  onConfirm={async () => {
+                    await deleteProject(id);
+                    await reload();
+                    navigate("/projects");
+                  }}
                 />
               </div>
-            </div>
+            ) : null}
           </div>
 
-          {/* The cover in the last column, staying put while the settings
-              beside it scroll. Every field on this page is described in
-              words - "the big line", "the foot of the cover" - and words
-              are a poor way to know whether a title has come out too long
-              for its own page. */}
-          <div className="cover-stage">
+          <div className="desk-stage">
             <div className="card">
               <div className="card-head">
                 <h2>As it will print</h2>
@@ -1001,7 +1030,6 @@ export function ProjectEditPage() {
                       height={coverPage.height}
                       photoUrls={coverUrls}
                       typeface={coverPage.typeface}
-                      maxHeight={640}
                     />
                     <figcaption className="hint">
                       {PAGE_SIZES[safeSettings.pageSize].label}, set in{" "}
@@ -1020,40 +1048,6 @@ export function ProjectEditPage() {
             </div>
           </div>
         </div>
-
-        {canEdit ? (
-          <div className="row" style={{ marginTop: 18 }}>
-            <button type="submit" className="btn primary" disabled={saving}>
-              {saving ? "Saving…" : isNew ? "Create directory" : "Save changes"}
-            </button>
-            {!isNew ? (
-              <Link className="btn" to={`/projects/${id}/preview`}>
-                Preview &amp; print
-              </Link>
-            ) : null}
-            <Link className="btn ghost" to="/projects">
-              Back
-            </Link>
-          </div>
-        ) : (
-          <Notice kind="warn">You have read-only access. You can still preview and print.</Notice>
-        )}
-
-        {/* Deleting is not one of the ways to leave this page, so it does not
-            sit in the row that saves and goes back. */}
-        {canEdit && !isNew && id ? (
-          <div className="form-decision">
-            <ConfirmButton
-              label="Delete directory"
-              confirmLabel="Delete permanently"
-              onConfirm={async () => {
-                await deleteProject(id);
-                await reload();
-                navigate("/projects");
-              }}
-            />
-          </div>
-        ) : null}
       </form>
     </div>
   );

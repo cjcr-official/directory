@@ -349,7 +349,7 @@ export function TagsEditPage() {
   }
 
   return (
-    <div className="page form">
+    <div className="page form desk-page">
       <div className="page-head">
         <div className="grow">
           <h1>{project.name}</h1>
@@ -413,51 +413,18 @@ export function TagsEditPage() {
           ))}
         </datalist>
 
-        {/* Down the tag, in the order it prints: the card itself, then the
-            header, the name, the line under it, and the paper it is all cut
-            out of. Two columns on a desk, one on a phone, and the same order
-            either way - which is also why the drawing has the first column to
-            itself. It is the tallest thing here, and the four cards of
-            settings beside it come to about its height. */}
-        {/* The drawing on the left, the settings on the right, in the order
-            the tag prints: the card itself, then its header, its name, the
-            line under it, and the paper it is cut out of. The drawing keeps a
-            column to itself and stays put while the settings scroll - every
-            one of them is a question the drawing answers, and answering it
-            should not mean scrolling back up. On a phone the columns stack and
-            the drawing simply leads. */}
-        <div className="grid two" style={{ marginTop: 16 }}>
-          <div className="tag-stage">
-            <section className="card" aria-labelledby="tags-preview">
-              <div className="card-head">
-                <h2 id="tags-preview">Preview</h2>
-              </div>
-              <div className="card-body">
-                {tagPreview ? (
-                  <figure className="tag-figure">
-                    <CoverCanvas
-                      page={tagPreview.page}
-                      width={tagPreview.width}
-                      height={tagPreview.height}
-                      photoUrls={logoUrls}
-                      typeface={tagPreview.typeface}
-                      maxHeight={300}
-                    />
-                    {/* Two facts rather than a sentence: which rectangle, and
-                        on whom. The second is the reason this is drawn on
-                        somebody the directory prints. */}
-                    <figcaption className="hint">
-                      {TAG_SIZES[safeSettings.tagSize].label} · {previewName}
-                    </figcaption>
-                  </figure>
-                ) : (
-                  <p className="hint tag-figure">Drawing the tag…</p>
-                )}
-              </div>
-            </section>
-          </div>
+        {/* The settings on the left, the tag itself on the right, and down
+            the tag in the order it prints: the card, then its header, its
+            name, the line under it, and the paper it is cut out of.
 
-          <div>
+            The settings scroll inside their own column and the drawing stays
+            where it is. Every setting here is a question the drawing answers -
+            is that name still readable, does the church name still fit beside
+            the logo - and answering it should not mean scrolling back up. On
+            a phone the two stack and the drawing leads, since there is nothing
+            else on this screen it could lead with. */}
+        <div className="desk lead-stage">
+          <div className="desk-settings">
             <section className="card" aria-labelledby="tags-tag">
               <div className="card-head">
                 <h2 id="tags-tag">Tag</h2>
@@ -715,33 +682,64 @@ export function TagsEditPage() {
                 </Field>
               </div>
             </section>
-          </div>
-        </div>
 
-        {/* Save and the way out. Preview & print is not repeated here - it is
-            in the head, and a screen with two of the same button has one of
-            them too many. */}
-        {canEdit ? (
-          <div className="row" style={{ marginTop: 18 }}>
-            <button type="submit" className="btn primary" disabled={saving}>
-              {saving ? "Saving…" : "Save changes"}
-            </button>
-            <Link className="btn ghost" to="/tags">
-              Back
-            </Link>
-          </div>
-        ) : (
-          <Notice kind="warn">You have read-only access. You can still preview and print.</Notice>
-        )}
+            {/* Save and the way out. Preview & print is not repeated here -
+                it is in the head, and a screen with two of the same button has
+                one of them too many. */}
+            {canEdit ? (
+              <div className="row" style={{ marginTop: 18 }}>
+                <button type="submit" className="btn primary" disabled={saving}>
+                  {saving ? "Saving…" : "Save changes"}
+                </button>
+                <Link className="btn ghost" to="/tags">
+                  Back
+                </Link>
+              </div>
+            ) : (
+              <Notice kind="warn">
+                You have read-only access. You can still preview and print.
+              </Notice>
+            )}
 
-        {/* Who is in the directory is the directory's own question - the same
-            list prints as a book - so it is asked once, there, and pointed at
-            from here rather than answered twice. */}
-        <div className="form-decision">
-          <p className="hint" style={{ marginBottom: 0 }}>
-            Everyone in this directory gets a tag.{" "}
-            <Link to={`/projects/${project.id}`}>Edit the directory</Link> to change who.
-          </p>
+            {/* Who is in the directory is the directory's own question - the
+                same list prints as a book - so it is asked once, there, and
+                pointed at from here rather than answered twice. */}
+            <div className="form-decision">
+              <p className="hint" style={{ marginBottom: 0 }}>
+                Everyone in this directory gets a tag.{" "}
+                <Link to={`/projects/${project.id}`}>Edit the directory</Link> to change who.
+              </p>
+            </div>
+          </div>
+
+          <div className="desk-stage">
+            <section className="card" aria-labelledby="tags-preview">
+              <div className="card-head">
+                <h2 id="tags-preview">Preview</h2>
+              </div>
+              <div className="card-body">
+                {tagPreview ? (
+                  <figure className="tag-figure">
+                    <CoverCanvas
+                      page={tagPreview.page}
+                      width={tagPreview.width}
+                      height={tagPreview.height}
+                      photoUrls={logoUrls}
+                      typeface={tagPreview.typeface}
+                    />
+                    {/* Two facts rather than a sentence: which rectangle, and
+                        on whom. The second is the reason this is drawn on
+                        somebody the directory prints. */}
+                    <figcaption className="hint">
+                      {TAG_SIZES[safeSettings.tagSize].label} · {previewName}
+                    </figcaption>
+                  </figure>
+                ) : (
+                  <p className="hint tag-figure">Drawing the tag…</p>
+                )}
+              </div>
+            </section>
+          </div>
         </div>
       </form>
     </div>
