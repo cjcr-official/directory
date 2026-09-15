@@ -171,7 +171,14 @@ export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
 
       <header className="preview-bar">
         <div className="preview-bar-main">
-          <Link className="preview-back" to={`/projects/${project.id}`} aria-label="Back">
+          {/* Back where this was opened from, which is now two different
+              screens: the tag sheet is reached from Name tags and set there,
+              the book from the directory's own page. */}
+          <Link
+            className="preview-back"
+            to={tags ? `/tags/${project.id}` : `/projects/${project.id}`}
+            aria-label="Back"
+          >
             <span aria-hidden>←</span>
           </Link>
           <div className="preview-titles">

@@ -20,6 +20,7 @@ import { GroupsPage } from "@/pages/GroupsPage";
 import { ProjectsPage } from "@/pages/ProjectsPage";
 import { ProjectEditPage } from "@/pages/ProjectEditPage";
 import { ProjectPreviewPage } from "@/pages/ProjectPreviewPage";
+import { TagsEditPage } from "@/pages/TagsEditPage";
 import { AdministratorsPage } from "@/pages/AdministratorsPage";
 import { BackupPage } from "@/pages/BackupPage";
 import { SettingsPage } from "@/pages/SettingsPage";
@@ -122,6 +123,7 @@ function Protected() {
             <Route path="groups" element={<GroupsPage />} />
             <Route path="projects" element={<ProjectsPage />} />
             <Route path="tags" element={<ProjectsPage tags />} />
+            <Route path="tags/:id" element={<TagsEditPage />} />
             <Route path="projects/new" element={<ProjectEditPage />} />
             <Route path="projects/:id" element={<ProjectEditPage />} />
             <Route path="settings" element={<SettingsPage />} />
