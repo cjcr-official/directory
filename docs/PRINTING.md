@@ -125,15 +125,16 @@ who is in the directory — add a family, drop a group — and the tags follow,
 because there is no second list to keep in step.
 
 Picking one opens how its tags look — the size, the style, the colour, the two
-faces, the church's name and the mark — and a **Preview & print** button beside
+fonts, the church name and the logo — and a **Preview & print** button beside
 them. That is the whole of it: nobody has to open the book's own form, past its
 cover and its index, to move a badge's heading down a size. The directory's page
 still says what its tags currently come to, and leads here.
 
-One tag is drawn at the top of that screen, at the size it prints, on somebody
-the directory actually prints — it redraws as you change anything, so the
-question "will that name still fit" is answered on the screen rather than at
-the guillotine.
+A tag is drawn in its own panel beside the settings, on somebody the directory
+actually prints, and stays in view as you work down them — so the question
+"will that name still fit" is answered on the screen rather than at the
+guillotine. The settings are grouped as the tag reads: **Tag**, **Header**,
+**Name**, **Footer line**, **Paper**.
 
 Tags print portrait, as many to a sheet as the paper holds, centred, with a
 pale line round each one to cut along. Pick the size to match the holders in
@@ -147,7 +148,7 @@ the cupboard rather than the paper:
 
 ### What is on a tag
 
-The mark and the church's name are the book's as well — a directory and its tags
+The logo and the church name are the book's as well — a directory and its tags
 carry the same one, and typing either here changes the cover too, which the
 screen says where it asks for them. Under them goes the person's name, as large
 as it will fit, and under that the tag's own line. A long name breaks over two
@@ -157,9 +158,10 @@ whatever the name on it.
 ### Type sizes
 
 All three texts on a tag are set in points, typed into a box the way Word asks
-for a font size — **Name size**, **Church name size** and **Line size**. Word's
-own ladder (8, 9, 10 … 36, 48, 72) is offered as suggestions, and any other
-number is allowed, in half points, from 6 to 96.
+for a font size — the **Size** under Name, **Church name size** under Header,
+and the **Size** under Footer line. Word's own ladder (8, 9, 10 … 36, 48, 72) is
+offered as suggestions, and any other number is allowed, in half points, from 6
+to 96.
 
 The number is the size. The one exception is a name too long for it: rather
 than run "Bartholomew Vanderst…" off the card, the name breaks over two lines
@@ -178,23 +180,24 @@ the points they came to on that directory's own tag.
 
 **Style** decides what sits above the name:
 
-| Style         | What it looks like                                                  |
-| ------------- | ------------------------------------------------------------------- |
-| Classic       | The mark at the left, the church's name at the right, on the paper. |
-| Banner        | The same on a band of colour, the church's name reversed out of it. |
-| Just the name | Neither — for holders that already carry the church's own artwork.  |
+| Style     | What it looks like                                                  |
+| --------- | ------------------------------------------------------------------- |
+| Classic   | The logo at the left, the church name at the right, on the paper.   |
+| Banner    | The same on a band of colour, the church's name reversed out of it. |
+| Name only | Neither — for holders that already carry the church's own artwork.  |
 
 **Church name size** is eighteen point on the tags this was measured against,
 which is the size a church that has been printing its own in Word usually has.
 Ten point beside a thirty-six point name is a caption under it rather than a
 masthead over it.
 
-**The mark** is the logo, added here or on the cover, printed small, medium or
-large — or not at all. **Colour** sets the band, the line under the name, and
-the hairline under the heading if you turn that on — most printed badges have
-none, so it is off unless asked for. Five of the colours a church badge is
-usually printed in are there to pick from, and any other colour can be chosen
-from the wheel beside them.
+**Logo size** prints it small, medium or large — or not at all. The logo can be
+added here or on the cover; it is the same one.
+
+**Accent colour** sets the band, the line under the name, and the rule under the
+header if you turn that on — most printed badges have none, so it is off unless
+asked for. Five of the colours a church badge is usually printed in are there to
+pick from, and any other colour can be chosen from the wheel beside them.
 
 The line under the name prints bold: at seven or eight point in a colour,
 regular weight goes thin enough on a laser printer to read as a smudge rather

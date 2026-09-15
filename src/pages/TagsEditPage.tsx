@@ -30,7 +30,7 @@ import { firstName, message } from "@/lib/format";
 import type { ProjectEntryRow, ProjectRow, SelectionMode } from "@/lib/database.types";
 
 /*
- * Stand-in path for a mark chosen but not yet uploaded. The composer draws a
+ * Stand-in path for a logo chosen but not yet uploaded. The composer draws a
  * picture by its storage path and a Blob picked a second ago has none, so this
  * carries it as far as the canvas; Save uploads the Blob and writes the real
  * path. Prefixed so it cannot collide with anything storage hands back.
@@ -148,7 +148,7 @@ export function TagsEditPage() {
     [pendingLogoUrl],
   );
 
-  /** The settings as they would print this second, mark and all. */
+  /** The settings as they would print this second, logo and all. */
   const drawnSettings = useMemo(() => {
     if (!safeSettings) return null;
     return {
@@ -157,7 +157,7 @@ export function TagsEditPage() {
     };
   }, [safeSettings, logoBlob, logoRemoved]);
 
-  // The saved mark, fetched once per path rather than per keystroke.
+  // The saved logo, fetched once per path rather than per keystroke.
   const [savedLogoUrl, setSavedLogoUrl] = useState<Map<string, string>>(new Map());
   const storedLogoPath = safeSettings?.coverLogoPath ?? "";
   useEffect(() => {
@@ -184,12 +184,17 @@ export function TagsEditPage() {
    * longest name in the congregation is what decides how big every tag in the
    * run is set.
    */
-  const tagPreview = useMemo(() => {
-    if (!metrics || !drawnSettings) return null;
+  const previewName = useMemo(() => {
     const person = people[0];
     const name = person ? `${firstName(person)} ${person.last_name}`.trim() : "";
-    return composeTagPreview(drawnSettings, metrics, name || "Madison Johnston");
-  }, [metrics, drawnSettings, people]);
+    return name || "Madison Johnston";
+  }, [people]);
+
+  const tagPreview = useMemo(
+    () =>
+      metrics && drawnSettings ? composeTagPreview(drawnSettings, metrics, previewName) : null,
+    [metrics, drawnSettings, previewName],
+  );
 
   /**
    * What the drawn name actually came out at, in points.
@@ -239,8 +244,8 @@ export function TagsEditPage() {
   const askedNamePt = safeSettings.tagNamePt;
   const shrunk = drawnNamePt !== null && drawnNamePt < askedNamePt - 0.01;
   const nameSizeHint = shrunk
-    ? `Shrunk to ${drawnNamePt}pt for this name — it is too long for ${askedNamePt}pt on this tag.`
-    : "A name too long for the tag is shrunk until it fits.";
+    ? `Shrunk to ${drawnNamePt}pt — ${previewName} does not fit at ${askedNamePt}pt.`
+    : "Longer names shrink to fit.";
   const hasLogo = Boolean(logoRemoved ? false : logoBlob || safeSettings.coverLogoPath);
 
   /*
@@ -309,7 +314,7 @@ export function TagsEditPage() {
     try {
       // Upload before deleting, never the other way round: this runs on a phone
       // on church wifi, and removing first would mean a failed upload took the
-      // existing mark with it.
+      // existing logo with it.
       const current = safeSettings.coverLogoPath;
       let coverLogoPath = current;
       if (logoBlob) {
@@ -396,7 +401,7 @@ export function TagsEditPage() {
           ) : null}
         </Notice>
       ) : null}
-      {savedAt ? <Notice kind="ok">Saved. Open the preview to see the sheet.</Notice> : null}
+      {savedAt ? <Notice kind="ok">Saved.</Notice> : null}
 
       <form onSubmit={save}>
         {/* Offered by all three boxes. Once per page rather than once per box:
@@ -408,17 +413,24 @@ export function TagsEditPage() {
           ))}
         </datalist>
 
-        {/* Down the tag, in the order it is read: the rectangle itself, then
-            what is above the name, then the name and the line under it, then
-            the paper it is all cut out of. Two columns on a desk, one on a
-            phone, and the same order either way - which is also why the drawing
-            has the first column to itself. It is the tallest thing here, and
-            the three cards of words beside it come to about its height. */}
+        {/* Down the tag, in the order it prints: the card itself, then the
+            header, the name, the line under it, and the paper it is all cut
+            out of. Two columns on a desk, one on a phone, and the same order
+            either way - which is also why the drawing has the first column to
+            itself. It is the tallest thing here, and the four cards of
+            settings beside it come to about its height. */}
+        {/* The drawing on the left, the settings on the right, in the order
+            the tag prints: the card itself, then its header, its name, the
+            line under it, and the paper it is cut out of. The drawing keeps a
+            column to itself and stays put while the settings scroll - every
+            one of them is a question the drawing answers, and answering it
+            should not mean scrolling back up. On a phone the columns stack and
+            the drawing simply leads. */}
         <div className="grid two" style={{ marginTop: 16 }}>
-          <div>
-            <div className="card">
+          <div className="tag-stage">
+            <section className="card" aria-labelledby="tags-preview">
               <div className="card-head">
-                <h2>The tag</h2>
+                <h2 id="tags-preview">Preview</h2>
               </div>
               <div className="card-body">
                 {tagPreview ? (
@@ -429,23 +441,29 @@ export function TagsEditPage() {
                       height={tagPreview.height}
                       photoUrls={logoUrls}
                       typeface={tagPreview.typeface}
-                      maxHeight={260}
+                      maxHeight={300}
                     />
+                    {/* Two facts rather than a sentence: which rectangle, and
+                        on whom. The second is the reason this is drawn on
+                        somebody the directory prints. */}
                     <figcaption className="hint">
-                      {TAG_SIZES[safeSettings.tagSize].label}, at the size it prints
-                      {people.length ? ", on somebody this directory actually prints" : ""}. Redraws
-                      as you change anything below.
+                      {TAG_SIZES[safeSettings.tagSize].label} · {previewName}
                     </figcaption>
                   </figure>
                 ) : (
                   <p className="hint tag-figure">Drawing the tag…</p>
                 )}
+              </div>
+            </section>
+          </div>
 
-                <Field
-                  label="Size"
-                  hint="Match the holders you have. As many as fit go on a sheet, centred, to be cut apart."
-                  htmlFor="tag_size"
-                >
+          <div>
+            <section className="card" aria-labelledby="tags-tag">
+              <div className="card-head">
+                <h2 id="tags-tag">Tag</h2>
+              </div>
+              <div className="card-body">
+                <Field label="Size" htmlFor="tag_size" hint="Match your badge holders.">
                   <select
                     id="tag_size"
                     value={settings.tagSize}
@@ -480,9 +498,9 @@ export function TagsEditPage() {
                 </Field>
 
                 <Field
-                  label="Colour"
+                  label="Accent colour"
                   htmlFor="tag_accent"
-                  hint={paleBand ? undefined : "The band, the rule and the line under the name."}
+                  hint={paleBand ? undefined : "Band, rules and footer line."}
                 >
                   <div className="colour-field">
                     <input
@@ -506,48 +524,26 @@ export function TagsEditPage() {
                       />
                     ))}
                   </div>
+                  {/* Only when it is true, and then in one line: the long
+                      version of this was three, and the fix is a colour. */}
                   {paleBand ? (
                     <span className="hint warn-hint">
-                      Neither white nor black reads well on this colour, so the church's name on the
-                      band will be hard to make out. A darker or paler one fixes it — or use the
-                      Classic style, which prints on the paper instead.
+                      Too mid-toned to read the church name on. Pick darker or paler.
                     </span>
                   ) : null}
                 </Field>
-
-                {safeSettings.tagStyle === "classic" ? (
-                  <Checkbox
-                    label="A line under the heading"
-                    hint="A hairline in the colour above, between the church's name and the person's. Most printed badges have none."
-                    checked={settings.tagHeadRule}
-                    disabled={!canEdit}
-                    onChange={(value) => set({ tagHeadRule: value })}
-                  />
-                ) : null}
               </div>
-            </div>
-          </div>
+            </section>
 
-          <div>
-            <div className="card">
-              <div className="card-head">
-                <h2>Above the name</h2>
+            <section className="card" aria-labelledby="tags-header">
+              {/* The one thing on this screen that reaches past it, said once
+                  here rather than twice under the two fields it applies to. */}
+              <div className="card-head column">
+                <h2 id="tags-header">Header</h2>
+                <span className="muted small">Shared with the book&rsquo;s cover</span>
               </div>
               <div className="card-body">
-                {/* The mark and the church's name are the book's as well. Said
-                    plainly here rather than discovered later: somebody who
-                    retypes the church's name on a tag has retyped it on the
-                    cover and along the top of every page inside. */}
-                <Notice>
-                  These two are the book's as well — a directory and its tags carry the same mark
-                  and the same name.
-                </Notice>
-
-                <Field
-                  label="Church name"
-                  hint="Above the name on every tag, and on the book's cover."
-                  htmlFor="church_name"
-                >
+                <Field label="Church name" htmlFor="church_name">
                   <input
                     id="church_name"
                     type="text"
@@ -558,12 +554,12 @@ export function TagsEditPage() {
                   />
                 </Field>
 
-                <Field label="The mark">
+                <Field label="Logo">
                   <PhotoInput
                     path={logoRemoved ? null : settings.coverLogoPath || null}
                     initials=""
                     shape="square"
-                    hint="Any shape — fitted whole, never cropped. It prints at the top of the tag, and at the top of the cover"
+                    hint="Any shape, fitted whole"
                     disabled={!canEdit}
                     onChange={(blob, removed) => {
                       setLogoBlob(blob);
@@ -573,11 +569,7 @@ export function TagsEditPage() {
                 </Field>
 
                 <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <Field
-                    label="Church name size"
-                    htmlFor="tag_heading_pt"
-                    hint="How big it prints above the name."
-                  >
+                  <Field label="Church name size" htmlFor="tag_heading_pt">
                     <PointSize
                       id="tag_heading_pt"
                       value={settings.tagHeadingPt}
@@ -587,15 +579,9 @@ export function TagsEditPage() {
                   </Field>
 
                   <Field
-                    label="The mark's size"
+                    label="Logo size"
                     htmlFor="tag_logo_size"
-                    hint={
-                      safeSettings.tagStyle === "plain"
-                        ? "Just the name prints no mark."
-                        : hasLogo
-                          ? "As a share of the tag's height."
-                          : "Add a mark above to use this."
-                    }
+                    hint={hasLogo || safeSettings.tagStyle === "plain" ? undefined : "Add a logo."}
                   >
                     <select
                       id="tag_logo_size"
@@ -603,35 +589,59 @@ export function TagsEditPage() {
                       disabled={!canEdit || settings.tagStyle === "plain"}
                       onChange={(event) => set({ tagLogoSize: event.target.value as TagLogoSize })}
                     >
-                      <option value="none">No mark</option>
+                      <option value="none">None</option>
                       <option value="small">Small</option>
                       <option value="medium">Medium</option>
                       <option value="large">Large</option>
                     </select>
                   </Field>
                 </div>
-              </div>
-            </div>
 
-            <div className="card">
-              <div className="card-head">
-                <h2>The name and the line under it</h2>
-              </div>
-              <div className="card-body">
-                {/* First in the card, because it is the one question about the
-                    name that is asked in points rather than in taste - and the
-                    drawing above answers it while it is being asked. */}
-                <Field label="Name size" htmlFor="tag_name_pt" hint={nameSizeHint}>
-                  <PointSize
-                    id="tag_name_pt"
-                    value={settings.tagNamePt}
+                <Field
+                  label="Small print font"
+                  htmlFor="tag_small_font"
+                  hint="Church name and footer line."
+                >
+                  <select
+                    id="tag_small_font"
+                    value={settings.tagSmallFont}
                     disabled={!canEdit}
-                    onChange={(pt) => set({ tagNamePt: pt })}
-                  />
+                    onChange={(event) => set({ tagSmallFont: event.target.value as Typeface })}
+                  >
+                    {TYPEFACES.map((face) => (
+                      <option key={face} value={face}>
+                        {TYPEFACE_LABELS[face]}
+                      </option>
+                    ))}
+                  </select>
                 </Field>
 
+                {safeSettings.tagStyle === "classic" ? (
+                  <Checkbox
+                    label="Rule under the header"
+                    checked={settings.tagHeadRule}
+                    disabled={!canEdit}
+                    onChange={(value) => set({ tagHeadRule: value })}
+                  />
+                ) : null}
+              </div>
+            </section>
+
+            <section className="card" aria-labelledby="tags-name">
+              <div className="card-head">
+                <h2 id="tags-name">Name</h2>
+              </div>
+              <div className="card-body">
                 <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <Field label="The name" htmlFor="tag_name_font">
+                  <Field label="Size" htmlFor="tag_name_pt">
+                    <PointSize
+                      id="tag_name_pt"
+                      value={settings.tagNamePt}
+                      disabled={!canEdit}
+                      onChange={(pt) => set({ tagNamePt: pt })}
+                    />
+                  </Field>
+                  <Field label="Font" htmlFor="tag_name_font">
                     <select
                       id="tag_name_font"
                       value={settings.tagNameFont}
@@ -645,40 +655,20 @@ export function TagsEditPage() {
                       ))}
                     </select>
                   </Field>
-                  <Field label="The small print" htmlFor="tag_small_font">
-                    <select
-                      id="tag_small_font"
-                      value={settings.tagSmallFont}
-                      disabled={!canEdit}
-                      onChange={(event) => set({ tagSmallFont: event.target.value as Typeface })}
-                    >
-                      {TYPEFACES.map((face) => (
-                        <option key={face} value={face}>
-                          {TYPEFACE_LABELS[face]}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
                 </div>
-                {/* Spaced like the field it explains: a p.hint has no bottom
-                    margin of its own, and the label of the next field was
-                    landing on the last line of this one. */}
-                <p className="hint" style={{ marginTop: -4, marginBottom: 14 }}>
-                  The name is set in the first, the church's name and the line underneath in the
-                  second. Sans serif is the one to beat across a hall; a serif church name over a
-                  sans serif name is the printed-badge look. Neither has anything to do with the
-                  face the book is set in.
-                </p>
+                {/* Under the pair rather than on the size alone: it is about
+                    what the two of them just did to this name. */}
+                <p className="hint">{nameSizeHint}</p>
+              </div>
+            </section>
 
-                {/* The words and their size on one line, because they are one
-                    decision: the line that is too long is the line that wants
-                    to be a point smaller. */}
+            <section className="card" aria-labelledby="tags-footer">
+              <div className="card-head">
+                <h2 id="tags-footer">Footer line</h2>
+              </div>
+              <div className="card-body">
                 <div className="grid" style={{ gridTemplateColumns: "1fr 108px", gap: 12 }}>
-                  <Field
-                    label="The line underneath"
-                    hint="Printed small under the name. Leave it empty for none."
-                    htmlFor="tag_line"
-                  >
+                  <Field label="Text" htmlFor="tag_line" hint="Leave empty for none.">
                     <input
                       id="tag_line"
                       type="text"
@@ -688,7 +678,7 @@ export function TagsEditPage() {
                       onChange={(event) => set({ tagLine: event.target.value })}
                     />
                   </Field>
-                  <Field label="Line size" htmlFor="tag_line_pt">
+                  <Field label="Size" htmlFor="tag_line_pt">
                     <PointSize
                       id="tag_line_pt"
                       value={settings.tagLinePt}
@@ -697,25 +687,18 @@ export function TagsEditPage() {
                     />
                   </Field>
                 </div>
-
-                <p className="hint">
-                  A long name breaks over two lines and shrinks until it fits, so every tag in a run
-                  is cut to the same size whatever the name on it. A colour too pale to read is
-                  darkened for the small print, so the band keeps the colour you picked and the
-                  words on the paper stay legible.
-                </p>
               </div>
-            </div>
+            </section>
 
-            <div className="card">
+            <section className="card" aria-labelledby="tags-paper">
               <div className="card-head">
-                <h2>The paper</h2>
+                <h2 id="tags-paper">Paper</h2>
               </div>
               <div className="card-body">
                 <Field
-                  label="Paper"
-                  hint="The same sheet the book prints on — tags simply use it portrait."
+                  label="Sheet"
                   htmlFor="page_size"
+                  hint={`${perSheet} per sheet, centred, with cut lines. Shared with the book.`}
                 >
                   <select
                     id="page_size"
@@ -730,27 +713,19 @@ export function TagsEditPage() {
                     ))}
                   </select>
                 </Field>
-
-                <Notice>
-                  <strong>
-                    {perSheet} tag{perSheet === 1 ? "" : "s"} on one sheet of paper
-                  </strong>{" "}
-                  — centred, with a pale line round each one to cut along. Print on card if you have
-                  it; ordinary paper curls inside a holder.
-                </Notice>
               </div>
-            </div>
+            </section>
           </div>
         </div>
 
+        {/* Save and the way out. Preview & print is not repeated here - it is
+            in the head, and a screen with two of the same button has one of
+            them too many. */}
         {canEdit ? (
           <div className="row" style={{ marginTop: 18 }}>
             <button type="submit" className="btn primary" disabled={saving}>
               {saving ? "Saving…" : "Save changes"}
             </button>
-            <Link className="btn" to={`/projects/${project.id}/tags`}>
-              Preview &amp; print
-            </Link>
             <Link className="btn ghost" to="/tags">
               Back
             </Link>
@@ -764,8 +739,8 @@ export function TagsEditPage() {
             from here rather than answered twice. */}
         <div className="form-decision">
           <p className="hint" style={{ marginBottom: 0 }}>
-            Everybody in <strong>{project.name}</strong> gets a tag. To change who that is, edit{" "}
-            <Link to={`/projects/${project.id}`}>the directory</Link>.
+            Everyone in this directory gets a tag.{" "}
+            <Link to={`/projects/${project.id}`}>Edit the directory</Link> to change who.
           </p>
         </div>
       </form>

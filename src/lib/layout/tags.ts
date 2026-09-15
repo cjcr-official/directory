@@ -35,7 +35,7 @@ import {
 /** 0.25in. About as near the paper's edge as a desk printer will go. */
 const MARGIN = 18;
 
-/** The mark, as a share of the tag's height. */
+/** The logo, as a share of the tag's height. */
 const LOGO_SHARE: Record<TagLogoSize, number> = {
   none: 0,
   small: 0.14,
@@ -43,7 +43,7 @@ const LOGO_SHARE: Record<TagLogoSize, number> = {
   large: 0.25,
 };
 
-/** However big the mark is asked to be, the head never takes this much tag. */
+/** However big the logo is asked to be, the head never takes this much tag. */
 const HEAD_MAX_SHARE = 0.32;
 
 /**
@@ -75,7 +75,7 @@ interface TagPlan {
   width: number;
   height: number;
   pad: number;
-  /** The side of the square the mark is drawn in. 0 when there is none. */
+  /** The side of the square the logo is drawn in. 0 when there is none. */
   logo: number;
   /** Top of the head band, and its height. 0 when nothing is above the name. */
   headTop: number;
@@ -119,7 +119,7 @@ export function planTag(settings: ProjectSettings, metrics: Metrics): TagPlan {
     hasHead && settings.churchName.trim()
       ? fitOneLine(
           settings.churchName.trim(),
-          // Beside a mark the church's name has what is left of the width; on
+          // Beside a logo the church's name has what is left of the width; on
           // its own it has all of it.
           inner - (logo ? logo + pad * 0.6 : 0),
           settings.tagHeadingPt,
@@ -193,7 +193,7 @@ export function planTag(settings: ProjectSettings, metrics: Metrics): TagPlan {
 /**
  * Draws one tag at (x, y), adding to the page it is given.
  *
- * The mark goes in the page's own picture list rather than on the card, because
+ * The logo goes in the page's own picture list rather than on the card, because
  * renderPdf draws a hairline round a card's photograph - right for a portrait,
  * wrong for a logo.
  */
@@ -250,7 +250,7 @@ function placeTag(
       w: plan.logo,
       h: plan.logo,
     };
-    // A white tile under the mark on a coloured band: most church logos are a
+    // A white tile under the logo on a coloured band: most church logos are a
     // JPEG with a white background, and a white rectangle sitting on the colour
     // reads as a mistake unless it is plainly on purpose.
     if (plan.banner) {
@@ -275,8 +275,8 @@ function placeTag(
       size: plan.church.size,
       weight: "bold",
       color: plan.church.color,
-      // Beside a mark it sits against the far edge, as it does on a letterhead;
-      // with no mark to balance, the middle of the tag is the only place for it.
+      // Beside a logo it sits against the far edge, as it does on a letterhead;
+      // with no logo to balance, the middle of the tag is the only place for it.
       align: plan.logo ? "right" : "center",
       text: plan.church.text,
       face: smallFace,

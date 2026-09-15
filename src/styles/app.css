@@ -2399,6 +2399,25 @@ th.num {
   text-align: center;
 }
 
+/*
+ * The drawn tag, staying put while the settings beside it scroll.
+ *
+ * Every setting on this screen is a question the drawing answers - is that
+ * name still readable, does the church name still fit beside the logo - and
+ * answering it should not mean scrolling back up. It can be pinned where the
+ * cover cannot: a tag is small, so the panel is well short of a window's
+ * height and nothing inside it can end up out of reach.
+ *
+ * Only once there are two columns. Stuck in a single-column phone layout it
+ * would travel the height of the settings below it and sit over them.
+ */
+@media (min-width: 900px) {
+  .tag-stage > .card {
+    position: sticky;
+    top: 16px;
+  }
+}
+
 /* A type size and its unit. The unit is drawn beside the box rather than typed
    into it: a number input holding "14pt" holds no number at all, and the
    stepper arrows and the phone's own numeric keypad are worth more than two
