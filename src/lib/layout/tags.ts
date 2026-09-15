@@ -4,8 +4,6 @@ import type { DirectoryEntry } from "../entries";
 import { truncate, wrapText, type FontWeight, type Metrics } from "./metrics";
 import {
   PAGE_SIZES,
-  TAG_HEADING_SHARES,
-  TAG_NAME_SIZES,
   TAG_SIZES,
   type ProjectSettings,
   type TagLogoSize,
@@ -49,20 +47,21 @@ const LOGO_SHARE: Record<TagLogoSize, number> = {
 const HEAD_MAX_SHARE = 0.32;
 
 /**
- * The name, in points.
+ * Where shrinking stops, in points.
  *
- * The ceiling is a share of the tag so a 4x3 badge sets a short name larger
- * than an Avery 5395 can, and the floor is where shrinking stops and the name
- * breaks instead. Nine is about as small as a name tag is worth printing.
+ * Only reached by a name too long for the size it was asked to be set at: it
+ * breaks over two lines, then steps down, and at this point it is cut short
+ * instead. Nine is about as small as a name tag is worth printing, and the two
+ * small ones are where their own text stops being words and becomes a smudge.
  *
- * The ceiling is the largest this app will set a name, not the size it sets:
- * tagNameSize takes a share of it, and every name is fitted under whatever that
- * comes to. The floor is not for lowering - a tag nobody can read across a
- * table is not a smaller tag, it is a wasted one.
+ * Each is a floor under the fitting and not under the setting. Somebody who
+ * types six point has asked for six point and gets it - see planTag, where the
+ * floor is lowered to meet a size smaller than itself rather than overriding
+ * it, which would print type larger than the box that set it says.
  */
-const NAME_MAX_SHARE = 0.22;
-const NAME_MAX = 44;
 const NAME_MIN = 9;
+const HEAD_MIN = 6.5;
+const LINE_MIN = 5.5;
 
 /**
  * One tag's furniture, in points from its own top-left corner.
@@ -123,8 +122,11 @@ export function planTag(settings: ProjectSettings, metrics: Metrics): TagPlan {
           // Beside a mark the church's name has what is left of the width; on
           // its own it has all of it.
           inner - (logo ? logo + pad * 0.6 : 0),
-          clamp(width * TAG_HEADING_SHARES[settings.tagHeadingSize], 8, 22),
-          6.5,
+          settings.tagHeadingPt,
+          // Never above what was asked for: a size typed below the usual floor
+          // is a size somebody chose, and coming back up from it would print a
+          // heading larger than the box that set it says.
+          Math.min(HEAD_MIN, settings.tagHeadingPt),
           "bold",
           smallFace,
           metrics,
@@ -143,8 +145,8 @@ export function planTag(settings: ProjectSettings, metrics: Metrics): TagPlan {
     ? fitOneLine(
         settings.tagLine.trim(),
         inner,
-        clamp(width * 0.03, 6.5, 10),
-        5.5,
+        settings.tagLinePt,
+        Math.min(LINE_MIN, settings.tagLinePt),
         "bold",
         smallFace,
         metrics,
@@ -184,20 +186,7 @@ export function planTag(settings: ProjectSettings, metrics: Metrics): TagPlan {
     tagline: tagline ? { ...tagline, color: inkOn(accent, COLORS.paper) } : null,
     nameTop,
     nameBottom,
-    // To the hundredth of a point, which is finer than any printer resolves and
-    // stops a share of a share of a rectangle writing 25.129209600000003 into
-    // the font size of every tag on the sheet.
-    //
-    // Never under the floor the fitting stops at: below it fitName's loop would
-    // not run at all and the fallback would set the name larger than the
-    // ceiling that was asked for, which is the one direction this must not
-    // fail in.
-    nameMax: Math.max(
-      NAME_MIN,
-      round2(
-        Math.min(NAME_MAX, height * NAME_MAX_SHARE) * TAG_NAME_SIZES[settings.tagNameSize].share,
-      ),
-    ),
+    nameMax: settings.tagNamePt,
   };
 }
 
@@ -363,14 +352,18 @@ function fitName(
   face: Typeface,
   metrics: Metrics,
 ): { size: number; lines: string[] } {
-  for (let size = maxSize; size >= NAME_MIN; size -= 0.5) {
+  // A size asked for below the floor is the floor: there is nothing left to
+  // shrink into, and stepping back up to nine would set a six point name at
+  // nine point.
+  const floor = Math.min(NAME_MIN, maxSize);
+  for (let size = maxSize; size >= floor; size -= 0.5) {
     const lines = wrapText(name, maxWidth, size, "bold", metrics, face);
     if (lines.length > 2) continue;
     if (lines.length * metrics.lineHeight(size) <= maxHeight) return { size, lines };
   }
   return {
-    size: NAME_MIN,
-    lines: [truncate(name, maxWidth, NAME_MIN, "bold", metrics, face)],
+    size: floor,
+    lines: [truncate(name, maxWidth, floor, "bold", metrics, face)],
   };
 }
 
@@ -592,8 +585,4 @@ function darken(hex: string, by: number): string {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
-}
-
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
 }
