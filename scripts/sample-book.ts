@@ -7,6 +7,7 @@ import { composeTags, tagsPerSheet } from "../src/lib/layout/tags";
 import { pdfMetrics, renderPdf } from "../src/lib/layout/pdf";
 import { DEFAULT_SETTINGS, normalizeSettings, recordsPerSheet } from "../src/lib/layout/settings";
 import { buildDemoData } from "../src/lib/demo";
+import { STANDARD_FONTS } from "../src/lib/layout/metrics";
 import { placeholderPortrait } from "./png";
 
 /**
@@ -95,12 +96,21 @@ async function main() {
   // the model is right either way, and a name drawn in the wrong font is a
   // perfectly valid PDF.
   const faces = await facesUsed(tagBytes);
-  const wanted = ["Helvetica-Bold", "Times-Bold", "Times-Roman"];
-  const missing = wanted.filter((face) => !faces.includes(face));
+  // Asked as "did each family reach the paper" rather than by naming the exact
+  // fonts: which weight a tag draws is the composer's business and changes with
+  // the design - the first version of this check named Times-Roman, and making
+  // the line at the foot bold broke it without anything being wrong. What must
+  // never change is that both chosen families are in the file.
+  const missing = [settings.tagNameFont, settings.tagSmallFont]
+    .filter((face, at, all) => all.indexOf(face) === at)
+    .filter((face) => {
+      const family = Object.values(STANDARD_FONTS[face]);
+      return !faces.some((name) => family.includes(name as (typeof family)[number]));
+    });
   if (missing.length) {
     throw new Error(
-      `the name tags were set in ${faces.join(", ") || "nothing"} - no ${missing.join(" or ")}, ` +
-        "so the two faces the settings asked for did not both reach the paper",
+      `the name tags were set in ${faces.join(", ") || "nothing"} - nothing from ` +
+        `${missing.join(" or ")}, so the faces the settings asked for did not all reach the paper`,
     );
   }
 
