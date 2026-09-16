@@ -2739,17 +2739,37 @@ th.num {
   background: color-mix(in srgb, var(--accent) 7%, transparent);
   outline-color: var(--accent);
 }
+/* A setting that holds more than one line - the cover's verse, its contact
+   block - is one box over the whole wrapped paragraph rather than one per
+   line, so it wraps and it does not offer to be dragged bigger: its size is
+   the composer's to decide, and it is redrawn the moment a word tips over. */
+.sheet textarea.run-edit {
+  white-space: pre-wrap;
+  resize: none;
+  overflow-y: auto;
+  scrollbar-width: none;
+  /* The app's own textarea is a box somebody types a paragraph into and has a
+     floor of 72px so it never arrives as a slot. This one is a line of type on
+     a printed page and is exactly as tall as the lines it stands in for -
+     without this it came out 72px whatever it held, four boxes overlapping
+     each other down the middle of the cover. */
+  min-height: 0;
+}
+.sheet textarea.run-edit::-webkit-scrollbar {
+  display: none;
+}
+
 /* An emptied line still holds its place, in words that say what belongs
-   there - see the placeholders in TagsEditPage for why the box may not be
-   allowed to disappear under the cursor. */
+   there - see the placeholders in TagsEditPage and ProjectEditPage for why the
+   box may not be allowed to disappear under the cursor. */
 .sheet .run-edit::placeholder {
   color: color-mix(in srgb, currentColor 45%, transparent);
   opacity: 1;
 }
 
-/* The sentence under the tag that says the tag can be typed on. Its own line,
-   because the caption above it is two facts about what is drawn and this is an
-   instruction about what to do with it. */
+/* The sentence under a tag or a cover that says it can be typed on. Its own
+   line, because the caption above it is facts about what is drawn and this is
+   an instruction about what to do with it. */
 .tag-figure-tip {
   display: block;
   margin-top: 3px;

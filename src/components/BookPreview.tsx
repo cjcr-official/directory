@@ -43,6 +43,66 @@ export interface EditableRuns {
    */
   onFocus?: (field: string) => void;
   onBlur?: (field: string) => void;
+  /**
+   * Whether this setting may hold more than one line.
+   *
+   * Asked of the field and not of what is on screen this second, because the
+   * answer decides whether the caret is sitting in an input or a textarea. A
+   * title that is one line until the word that tips it over two would swap one
+   * control for the other mid-word, and take the caret with it.
+   */
+  multiline?: (field: string) => boolean;
+  /** Extra styling for a line the composer transformed on its way in. */
+  style?: (field: string) => React.CSSProperties | undefined;
+}
+
+/**
+ * The runs of one page, with the ones a setting produced offered back.
+ *
+ * A block that wrapped over three lines is three runs carrying one field, and
+ * they are put back together here: the wrap belongs to the composer, and what
+ * is typed into is the setting rather than whichever line the pointer landed
+ * on. The box is the union of the lines - the first line's top, the last
+ * line's bottom - so the control covers exactly the type it replaces.
+ */
+function renderRuns(
+  runs: TextRun[],
+  fontStack: string,
+  prefix: string,
+  editable?: EditableRuns,
+): React.ReactNode[] {
+  const out: React.ReactNode[] = [];
+  for (let i = 0; i < runs.length; i++) {
+    const run = runs[i];
+    if (!editable || !run.field) {
+      out.push(
+        <div key={`${prefix}-${i}`} style={runStyle(run, fontStack)}>
+          {run.text}
+        </div>,
+      );
+      continue;
+    }
+    let end = i;
+    while (end + 1 < runs.length && runs[end + 1].field === run.field) end += 1;
+    const last = runs[end];
+    const lines = end - i + 1;
+    // The composer's own leading, read back off the lines rather than guessed
+    // at: the gap between two of them is what it used, exactly. One line has no
+    // gap to read, so it falls back to the ratio the book is set on.
+    const leading = lines > 1 ? (last.y - run.y) / (lines - 1) : run.size * 1.25;
+    out.push(
+      <EditableRun
+        key={`${prefix}-${i}`}
+        run={run as TextRun & { field: string }}
+        fontStack={fontStack}
+        editable={editable}
+        height={last.y - run.y + leading}
+        leading={leading}
+      />,
+    );
+    i = end;
+  }
+  return out;
 }
 
 /**
@@ -60,32 +120,69 @@ function EditableRun({
   run,
   fontStack,
   editable,
+  height,
+  leading,
 }: {
   run: TextRun & { field: string };
   fontStack: string;
   editable: EditableRuns;
+  height: number;
+  leading: number;
 }) {
+  const multiline = editable.multiline?.(run.field) ?? false;
+  const common = {
+    className: "run-edit",
+    value: editable.value(run.field),
+    placeholder: editable.placeholder(run.field),
+    "aria-label": editable.placeholder(run.field),
+    onFocus: () => editable.onFocus?.(run.field),
+    onBlur: () => editable.onBlur?.(run.field),
+    style: {
+      ...runStyle(run, fontStack),
+      height: `${height}pt`,
+      lineHeight: `${leading}pt`,
+      ...editable.style?.(run.field),
+    },
+  };
+
+  /* Escape means done, and so does Enter on a line that cannot hold two. On a
+     block that can, Enter is a line break and is left alone - but it still has
+     to be stopped from reaching the form, whose submit button is Save. Both
+     are already committed either way: the page has been redrawn on every
+     keystroke. */
+  if (multiline) {
+    return (
+      <textarea
+        {...common}
+        /* Both of these have to be said here rather than in the stylesheet:
+           runStyle sets white-space and overflow inline - a composed run is
+           pre-broken and must never re-wrap - and an inline declaration is not
+           something a rule can argue with. Left alone, the box did not wrap at
+           all: one long line ran off its right edge and the second line of the
+           paragraph was never drawn. */
+        style={{ ...common.style, whiteSpace: "pre-wrap", overflow: "hidden auto" }}
+        onChange={(event) => editable.onChange(run.field, event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            event.currentTarget.blur();
+          }
+        }}
+      />
+    );
+  }
+
   return (
     <input
+      {...common}
       type="text"
-      className="run-edit"
-      value={editable.value(run.field)}
-      placeholder={editable.placeholder(run.field)}
-      aria-label={editable.placeholder(run.field)}
       onChange={(event) => editable.onChange(run.field, event.target.value)}
-      onFocus={() => editable.onFocus?.(run.field)}
-      onBlur={() => editable.onBlur?.(run.field)}
-      /* Both of these are already committed - the page has been redrawn on
-         every keystroke - so both mean the same thing here: done. Enter has to
-         be caught whatever it means, because this sits inside the form whose
-         submit button is Save. */
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === "Escape") {
           event.preventDefault();
           event.currentTarget.blur();
         }
       }}
-      style={{ ...runStyle(run, fontStack), height: `${run.size * 1.25}pt` }}
     />
   );
 }
@@ -246,20 +343,7 @@ const Page = memo(function Page({
               })()
             : null}
 
-          {card.runs.map((run, i) =>
-            editable && run.field ? (
-              <EditableRun
-                key={i}
-                run={run as TextRun & { field: string }}
-                fontStack={fontStack}
-                editable={editable}
-              />
-            ) : (
-              <div key={i} style={runStyle(run, fontStack)}>
-                {run.text}
-              </div>
-            ),
-          )}
+          {renderRuns(card.runs, fontStack, `card-${card.entryId}`, editable)}
         </Fragment>
       ))}
 
@@ -277,11 +361,7 @@ const Page = memo(function Page({
         />
       ))}
 
-      {page.runs.map((run, i) => (
-        <div key={`run-${i}`} style={runStyle(run, fontStack)}>
-          {run.text}
-        </div>
-      ))}
+      {renderRuns(page.runs, fontStack, "run", editable)}
     </Fragment>
   );
 });
