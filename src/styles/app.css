@@ -1852,6 +1852,14 @@ th.num {
   white-space: nowrap;
 }
 
+/* The same measure a notice keeps, for a paragraph that is not in one. The
+   import card runs the width of the page because its figures want the room,
+   and a sentence does not: at 1800px it came to a hundred and seventy
+   characters a line. */
+.measure {
+  max-width: 92ch;
+}
+
 .notice {
   /* Prose has a comfortable measure whatever the screen is doing. Run across a
      1560px page the sign-up explanation was a hundred and seventy characters

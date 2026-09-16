@@ -37,6 +37,14 @@ CSVs that open in any spreadsheet, every photograph as an ordinary JPEG, and a
 there is no undo, so this is what turns a bad click into an annoyance. Once a
 month, and again before a print run.
 
+**Starting from Planning Center.** A church that already keeps its people
+somewhere else does not type them in again: export the list from Planning
+Center as a spreadsheet, choose the file on the Backup screen, and it says what
+it would add before adding anything. Rows are folded back into families, and
+names, addresses, phones, emails, birthdays, anniversaries and background check
+dates come across with them. It only ever adds, so importing the same file
+twice does nothing the second time.
+
 **Background checks.** For whoever works with children or handles money: when
 the last check was done, and when the next one is due. The office is told
 before it lapses rather than years afterwards. Optional per person, and blank

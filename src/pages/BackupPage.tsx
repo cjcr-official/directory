@@ -3,6 +3,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { useDirectory } from "@/data/DirectoryContext";
 import { Checkbox, LoadingScreen, Notice } from "@/components/ui";
 import { RestorePanel } from "@/components/RestorePanel";
+import { ImportPanel } from "@/components/ImportPanel";
 import { buildBackup, type BackupProgress } from "@/lib/backup";
 import { message } from "@/lib/format";
 
@@ -94,10 +95,7 @@ export function BackupPage() {
       <div className="page-head">
         <div className="grow">
           <h1>Backup</h1>
-          <div className="sub">
-            Download everything as one file — the records, the groups and the photographs — and load
-            it back if something is lost.
-          </div>
+          <div className="sub">Take a copy, put one back, or bring a congregation in.</div>
         </div>
       </div>
 
@@ -115,8 +113,8 @@ export function BackupPage() {
               label="Include photographs"
               hint={
                 includePhotos
-                  ? "Makes the file much larger, and makes it a complete copy."
-                  : "Records only. Faster, but the photographs would have to be taken again."
+                  ? "A complete copy, and a much larger file."
+                  : "Records only — the photographs would have to be taken again."
               }
               checked={includePhotos}
               onChange={setIncludePhotos}
@@ -170,43 +168,28 @@ export function BackupPage() {
               </div>
             ) : null}
 
-            {age ? (
-              <p className="muted small" style={{ marginTop: 14 }}>
-                Last backup from this browser: {age}.
-              </p>
-            ) : null}
-          </div>
-        </div>
+            {/* Deleting a family has no undo, so the interval is the whole
+                advice: often enough that a bad afternoon costs a month, and
+                kept somewhere that is not the database it copies. */}
+            <p className="muted small" style={{ marginTop: 14 }}>
+              Once a month, and before a print run. Keep it somewhere other than the database.
+              {age ? ` Last one from this browser: ${age}.` : ""}
+            </p>
 
-        <div className="card">
-          <div className="card-head">
-            <h2>Why this matters</h2>
-          </div>
-          <div className="card-body">
-            <p className="small">
-              Anyone with the editor role can delete a family, and there is no undo. A backup turns
-              that from a disaster into an annoyance.
-            </p>
-            <p className="small">
-              <strong>Once a month is plenty</strong>, and again right before a print run. Keep the
-              file somewhere that is not the same place as the database — a backup stored next to
-              the thing it backs up is not a backup.
-            </p>
-            <p className="small">
-              The archive holds <span className="mono">families.csv</span> and{" "}
-              <span className="mono">people.csv</span>, which open in any spreadsheet;{" "}
-              <span className="mono">photos/</span>, with every picture as an ordinary JPEG; and{" "}
-              <span className="mono">directory.json</span>, which is the complete copy to restore
-              from. There is a README inside explaining all of it.
-            </p>
             <Notice kind="warn">
-              The file contains the congregation's home addresses and phone numbers. Treat it the
-              way you would treat the printed directory.
+              The file holds every address and phone number in one place. Treat it the way you treat
+              the printed directory.
             </Notice>
           </div>
         </div>
 
         <RestorePanel />
+      </div>
+
+      {/* Under the pair rather than beside them: it is the one of the three
+          with a list to show, and it is the thing a church does once. */}
+      <div style={{ marginTop: 16 }}>
+        <ImportPanel />
       </div>
     </div>
   );
