@@ -353,6 +353,18 @@ export const PAGE_SIZES: Record<PageSizeName, { width: number; height: number; l
 };
 
 /**
+ * The paper's name without its dimensions - "Letter", not `Letter (11" x 8.5")`.
+ *
+ * For the one-line summaries, where the inches are the least useful thing on
+ * the line and the longest. It was three different spellings of the same
+ * answer before this: a regexp on the tag form, and a pair of nested ternaries
+ * on the list, which is one place per screen for "Legal" to be forgotten.
+ */
+export function paperName(size: PageSizeName): string {
+  return PAGE_SIZES[size].label.replace(/\s*\(.*\)$/, "");
+}
+
+/**
  * The rectangles a name tag is cut to, in PDF points.
  *
  * Named for the holder rather than the paper: whoever is printing these has

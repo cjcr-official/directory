@@ -19,6 +19,7 @@ import {
   TAG_SIZES,
   TAG_STYLES,
   normalizeSettings,
+  paperName,
   type PageSizeName,
   type ProjectSettings,
   type TagLogoSize,
@@ -687,7 +688,7 @@ export function TagsEditPage() {
                   >
                     {(Object.keys(PAGE_SIZES) as PageSizeName[]).map((key) => (
                       <option key={key} value={key}>
-                        {PAGE_SIZES[key].label.replace(/\s*\(.*\)$/, "")} portrait
+                        {paperName(key)} portrait
                       </option>
                     ))}
                   </select>
