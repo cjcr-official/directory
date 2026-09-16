@@ -230,7 +230,7 @@ export function ImportPanel() {
         ) : (
           <>
             <label className="btn file-button" htmlFor="import-file">
-              {reading ? "Reading…" : "Choose an export"}
+              {reading ? "Reading…" : "Import"}
             </label>
             <span className="note">An .xlsx or .csv export.</span>
           </>
