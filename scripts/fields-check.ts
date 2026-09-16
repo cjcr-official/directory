@@ -90,6 +90,51 @@ for (const type of relevant) {
   );
 }
 
+/*
+ * And the colour well, which is the same trap wearing a different hat.
+ *
+ * It is one of seven circles on a row, six of which are ordinary buttons. With
+ * its platform appearance left on, no two browsers draw it alike - a bordered
+ * rectangle in Chrome, and on iOS a circle with a ring of every colour around
+ * it at whatever size iOS likes - so on a phone it read as a stray widget
+ * beside the colours rather than as one of them.
+ *
+ * The three sizing rules above are not asked for here: this one is a fixed
+ * 26px circle rather than a field stretched across a card, so a max-width and
+ * a zero floor would be cargo. What it does need is the appearance off, and a
+ * shape, which is what makes it match the six it stands with.
+ */
+if (used.has("color")) {
+  const bodies = bodiesFor("color");
+  check("color: the stylesheet styles it at all", bodies.length > 0, `${bodies.length} rule(s)`);
+  check(
+    "color: the platform appearance is off",
+    bodies.some((b) => /(^|\s|-)appearance:\s*none/.test(b)),
+    "needs -webkit-appearance: none, or iOS draws its own well at its own size",
+  );
+  check(
+    "color: it is given a shape of its own",
+    bodies.some((b) => /border-radius:/.test(b)),
+    "needs a border-radius, or it is a rectangle among circles",
+  );
+  /*
+   * Turning the appearance off is not the end of it. Blink and WebKit paint
+   * the colour through boxes inside the input, and those keep their own
+   * padding and square corners however the input itself is styled - so a
+   * round well came out as a round hole with a square of colour in it.
+   */
+  check(
+    "color: the swatch inside it is squared off too",
+    /::-webkit-color-swatch\b[^{]*\{[^}]*border-radius:/.test(css),
+    "needs ::-webkit-color-swatch { border-radius }, or the colour stays a square",
+  );
+  check(
+    "color: and the wrapper around that keeps no padding",
+    /::-webkit-color-swatch-wrapper[^{]*\{[^}]*padding:\s*0/.test(css),
+    "needs ::-webkit-color-swatch-wrapper { padding: 0 }",
+  );
+}
+
 // The wrapper has to give way too, or a "1fr 1fr" row is held open by the
 // field's own content and drags the page wider than the phone.
 const fieldRule = css.slice(css.indexOf(".field {"), css.indexOf("}", css.indexOf(".field {")));

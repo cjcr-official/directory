@@ -2568,20 +2568,13 @@ th.num {
   color: var(--ink-3);
 }
 
-/* The colour well and the handful of colours a church badge is usually
-   printed in, on one line that wraps on a phone. */
+/* The handful of colours a church badge is usually printed in, and a well for
+   any other, on one line that wraps on a phone. */
 .colour-field {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-}
-.colour-field input[type="color"] {
-  width: 46px;
-  height: 38px;
-  padding: 2px;
-  flex: 0 0 auto;
-  cursor: pointer;
 }
 .swatch {
   width: 26px;
@@ -2604,6 +2597,71 @@ th.num {
 .swatch:disabled {
   cursor: default;
   opacity: 0.5;
+}
+
+/*
+ * The way out of the six, which has to look like the seventh of them.
+ *
+ * Left alone this control is drawn by the platform rather than by us, and no
+ * two platforms draw it alike: a bordered 46x38 rectangle in Chrome, and on
+ * iOS a circle with a ring of every colour around it, sized to whatever iOS
+ * thinks a colour well should be. Beside six flat 26px circles that read as a
+ * stray widget somebody forgot to style rather than as one more colour.
+ *
+ * So the appearance goes off and the ring is drawn here instead. iOS had the
+ * right idea - a ring of every colour is what says "or any other" - it only
+ * has to be the same size and shape as the things it stands next to, in every
+ * browser. The hexes in it are not theme colours and are not checked as any:
+ * it is a rainbow, and being every colour at once is the whole of its job.
+ */
+.any-colour {
+  flex: 0 0 auto;
+  display: block;
+  width: 26px;
+  height: 26px;
+  padding: 3px;
+  border-radius: 50%;
+  background: conic-gradient(#e5484d, #f5a524, #f2e15c, #46a758, #3e63dd, #8e4ec6, #e5484d);
+}
+.any-colour input[type="color"] {
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+/* Blink and WebKit draw the colour through boxes of their own inside the
+   input, and those keep their own padding and square corners whatever the
+   input is told. */
+.any-colour input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.any-colour input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 50%;
+}
+.any-colour input[type="color"]::-moz-color-swatch {
+  border: none;
+  border-radius: 50%;
+}
+/* Ringed like a chosen swatch, and for the same reason: with a colour of your
+   own on the tag, none of the six is the one in use and the row would
+   otherwise show nothing as chosen at all. */
+.any-colour.on {
+  box-shadow:
+    0 0 0 2px var(--raised),
+    0 0 0 4px var(--accent);
+}
+.any-colour:has(input:disabled) {
+  opacity: 0.5;
+}
+.any-colour input[type="color"]:disabled {
+  cursor: default;
 }
 /* A hint that is telling you something is wrong rather than how it works. */
 .warn-hint {
