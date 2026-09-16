@@ -903,6 +903,11 @@ function composeCover(
     weight: FontWeight,
     color: string,
     width: number,
+    /* The setting these lines were laid out from, so a preview can offer them
+       back where they are drawn. A block that wrapped over three lines is
+       three runs carrying the same field, and the preview puts them back
+       together - the wrap belongs to the composer, not to what was typed. */
+    field?: string,
   ) => {
     const lineHeight = metrics.lineHeight(size);
     lines.forEach((line, i) => {
@@ -915,6 +920,7 @@ function composeCover(
         color,
         align: "center",
         text: line,
+        field,
       });
     });
     return lines.length * lineHeight;
@@ -929,7 +935,7 @@ function composeCover(
   if (contact.length) {
     const height = contact.length * metrics.lineHeight(9.5);
     const top = floor - height;
-    put(contact, top, 9.5, "regular", COLORS.muted, inner);
+    put(contact, top, 9.5, "regular", COLORS.muted, inner, "coverContact");
     page.rules.push({ x: W / 2 - 26, y: top - 15, w: 52, color: COLORS.rule });
     floor = top - 32;
   }
@@ -957,7 +963,7 @@ function composeCover(
     const size = usable
       ? fitted
       : Math.min(11, (11 * inner) / Math.max(metrics.widthOf(text, 11, "regular"), 1));
-    y += put([text], y, size, "regular", COLORS.accent, inner) + 20;
+    y += put([text], y, size, "regular", COLORS.accent, inner, "churchName") + 20;
   }
 
   // --- the middle, measured so the photograph can take what is left --------
@@ -980,7 +986,7 @@ function composeCover(
     middle.push({
       height: lines.length * metrics.lineHeight(size),
       gap: 0,
-      place: (top) => put(lines, top, size, "bold", COLORS.strong, inner),
+      place: (top) => put(lines, top, size, "bold", COLORS.strong, inner, "coverTitle"),
     });
     middle.push({
       height: 1,
@@ -994,7 +1000,7 @@ function composeCover(
     middle.push({
       height: subtitle.length * metrics.lineHeight(11),
       gap: 15,
-      place: (top) => put(subtitle, top, 11, "regular", COLORS.muted, inner),
+      place: (top) => put(subtitle, top, 11, "regular", COLORS.muted, inner, "coverSubtitle"),
     });
   }
 
@@ -1006,7 +1012,8 @@ function composeCover(
     middle.push({
       height: statement.length * metrics.lineHeight(10.5),
       gap: 22,
-      place: (top) => put(statement, top, 10.5, "italic", COLORS.ink, statementWidth),
+      place: (top) =>
+        put(statement, top, 10.5, "italic", COLORS.ink, statementWidth, "coverStatement"),
     });
   }
 

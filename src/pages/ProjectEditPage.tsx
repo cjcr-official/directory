@@ -55,6 +55,23 @@ import { PhotoInput } from "@/components/PhotoInput";
 const PENDING_LOGO = "pending:cover-logo";
 const PENDING_PHOTO = "pending:cover-photo";
 
+/**
+ * The five lines on a cover that come from a setting, and the grey words each
+ * holds its place with while it is being typed in. Named after what belongs
+ * there, because they are read on the cover by somebody who has never seen the
+ * field they came from.
+ */
+const COVER_PLACEHOLDER: Record<string, string> = {
+  churchName: "Your church's name",
+  coverTitle: "The book's title",
+  coverSubtitle: "A subtitle",
+  coverStatement: "A verse, or a sentence about the congregation",
+  coverContact: "The address, and how to reach the office",
+};
+
+/** The two of them that may hold more than one line. */
+const COVER_MULTILINE = new Set(["coverStatement", "coverContact", "coverTitle", "coverSubtitle"]);
+
 export function ProjectEditPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -230,11 +247,71 @@ export function ProjectEditPage() {
     [safeSettings, coverBlobs, coverRemoved],
   );
 
+  /*
+   * A line being typed in keeps its place even when it has been emptied.
+   *
+   * Composed, a setting with nothing in it is not on the cover at all - which
+   * is right on paper and a trap on screen: clear the subtitle and the box you
+   * were typing in vanishes under the cursor. So an emptied line stands in with
+   * grey words for exactly as long as it has the caret, and no longer. A
+   * placeholder that outstayed the caret would have the screen laying the cover
+   * out around type the paper never sees - and on a cover that matters more
+   * than on a tag, because everything below a line moves when it goes.
+   */
+  const [editing, setEditing] = useState<string | null>(null);
+
   /** What the cover would be if it were saved and printed exactly now. */
   const coverPage = useMemo(() => {
     if (!metrics || !safeSettings.includeCover) return null;
-    return composeCoverPage(drawnSettings, metrics);
-  }, [metrics, safeSettings.includeCover, drawnSettings]);
+    const standIn = (field: string, value: string) =>
+      value.trim() || (editing === field ? COVER_PLACEHOLDER[field] : "");
+    return composeCoverPage(
+      {
+        ...drawnSettings,
+        churchName: standIn("churchName", drawnSettings.churchName),
+        coverTitle: standIn("coverTitle", drawnSettings.coverTitle),
+        coverSubtitle: standIn("coverSubtitle", drawnSettings.coverSubtitle),
+        coverStatement: standIn("coverStatement", drawnSettings.coverStatement),
+        coverContact: standIn("coverContact", drawnSettings.coverContact),
+      },
+      metrics,
+    );
+  }, [metrics, safeSettings.includeCover, drawnSettings, editing]);
+
+  /*
+   * The cover, handing its own type back.
+   *
+   * Writing goes through the same set() the pane's own fields use, so the two
+   * are never out of step and Save means what it always did.
+   */
+  const editableCover = useMemo(
+    () => ({
+      value: (field: string) => (settings?.[field as keyof typeof settings] as string) ?? "",
+      placeholder: (field: string) => COVER_PLACEHOLDER[field] ?? "",
+      multiline: (field: string) => COVER_MULTILINE.has(field),
+      onChange: (field: string, value: string) => set({ [field]: value }),
+      onFocus: (field: string) => setEditing(field),
+      onBlur: (field: string) => setEditing((current) => (current === field ? null : current)),
+      /*
+       * The church's name is the one line the composer does not draw as it was
+       * typed: it sets it in capitals with a space between every letter, which
+       * is a shape no field can hold. So the box that edits it wears the shape
+       * instead - capitals and tracking in CSS - and holds the name as it was
+       * written. The tracking is added after the last letter as well, which
+       * pushes a centred line left by half of it; half of it back as an indent
+       * puts it where the composed line sits. The same correction the code
+       * field on Settings makes, for the same reason.
+       *
+       * It is near rather than exact - CSS spaces letters, the composer spaces
+       * them with spaces - and it is only worn while the caret is in the box.
+       */
+      style: (field: string) =>
+        field === "churchName"
+          ? ({ textTransform: "uppercase", letterSpacing: "0.28em", textIndent: "0.14em" } as const)
+          : undefined,
+    }),
+    [settings],
+  );
 
   // Saved photographs, fetched once per set of paths rather than per keystroke.
   const [savedCoverUrls, setSavedCoverUrls] = useState<Map<string, string>>(new Map());
@@ -1057,6 +1134,7 @@ export function ProjectEditPage() {
                       height={coverPage.height}
                       photoUrls={coverUrls}
                       typeface={coverPage.typeface}
+                      editable={editableCover}
                     />
                     {/* Two facts rather than a sentence: which paper, and the
                         face it is set in. That it redraws as you type is
@@ -1064,6 +1142,9 @@ export function ProjectEditPage() {
                     <figcaption className="hint">
                       {paperName(safeSettings.pageSize)} landscape ·{" "}
                       {TYPEFACE_LABELS[safeSettings.typeface].toLowerCase()}
+                      <span className="tag-figure-tip">
+                        Every line of the cover's own words can be changed by clicking it here.
+                      </span>
                     </figcaption>
                   </figure>
                 ) : safeSettings.includeCover ? (
