@@ -121,8 +121,9 @@ export function RestorePanel() {
   if (!canEdit) {
     return (
       <div className="card">
-        <div className="card-head">
+        <div className="card-head column">
           <h2>Restore from a backup</h2>
+          <span className="muted">Nothing is written until you say so.</span>
         </div>
         <div className="card-body">
           <Notice kind="warn">
@@ -147,14 +148,11 @@ export function RestorePanel() {
 
   return (
     <div className="card">
-      <div className="card-head">
+      <div className="card-head column">
         <h2>Restore from a backup</h2>
+        <span className="muted">Nothing is written until you say so.</span>
       </div>
       <div className="card-body">
-        <p className="small">
-          Choose a backup file to see what is in it. Nothing is written until you say so.
-        </p>
-
         {/* No accept filter on purpose. iOS greys out anything outside it and
             decides what a .zip is by its own file type rather than the
             extension, so a backup that cannot be picked at all is the worse
@@ -168,12 +166,16 @@ export function RestorePanel() {
           disabled={reading || busy}
           onChange={(event) => void choose(event.target.files?.[0])}
         />
-        <label className="btn file-button" htmlFor="restore-file">
-          {reading ? "Reading…" : plan ? "Choose a different file" : "Choose a backup file"}
-        </label>
 
         {plan ? (
           <>
+            {/* Second in the body once a file is read, because by then the
+                first thing to say is what that file holds. Choosing another
+                one is the correction, not the task. */}
+            <label className="btn small file-button" htmlFor="restore-file">
+              {reading ? "Reading…" : "Choose a different file"}
+            </label>
+
             <dl className="plan-figures">
               <div>
                 <dt>File</dt>
@@ -285,26 +287,14 @@ export function RestorePanel() {
                 Nothing is missing. Everything in this file is already in the directory.
               </Notice>
             ) : null}
-
-            <div className="row tight" style={{ marginTop: 12 }}>
-              <button
-                type="button"
-                className={`btn ${replacing ? "danger" : "primary"}`}
-                disabled={busy || !confirmed || nothingToDo}
-                onClick={() => void restore()}
-              >
-                {busy
-                  ? "Restoring…"
-                  : replacing
-                    ? "Replace everything"
-                    : "Add back what is missing"}
-              </button>
-              <button type="button" className="btn ghost" disabled={busy} onClick={forget}>
-                Cancel
-              </button>
-            </div>
           </>
-        ) : null}
+        ) : (
+          <p className="small">
+            Choose a backup file and it is read and described here: what it holds, and what is in it
+            that the directory no longer has. Adding back what is missing changes nothing that is
+            already here.
+          </p>
+        )}
 
         {progress ? (
           <div className="row" style={{ marginTop: 14 }}>
@@ -360,6 +350,35 @@ export function RestorePanel() {
             </Notice>
           </div>
         ) : null}
+      </div>
+
+      {/* What you press, ruled off at the bottom of the panel where the other
+          two keep theirs. Before a file is read there is nothing to commit, so
+          the foot holds the chooser instead - which is the only thing this
+          panel can do at that point, and the reason to be looking at it. */}
+      <div className="panel-foot">
+        {plan ? (
+          <>
+            <button
+              type="button"
+              className={`btn ${replacing ? "danger" : "primary"}`}
+              disabled={busy || !confirmed || nothingToDo}
+              onClick={() => void restore()}
+            >
+              {busy ? "Restoring…" : replacing ? "Replace everything" : "Add back what is missing"}
+            </button>
+            <button type="button" className="btn ghost" disabled={busy} onClick={forget}>
+              Cancel
+            </button>
+          </>
+        ) : (
+          <>
+            <label className="btn file-button" htmlFor="restore-file">
+              {reading ? "Reading…" : "Choose a backup file"}
+            </label>
+            <span className="note">A .zip this app took.</span>
+          </>
+        )}
       </div>
     </div>
   );

@@ -80,8 +80,9 @@ export function ImportPanel() {
   if (!canEdit) {
     return (
       <div className="card">
-        <div className="card-head">
+        <div className="card-head column">
           <h2>Import from Planning Center</h2>
+          <span className="muted">Only ever adds. Nothing already here is changed.</span>
         </div>
         <div className="card-body">
           <Notice kind="warn">
@@ -97,14 +98,14 @@ export function ImportPanel() {
 
   return (
     <div className="card">
-      <div className="card-head">
+      <div className="card-head column">
         <h2>Import from Planning Center</h2>
+        <span className="muted">Only ever adds. Nothing already here is changed.</span>
       </div>
       <div className="card-body">
         <p className="small measure">
           In Planning Center: <strong>People → the list you want → Actions → Export</strong>, as a
-          spreadsheet. Choose that file here to see what it would add. Nothing already in the
-          directory is changed.
+          spreadsheet.
         </p>
 
         {/* No accept filter, for the reason the restore panel gives: iOS greys
@@ -118,12 +119,13 @@ export function ImportPanel() {
           disabled={reading || busy}
           onChange={(event) => void choose(event.target.files?.[0])}
         />
-        <label className="btn file-button" htmlFor="import-file">
-          {reading ? "Reading…" : plan ? "Choose a different file" : "Choose an export"}
-        </label>
 
         {plan ? (
           <>
+            <label className="btn small file-button" htmlFor="import-file">
+              {reading ? "Reading…" : "Choose a different file"}
+            </label>
+
             <dl className="plan-figures">
               <div>
                 <dt>File</dt>
@@ -159,27 +161,6 @@ export function ImportPanel() {
                 </div>
               ) : null}
             </dl>
-
-            <div className="row" style={{ marginTop: 14 }}>
-              <button
-                type="button"
-                className="btn primary"
-                disabled={busy || adding === 0}
-                onClick={() => void bringIn()}
-              >
-                {busy
-                  ? "Adding…"
-                  : adding === 0
-                    ? "Nothing new to add"
-                    : `Add ${join([
-                        count(plan.households.length, "family", "families"),
-                        count(plan.people.length, "person", "people"),
-                      ])}`}
-              </button>
-              <button type="button" className="btn ghost" disabled={busy} onClick={forget}>
-                Cancel
-              </button>
-            </div>
           </>
         ) : null}
 
@@ -217,8 +198,43 @@ export function ImportPanel() {
 
         <p className="muted small measure" style={{ marginTop: 14 }}>
           Comes in: names, the family each person is in, addresses, phones, emails, birthdays,
-          anniversaries, background check dates and medical notes.
+          anniversaries, background check dates and medical notes. Photographs are not in an export.
         </p>
+      </div>
+
+      {/* The same foot the other two panels keep: what you press, ruled off at
+          the bottom, with the chooser standing in for it until there is a file
+          to say anything about. */}
+      <div className="panel-foot">
+        {plan ? (
+          <>
+            <button
+              type="button"
+              className="btn primary"
+              disabled={busy || adding === 0}
+              onClick={() => void bringIn()}
+            >
+              {busy
+                ? "Adding…"
+                : adding === 0
+                  ? "Nothing new to add"
+                  : `Add ${join([
+                      count(plan.households.length, "family", "families"),
+                      count(plan.people.length, "person", "people"),
+                    ])}`}
+            </button>
+            <button type="button" className="btn ghost" disabled={busy} onClick={forget}>
+              Cancel
+            </button>
+          </>
+        ) : (
+          <>
+            <label className="btn file-button" htmlFor="import-file">
+              {reading ? "Reading…" : "Choose an export"}
+            </label>
+            <span className="note">An .xlsx or .csv export.</span>
+          </>
+        )}
       </div>
     </div>
   );
