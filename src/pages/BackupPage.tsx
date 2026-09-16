@@ -99,7 +99,11 @@ export function BackupPage() {
         </div>
       </div>
 
-      <div className="grid two" style={{ alignItems: "start" }}>
+      {/* All three in one row rather than a pair with the import card slung
+          underneath: they are three things to do with one file, and a card
+          twice the width of the two above it read as a different kind of
+          thing. The stylesheet decides how many fit. */}
+      <div className="grid backup-panels">
         <div className="card">
           <div className="card-head">
             <h2>Download a backup</h2>
@@ -184,11 +188,6 @@ export function BackupPage() {
         </div>
 
         <RestorePanel />
-      </div>
-
-      {/* Under the pair rather than beside them: it is the one of the three
-          with a list to show, and it is the thing a church does once. */}
-      <div style={{ marginTop: 16 }}>
         <ImportPanel />
       </div>
     </div>

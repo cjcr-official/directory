@@ -1853,9 +1853,10 @@ th.num {
 }
 
 /* The same measure a notice keeps, for a paragraph that is not in one. The
-   import card runs the width of the page because its figures want the room,
-   and a sentence does not: at 1800px it came to a hundred and seventy
-   characters a line. */
+   import card used to run the width of the page, where a sentence came to a
+   hundred and seventy characters a line; it sits in a column with the other
+   two backup panels now and never gets near this. Kept as the backstop it was
+   always meant to be, for any card that does get the room. */
 .measure {
   max-width: 92ch;
 }
@@ -4060,7 +4061,75 @@ th.num {
   font-size: 0.85em;
 }
 
-/* --- restoring a backup --------------------------------------------------- */
+/* --- the backup tab: download, restore, import ---------------------------- */
+
+/*
+ * Three cards of one size, however wide the desk is.
+ *
+ * They were a .grid.two with the import card dropped underneath, which on a
+ * 1920 screen came out as two 800px cards over one 1616px card: three
+ * siblings, three widths, and a right-hand edge that moved twice on the way
+ * down the page. The import card was the worst of it, because .measure caps
+ * its sentences at 92ch and nothing caps its figures - so at full width the
+ * prose stopped at 1083px and the table beside it ran on to 1865, two right
+ * edges inside the one card. A term and its value, set apart by
+ * space-between, ended up 1296px from each other: "Holds" on one side of the
+ * screen and "412 rows" on the other, with a thousand pixels of nothing in
+ * between to read across.
+ *
+ * One auto-fit row of all three fixes every part of that at once, because the
+ * card width is what was wrong rather than anything inside it. The track asks
+ * for 420px before it will make another column - the same number, and the
+ * same argument, as the form grid higher up this file: three columns wait
+ * until there is room to fill them rather than arriving cramped. So a 1920
+ * desk gets three of about 530px, a 1600 one gets three of 420, a 1440 laptop
+ * gets two of 560 with the import card under the short download card, and a
+ * phone gets one. The order is the order they are written in, so import is
+ * still last wherever it lands.
+ *
+ * align-items: start rather than stretch: the restore card grows by half
+ * again when a file is chosen, and there is no reason for the other two to
+ * grow with it.
+ *
+ * On .grid rather than standing alone, so the three cards get the rule above
+ * that drops the stacking margin from a card that follows another one. Left
+ * to itself the row came out with the second and third headings sixteen
+ * pixels below the first.
+ */
+.grid.backup-panels {
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  align-items: start;
+}
+
+/*
+ * How far along a backup, a restore or an import is.
+ *
+ * There was no rule for this at all: the markup has been in all three panels
+ * since they were written, and .progress-track is a bare span, so inside the
+ * flex .row it blockified to 0x0 and the fill div took 46% of nothing. The
+ * label beside it has been announcing "Adding photographs - 98 of 212" next
+ * to a gap where the bar should be, on every screen, for as long as the
+ * feature has existed.
+ *
+ * Capped rather than left to take the room: the bar says how far along, and
+ * five hundred pixels of it says that no better than two hundred and sixty
+ * do. --line for the track and --accent for the fill, which is the same pair
+ * the preview's progress strip uses.
+ */
+.progress-track {
+  flex: 1 1 140px;
+  max-width: 260px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+.progress-track > div {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
 
 /* The real file input is unstyleable and its "No file chosen" is worse than
    nothing, so it is hidden and its label wears the button. Hidden with
@@ -4121,14 +4190,24 @@ th.num {
   overflow-wrap: anywhere;
 }
 
-/* Two things of very different size, so each says what it does rather than
-   being a word in a segmented control. */
+/*
+ * Two things of very different size, so each says what it does rather than
+ * being a word in a segmented control.
+ *
+ * Every rule here is scoped to .choices, because the settings block below
+ * names a .choice of its own - a tile with its label under the radio rather
+ * than beside it - and being written later in the file it was winning all
+ * seven of these. What that looked like on Backup was a radio sitting alone on
+ * a line above the words it belongs to, on the one control in the app that
+ * offers to delete the whole directory. Two unrelated controls sharing a class
+ * name is the fault; the parent each of them always has is the fix.
+ */
 .choices {
   display: grid;
   gap: 8px;
   margin: 16px 0 4px;
 }
-.choice {
+.choices .choice {
   display: flex;
   gap: 10px;
   align-items: flex-start;
@@ -4137,28 +4216,28 @@ th.num {
   border-radius: 10px;
   cursor: pointer;
 }
-.choice input {
+.choices .choice input {
   margin-top: 2px;
   flex: none;
   accent-color: var(--accent);
 }
-.choice.active {
+.choices .choice.active {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
-.choice.danger.active {
+.choices .choice.danger.active {
   border-color: var(--danger);
   background: color-mix(in srgb, var(--danger) 7%, transparent);
 }
-.choice.disabled {
+.choices .choice.disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
-.choice strong {
+.choices .choice strong {
   display: block;
   font-size: 0.9rem;
 }
-.choice-hint {
+.choices .choice-hint {
   display: block;
   margin-top: 3px;
   font-size: 0.78rem;
@@ -4180,7 +4259,7 @@ th.num {
   gap: 10px;
 }
 
-.choice {
+.choice-row .choice {
   flex: 1 1 170px;
   display: flex;
   flex-direction: column;
@@ -4191,7 +4270,7 @@ th.num {
   background: var(--paper);
   cursor: pointer;
 }
-.choice:hover {
+.choice-row .choice:hover {
   border-color: var(--accent-line);
 }
 /* The chosen one is said with the border rather than with a tint. A tinted
@@ -4199,11 +4278,11 @@ th.num {
    comes to 4.18:1 - under what small text needs, on the one tile a person is
    most likely to read. Doubling the line costs nothing and moves nothing: the
    ring is a shadow, so the tile does not grow by a pixel when it is picked. */
-.choice.active {
+.choice-row .choice.active {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
 }
-.choice:focus-within {
+.choice-row .choice:focus-within {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -4217,7 +4296,7 @@ th.num {
   font-size: 0.9rem;
   font-weight: 600;
 }
-.choice-hint {
+.choice-row .choice-hint {
   color: var(--ink-3);
   font-size: 0.78rem;
 }
