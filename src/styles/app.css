@@ -807,8 +807,12 @@ p:last-child {
 .role-key-item dt {
   margin-bottom: 4px;
 }
+/* The blurb is read against the bubble above it, so it is indented to the text
+   inside one rather than to the edge of the card - beside the table and under
+   it alike, which is two places the same key is drawn. */
 .role-key-item dd {
   margin: 0;
+  padding-left: 2px;
 }
 
 /*
@@ -850,11 +854,6 @@ p:last-child {
 }
 .admins-main .notice {
   max-width: none;
-}
-.admins-aside .role-key-item dd {
-  /* The blurb is read against the bubble above it, so it is indented to the
-     text inside one rather than to the edge of the pane. */
-  padding-left: 2px;
 }
 
 /*
@@ -1116,16 +1115,36 @@ input[type="radio"] {
   position: relative;
   display: inline-flex;
 }
-.role-trigger {
-  /* A pill is set for a label; this one is pressed, so it is given the height
-     of a small button and the padding to be hit on a phone. */
-  min-height: var(--control-h-sm);
-  padding: 2px 8px 2px 10px;
-  gap: 4px;
-  cursor: pointer;
-  font: inherit;
+
+/*
+ * One bubble for a level, wherever the level is stated: in the key, on the row
+ * that cannot be changed, and on the control that changes one.
+ *
+ * It was three sizes before this. The frozen owner's row is a plain pill and
+ * the rows under it are buttons, so the one word an owner reads down that
+ * column - Owner, Owner, Editor - was set smaller on the row that happened not
+ * to be pressable, which reads as a different kind of thing rather than the
+ * same thing settled. The type is one size now and only the height differs:
+ * the bubbles in the control column are as tall as a control, because two of
+ * the three are pressed.
+ *
+ * font-family rather than the font shorthand: the trigger is a button and
+ * brings its own, and the shorthand would take the size back off this rule.
+ */
+.role-bubble {
+  font-family: inherit;
   font-size: 0.78rem;
   font-weight: 600;
+  padding: 2px 10px;
+}
+.admins-role .role-bubble {
+  min-height: var(--control-h-sm);
+}
+.role-trigger {
+  /* The caret takes the room on the right that the word would have had. */
+  padding-right: 8px;
+  gap: 4px;
+  cursor: pointer;
 }
 .role-trigger:hover:not(:disabled) {
   border-color: var(--line-strong);
@@ -3910,13 +3929,19 @@ th.num {
     display: none;
   }
 
-  /* A thumb, not a pointer: the bubble takes the full height of a control on
-     a phone, which is also what keeps the row the height it has always been -
-     the Delete beside it is set to the same. */
-  .role-trigger {
-    min-height: var(--control-h);
-    padding: 3px 9px 3px 12px;
+  /* A thumb, not a pointer: in the table the bubble takes the full height of a
+     control, which is also what keeps the row the height it has always been -
+     the Delete beside it is set to the same. The type goes up with it, in the
+     key as well, so the four in the key are the four in the table. */
+  .role-bubble {
     font-size: 0.82rem;
+    padding: 3px 12px;
+  }
+  .admins-role .role-bubble {
+    min-height: var(--control-h);
+  }
+  .role-trigger {
+    padding-right: 9px;
   }
   .role-choice {
     padding: 8px 8px;
