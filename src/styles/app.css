@@ -818,13 +818,13 @@ p:last-child {
 /*
  * A roster and its key, on a desk.
  *
- * Four short columns and a church office's three or four people do not want
- * eighteen hundred pixels: stretched across one, the role sat a foot from the
- * name it belonged to and the Delete another foot past that, which is a table
- * you read with a ruler. The list is capped at about the width its own
- * contents ask for and what is left goes to the key, which is the thing on
- * this page that was a full-width card underneath saying what a page of
- * bubbles already half says.
+ * The list takes the room and the key takes a column beside it. What made a
+ * desk monitor read badly was never the width itself - it was four columns
+ * clustered at the two ends of it, the role a foot from the name it belonged
+ * to and the Delete a foot past that. The columns are ruled to the same right
+ * edge now and a fifth arrives with the width (see admins-signed below), so
+ * the page fills the screen it is given rather than stopping in the middle of
+ * it with a third of the desk left over.
  *
  * 1200 rather than the 1080 the two panes first fit in: the list needs about
  * 810px before a double-barrelled surname stops wrapping and an address stops
@@ -840,7 +840,7 @@ p:last-child {
 }
 @media (min-width: 1200px) {
   .admins-layout {
-    grid-template-columns: minmax(0, 960px) minmax(240px, 300px);
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
     align-items: start;
   }
 }
@@ -889,8 +889,49 @@ p:last-child {
    name and address the phone stacks are one line here, and it is given the
    height to be read at. */
 .admins-table td {
-  padding-top: 10px;
-  padding-bottom: 10px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+/*
+ * When somebody signed up, on a screen with the room to say so.
+ *
+ * Off by default, because it is the fifth column of a table whose first four
+ * already fit a laptop, and a date squeezed in beside an email address costs
+ * the address its last letters. Above 1500 the list has three hundred pixels
+ * going spare and this is what they are worth spending on.
+ */
+/* Through .admins-table, because the phone turns every cell in this table into
+   a block with a rule of its own - and a rule naming a class and an element
+   outranks one naming a class, wherever it happens to sit in the file. */
+.admins-table .admins-signed-head,
+.admins-table .admins-signed {
+  display: none;
+}
+@media (min-width: 1400px) {
+  .admins-table .admins-signed-head,
+  .admins-table .admins-signed {
+    display: table-cell;
+    white-space: nowrap;
+  }
+  /*
+   * And the three columns of text are spread across the width rather than
+   * huddled at the left of it. A table hands its spare room to whichever
+   * column has the longest content, so on a wide screen the addresses grew a
+   * three-hundred-pixel margin and the name, the address and the date ended up
+   * in the left half with a hole after them. Shares of the width instead: the
+   * air is divided between the columns, which is what makes a wide table read
+   * as ruled rather than as half-empty.
+   */
+  .admins-table th:first-child {
+    width: 26%;
+  }
+  .admins-table th:nth-child(2) {
+    width: 34%;
+  }
+  .admins-signed-head {
+    width: 18%;
+  }
 }
 .admins-who {
   font-weight: 560;

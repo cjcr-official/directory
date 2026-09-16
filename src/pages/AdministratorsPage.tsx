@@ -3,7 +3,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { ConfirmButton, LoadingScreen, Notice } from "@/components/ui";
 import { deleteAccount, fetchProfiles, updateProfile } from "@/lib/queries";
 import type { AppRole, ProfileRow } from "@/lib/database.types";
-import { message } from "@/lib/format";
+import { describeWhen, message } from "@/lib/format";
 
 /**
  * "No access" is not a role. The database knows three - owner, editor, viewer -
@@ -23,6 +23,18 @@ const LEVELS: { value: string; label: string; blurb: string }[] = [
 
 function levelPatch(value: string): Partial<ProfileRow> {
   return value === NO_ACCESS ? { is_active: false } : { role: value as AppRole, is_active: true };
+}
+
+/**
+ * "today", "yesterday", "Thursday", "12 June 2025" - when the account appeared.
+ *
+ * describeWhen writes it for the middle of a sentence, and a column is not
+ * one, so the preposition comes off. The fuzzy end of it is the useful end
+ * here: the question this column answers is which of these accounts is the
+ * stranger who turned up this week.
+ */
+function signedUp(iso: string | null | undefined): string {
+  return describeWhen(iso).replace(/^on /, "");
 }
 
 /** What a row is at the moment: its role, unless access has been taken away. */
@@ -297,6 +309,14 @@ export function AdministratorsPage() {
                 <tr>
                   <th>Name</th>
                   <th>Email</th>
+                  {/* Only where there is width going spare - see the
+                      stylesheet. A church office has three administrators and
+                      four columns about them do not need a desk monitor, but
+                      given one, when somebody appeared is the fact worth
+                      spending it on: it is how the stranger who signed
+                      themselves up on Tuesday is told from the volunteer who
+                      has been here since the directory was set up. */}
+                  <th className="admins-signed-head">Signed up</th>
                   <th className="admins-role-head">Role</th>
                   {/* The bubble ends the ladder at "No access", which is the
                       whole of what an access column had to say - it stood
@@ -323,6 +343,7 @@ export function AdministratorsPage() {
                         {isMe ? <span className="pill admins-you">You</span> : null}
                       </td>
                       <td className="admins-email small muted">{row.email}</td>
+                      <td className="admins-signed small muted">{signedUp(row.created_at)}</td>
                       <td className="admins-role">
                         {isOwner && !lastOwner ? (
                           <RoleMenu
