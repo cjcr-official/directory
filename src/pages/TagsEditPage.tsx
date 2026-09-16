@@ -259,6 +259,15 @@ export function TagsEditPage() {
    */
   const paleBand = safeSettings.tagStyle === "banner" && bandContrast(safeSettings.tagAccent) < 4.5;
 
+  /*
+   * Whether the colour on the tag is one of the six or one somebody picked.
+   *
+   * The six say which is in use by being ringed, and a colour of their own is
+   * no different - without this the row shows nothing as chosen at all the
+   * moment anybody leaves the offered ones.
+   */
+  const ownColour = !TAG_ACCENTS.some((accent) => accent.value === safeSettings.tagAccent);
+
   function set(patch: Partial<ProjectSettings>) {
     setSettings((current) => (current ? { ...current, ...patch } : current));
   }
@@ -469,13 +478,6 @@ export function TagsEditPage() {
                   hint={paleBand ? undefined : "Band, rules and footer line."}
                 >
                   <div className="colour-field">
-                    <input
-                      id="tag_accent"
-                      type="color"
-                      value={safeSettings.tagAccent}
-                      disabled={!canEdit}
-                      onChange={(event) => set({ tagAccent: event.target.value })}
-                    />
                     {TAG_ACCENTS.map((accent) => (
                       <button
                         key={accent.value}
@@ -489,6 +491,17 @@ export function TagsEditPage() {
                         onClick={() => set({ tagAccent: accent.value })}
                       />
                     ))}
+                    {/* Last, because that is the order the row is read in: the
+                        colours a badge is usually printed in, or any other. */}
+                    <span className={`any-colour${ownColour ? " on" : ""}`} title="Any colour">
+                      <input
+                        id="tag_accent"
+                        type="color"
+                        value={safeSettings.tagAccent}
+                        disabled={!canEdit}
+                        onChange={(event) => set({ tagAccent: event.target.value })}
+                      />
+                    </span>
                   </div>
                   {/* Only when it is true, and then in one line: the long
                       version of this was three, and the fix is a colour. */}
