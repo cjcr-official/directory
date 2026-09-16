@@ -2695,6 +2695,66 @@ th.num {
   border-left: 1px dashed rgb(20 32 31 / 26%);
 }
 
+/*
+ * Type on the tag, typed on the tag.
+ *
+ * The lines the composer marked are drawn as inputs rather than as text, so
+ * the church's name and the small print are changed where they are read
+ * instead of by hunting for the field in the pane beside them. Every metric
+ * that matters comes from the run itself and is set inline - the face, the
+ * size, the weight, the alignment, the colour - because the whole point is
+ * that what is typed is set exactly as it will print.
+ *
+ * So everything here is a refusal: the app's own field, which is a bordered
+ * white box 0.92rem high with ten pixels of padding, has to be talked all the
+ * way back down to being a line of type on a piece of paper.
+ */
+.sheet .run-edit {
+  font: inherit;
+  padding: 0;
+  border: 0;
+  border-radius: 1.5pt;
+  background: transparent;
+  color: inherit;
+  min-width: 0;
+  max-width: none;
+  appearance: none;
+  cursor: text;
+  /* The run's own box, and not a pixel more: an outline rather than a border
+     or a ring, because either of those is laid out and would shift the line it
+     is drawn around off the position the composer measured. */
+  outline: 0.75pt solid transparent;
+  outline-offset: 1pt;
+  transition: none;
+}
+/* Discoverability, and nothing else. Somebody looking at a finished tag has no
+   reason to think the words on it are a field, so the tint under the pointer
+   is the whole of how they find out. Faint enough that it never reads as part
+   of the tag being designed. */
+.sheet .run-edit:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.sheet .run-edit:focus-visible,
+.sheet .run-edit:focus {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  outline-color: var(--accent);
+}
+/* An emptied line still holds its place, in words that say what belongs
+   there - see the placeholders in TagsEditPage for why the box may not be
+   allowed to disappear under the cursor. */
+.sheet .run-edit::placeholder {
+  color: color-mix(in srgb, currentColor 45%, transparent);
+  opacity: 1;
+}
+
+/* The sentence under the tag that says the tag can be typed on. Its own line,
+   because the caption above it is two facts about what is drawn and this is an
+   instruction about what to do with it. */
+.tag-figure-tip {
+  display: block;
+  margin-top: 3px;
+}
+
 /* --- the cover and the tag, on the pages that edit them ------------------ */
 
 .cover-figure {

@@ -280,6 +280,7 @@ function placeTag(
       align: plan.logo ? "right" : "center",
       text: plan.church.text,
       face: smallFace,
+      field: "churchName",
     });
   }
 
@@ -330,6 +331,7 @@ function placeTag(
       align: "center",
       text: plan.tagline.text,
       face: smallFace,
+      field: "tagLine",
     });
   }
 

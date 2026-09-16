@@ -20,6 +20,76 @@ interface Props {
   limit?: number;
 }
 
+/**
+ * What a preview needs to hand back a line of type for editing in place.
+ *
+ * The composer marks a run with the setting it came from (TextRun.field); this
+ * says what that setting currently holds, what to show when it holds nothing,
+ * and where to put what gets typed. A preview given none of this draws the
+ * same page as ever - the book's does, and the tag's did until the day this
+ * was written.
+ */
+export interface EditableRuns {
+  value: (field: string) => string;
+  placeholder: (field: string) => string;
+  onChange: (field: string, value: string) => void;
+  /**
+   * Which line is being typed into, and which has been left.
+   *
+   * A preview that stands a placeholder in for an emptied line has to know
+   * when to stop: a line nobody is editing is not on the tag, and drawing it
+   * anyway would have the screen showing type the paper will not print - and
+   * laying the rest of the tag out around it.
+   */
+  onFocus?: (field: string) => void;
+  onBlur?: (field: string) => void;
+}
+
+/**
+ * A run of type that can be typed over where it is drawn.
+ *
+ * A real input rather than a contentEditable div, and rather than a div that
+ * swaps itself for an input when clicked: an input is the one of the three
+ * React can hold the value of without fighting the browser for the caret, and
+ * the tag re-fits its type on every keystroke - the name shrinks, the heading
+ * re-measures - so the element being typed into is re-rendered constantly. It
+ * carries the run's own metrics, so what is typed is set in the face, size,
+ * weight and alignment it will print in.
+ */
+function EditableRun({
+  run,
+  fontStack,
+  editable,
+}: {
+  run: TextRun & { field: string };
+  fontStack: string;
+  editable: EditableRuns;
+}) {
+  return (
+    <input
+      type="text"
+      className="run-edit"
+      value={editable.value(run.field)}
+      placeholder={editable.placeholder(run.field)}
+      aria-label={editable.placeholder(run.field)}
+      onChange={(event) => editable.onChange(run.field, event.target.value)}
+      onFocus={() => editable.onFocus?.(run.field)}
+      onBlur={() => editable.onBlur?.(run.field)}
+      /* Both of these are already committed - the page has been redrawn on
+         every keystroke - so both mean the same thing here: done. Enter has to
+         be caught whatever it means, because this sits inside the form whose
+         submit button is Save. */
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === "Escape") {
+          event.preventDefault();
+          event.currentTarget.blur();
+        }
+      }}
+      style={{ ...runStyle(run, fontStack), height: `${run.size * 1.25}pt` }}
+    />
+  );
+}
+
 function runStyle(run: TextRun, fontStack: string): React.CSSProperties {
   return {
     position: "absolute",
@@ -55,10 +125,12 @@ const Page = memo(function Page({
   page,
   photoUrls,
   fontStack,
+  editable,
 }: {
   page: BookPage;
   photoUrls: Map<string, string>;
   fontStack: string;
+  editable?: EditableRuns;
 }) {
   return (
     <Fragment>
@@ -174,11 +246,20 @@ const Page = memo(function Page({
               })()
             : null}
 
-          {card.runs.map((run, i) => (
-            <div key={i} style={runStyle(run, fontStack)}>
-              {run.text}
-            </div>
-          ))}
+          {card.runs.map((run, i) =>
+            editable && run.field ? (
+              <EditableRun
+                key={i}
+                run={run as TextRun & { field: string }}
+                fontStack={fontStack}
+                editable={editable}
+              />
+            ) : (
+              <div key={i} style={runStyle(run, fontStack)}>
+                {run.text}
+              </div>
+            ),
+          )}
         </Fragment>
       ))}
 
@@ -289,12 +370,15 @@ export function CoverCanvas({
   height,
   photoUrls,
   typeface,
+  editable,
 }: {
   page: BookPage;
   width: number;
   height: number;
   photoUrls: Map<string, string>;
   typeface: Typeface;
+  /** Given, the lines the composer marked can be typed over where they sit. */
+  editable?: EditableRuns;
 }) {
   const holder = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.5);
@@ -353,7 +437,7 @@ export function CoverCanvas({
             transformOrigin: "top left",
           }}
         >
-          <Page page={page} photoUrls={photoUrls} fontStack={fontStack} />
+          <Page page={page} photoUrls={photoUrls} fontStack={fontStack} editable={editable} />
         </div>
       </div>
     </div>
