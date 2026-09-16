@@ -91,7 +91,7 @@ export function BackupPage() {
   const age = describeAge(lastBackup);
 
   return (
-    <div className="page">
+    <div className="page backup-page">
       <div className="page-head">
         <div className="grow">
           <h1>Backup</h1>
@@ -99,41 +99,54 @@ export function BackupPage() {
         </div>
       </div>
 
-      {/* All three in one row rather than a pair with the import card slung
-          underneath: they are three things to do with one file, and a card
-          twice the width of the two above it read as a different kind of
-          thing. The stylesheet decides how many fit. */}
+      {/* What a backup would hold, and how long it has been. These are facts
+          about the directory rather than about any one of the three panels, so
+          they are stated once at the top instead of as a line of small print
+          inside the download card - which is where they used to live, and
+          where the one that actually decides anything, how long it has been,
+          was the last few words of a paragraph. */}
+      <div className="card stat-strip">
+        <div className="stat">
+          <span className="value">{entries.length}</span>
+          <span className="label">Records</span>
+        </div>
+        <div className="stat">
+          <span className="value">{people.length}</span>
+          <span className="label">People</span>
+        </div>
+        <div className="stat">
+          <span className="value">{withPhotos}</span>
+          <span className="label">Photographs</span>
+        </div>
+        <div className="stat worded">
+          <span className="value">{age ?? "Never"}</span>
+          <span className="label">Last backup</span>
+        </div>
+      </div>
+
+      {/* Three things to do with one file, so three panels of one shape: a
+          head saying what it is, a body holding however much it holds, and a
+          foot holding what you press. The stylesheet keeps them the same
+          height as each other and no taller than the window. */}
       <div className="grid backup-panels">
         <div className="card">
-          <div className="card-head">
+          <div className="card-head column">
             <h2>Download a backup</h2>
+            <span className="muted">Every record and photograph, in one file you keep.</span>
           </div>
           <div className="card-body">
-            <p className="small">
-              {entries.length} records · {people.length} people · {withPhotos} photographs
-            </p>
-
-            <Checkbox
-              label="Include photographs"
-              hint={
-                includePhotos
-                  ? "A complete copy, and a much larger file."
-                  : "Records only — the photographs would have to be taken again."
-              }
-              checked={includePhotos}
-              onChange={setIncludePhotos}
-            />
-
             {canEdit ? (
-              <button
-                type="button"
-                className="btn primary"
+              <Checkbox
+                label="Include photographs"
+                hint={
+                  includePhotos
+                    ? "A complete copy, and a much larger file."
+                    : "Records only — the photographs would have to be taken again."
+                }
+                checked={includePhotos}
+                onChange={setIncludePhotos}
                 disabled={busy}
-                onClick={() => void download()}
-                style={{ marginTop: 6 }}
-              >
-                {busy ? "Building…" : "Download backup"}
-              </button>
+              />
             ) : (
               <Notice kind="warn">
                 Backups are limited to editors and owners — the file contains every address and
@@ -177,7 +190,6 @@ export function BackupPage() {
                 kept somewhere that is not the database it copies. */}
             <p className="muted small" style={{ marginTop: 14 }}>
               Once a month, and before a print run. Keep it somewhere other than the database.
-              {age ? ` Last one from this browser: ${age}.` : ""}
             </p>
 
             <Notice kind="warn">
@@ -185,6 +197,19 @@ export function BackupPage() {
               the printed directory.
             </Notice>
           </div>
+          {canEdit ? (
+            <div className="panel-foot">
+              <button
+                type="button"
+                className="btn primary"
+                disabled={busy}
+                onClick={() => void download()}
+              >
+                {busy ? "Building…" : "Download backup"}
+              </button>
+              {age ? <span className="note">Last one from this browser: {age}.</span> : null}
+            </div>
+          ) : null}
         </div>
 
         <RestorePanel />

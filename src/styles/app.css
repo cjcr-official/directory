@@ -993,6 +993,26 @@ a.stat:hover {
   color: var(--ink-3);
   font-size: 0.85rem;
 }
+/* A stat whose value is words rather than a figure - "9 days ago" beside
+   "Last backup". Set near the size of the words it is: at the figure size an
+   honest answer like "about three months ago" ran out of its quarter of the
+   strip and pushed the label off the end.
+
+   Wrapping as two whole phrases rather than four loose words: on a phone the
+   strip is two columns and this one broke as "9 days / ago" over "Last /
+   backup", which reads as four things rather than one fact. */
+.stat.worded {
+  flex-wrap: wrap;
+}
+.stat.worded .value {
+  font-size: 1.05rem;
+  font-weight: 640;
+  letter-spacing: 0;
+}
+.stat.worded .value,
+.stat.worded .label {
+  white-space: nowrap;
+}
 
 /* --- forms --------------------------------------------------------------- */
 
@@ -4064,7 +4084,7 @@ th.num {
 /* --- the backup tab: download, restore, import ---------------------------- */
 
 /*
- * Three cards of one size, however wide the desk is.
+ * Three panels of one size, however wide the desk is.
  *
  * They were a .grid.two with the import card dropped underneath, which on a
  * 1920 screen came out as two 800px cards over one 1616px card: three
@@ -4078,20 +4098,18 @@ th.num {
  * between to read across.
  *
  * One auto-fit row of all three fixes every part of that at once, because the
- * card width is what was wrong rather than anything inside it. The track asks
- * for 420px before it will make another column - the same number, and the
- * same argument, as the form grid higher up this file: three columns wait
- * until there is room to fill them rather than arriving cramped. So a 1920
- * desk gets three of about 530px, a 1600 one gets three of 420, a 1440 laptop
- * gets two of 560 with the import card under the short download card, and a
- * phone gets one. The order is the order they are written in, so import is
- * still last wherever it lands.
+ * panel width is what was wrong rather than anything inside it. The track
+ * asks for 420px before it will make another column - the same number, and
+ * the same argument, as the form grid higher up this file: columns wait until
+ * there is room to fill them rather than arriving cramped. This is the layout
+ * a tablet and a laptop get, and the one a desk falls back to when the window
+ * is too short to divide (see the desk block below).
  *
- * align-items: start rather than stretch: the restore card grows by half
+ * align-items: start rather than stretch: the restore panel grows by half
  * again when a file is chosen, and there is no reason for the other two to
  * grow with it.
  *
- * On .grid rather than standing alone, so the three cards get the rule above
+ * On .grid rather than standing alone, so the three panels get the rule above
  * that drops the stacking margin from a card that follows another one. Left
  * to itself the row came out with the second and third headings sixteen
  * pixels below the first.
@@ -4099,6 +4117,95 @@ th.num {
 .grid.backup-panels {
   grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
   align-items: start;
+}
+
+/*
+ * One shape, three times: a head, a body, and the things you press.
+ *
+ * The three panels do very different amounts of work - one is a button, one
+ * grows a table and two tiles and a confirmation field once a file is chosen,
+ * one grows a table - and as plain cards that difference was the whole look
+ * of the page. Whatever a panel is doing, it is now a head saying what it is,
+ * a body that holds however much it holds, and a foot holding what you press
+ * to commit it. The foot is ruled off and pushed to the bottom, so the three
+ * of them line up wherever the panels end.
+ */
+.backup-panels > .card {
+  display: flex;
+  flex-direction: column;
+}
+.panel-foot {
+  margin-top: auto;
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 13px 18px;
+  border-top: 1px solid var(--line);
+  background: var(--raised);
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+/* The note that rides along with the action - when the last backup was taken,
+   what the file holds. It takes what the buttons leave and wraps under them
+   rather than widening the panel. */
+.panel-foot .note {
+  flex: 1 1 8rem;
+  min-width: 0;
+  color: var(--ink-3);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+/*
+ * A desk: three panels of one height, and never taller than the window.
+ *
+ * The complaint this answers is that the page was blocky, and differently
+ * blocky depending on what was being done. It was: the three panels take
+ * turns being the tallest - restore grows a table, two tiles and a
+ * confirmation field the moment a file is chosen, import grows a table, the
+ * download panel never grows at all - so they ended at three different
+ * heights over a screen of empty canvas, and the arrangement reshuffled
+ * itself every time a file was chosen or a mode picked.
+ *
+ * Two rules settle it. Stretched, the three are whatever the tallest of them
+ * needs, so they start and end together and the feet line up whatever is in
+ * them. Capped, none of them can grow past the window, so choosing a file
+ * fills a panel rather than moving the page - the body scrolls inside its own
+ * panel and the foot it would have pushed off the bottom stays where it is.
+ *
+ * The cap is the window less the furniture above the row, which is the page's
+ * own padding (26 and 64), the head and its margin (66 and 20), and the
+ * figures and theirs (56 and 18) - 250px, near enough, and named so the
+ * arithmetic is somewhere rather than sitting in a calc as a bare number.
+ *
+ * Desk only: a pane that scrolls inside a page that also scrolls is a poor
+ * trade on a touch screen, and the two form pages already draw this line in
+ * the same three tests. Under any of them the panels flow at their own
+ * heights, which is the layout a phone and a tablet have always had.
+ */
+@media (min-width: 1160px) and (min-height: 620px) and (pointer: fine) {
+  .backup-page {
+    --panel-cap: calc(100dvh - 250px);
+  }
+  .grid.backup-panels {
+    align-items: stretch;
+  }
+  .backup-panels > .card {
+    max-height: var(--panel-cap);
+    min-height: 0;
+    overflow: hidden;
+  }
+  /* The scroller, on the panel that has outgrown the window rather than on
+     the page. A gutter is kept open for the bar so the text does not step
+     sideways the first time one of them needs it. */
+  .backup-panels > .card > .card-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
 }
 
 /*
