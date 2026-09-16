@@ -62,6 +62,16 @@ export interface TextRun {
    * happened to carry.
    */
   face?: Typeface;
+  /**
+   * The setting this line was composed from, where it came from exactly one.
+   *
+   * Provenance rather than presentation: the PDF writer has no use for it and
+   * ignores it. It is here so a preview can offer the line back for editing in
+   * the place it is drawn, without a second copy of the arithmetic that put it
+   * there - the composer already knows which box the church name landed in,
+   * and this is it saying so.
+   */
+  field?: string;
 }
 
 export interface PhotoSlot {

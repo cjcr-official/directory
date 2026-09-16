@@ -39,6 +39,16 @@ import type { ProjectEntryRow, ProjectRow, SelectionMode } from "@/lib/database.
 const PENDING_LOGO = "pending:cover-logo";
 
 /**
+ * The grey words an emptied line holds its place with while it is being typed
+ * in. Named after what belongs there rather than after the setting, because
+ * they are read on the tag by somebody who has never seen the setting.
+ */
+const PREVIEW_PLACEHOLDER: Record<string, string> = {
+  churchName: "Your church's name",
+  tagLine: "A line of small print",
+};
+
+/**
  * Name tags, set where name tags live.
  *
  * Everything on this screen is stored on the directory, because a tag is one of
@@ -191,10 +201,60 @@ export function TagsEditPage() {
     return name || "Madison Johnston";
   }, [people]);
 
+  /*
+   * What the preview stands in with, and only while somebody is typing in it.
+   *
+   * A line with nothing in it is composed out of the tag altogether, which is
+   * right on paper and a trap on screen: clear the tag line and the box you
+   * were typing in would vanish under the cursor, with no way back to it but
+   * the field in the pane. So an emptied line keeps its place - in grey words
+   * saying what belongs there - for as long as it has the caret.
+   *
+   * For exactly that long, and no longer. A church that wants no small print
+   * clears the line, clicks away, and the preview goes back to being the tag
+   * that will print: no ghost line, and the name set in the room the missing
+   * line gives back. A preview that kept the placeholder would be laying the
+   * rest of the tag out around type the paper never sees.
+   */
+  const [editing, setEditing] = useState<string | null>(null);
+
+  const previewSettings = useMemo(() => {
+    if (!drawnSettings) return null;
+    const standIn = (field: string, value: string) =>
+      value.trim() || (editing === field ? PREVIEW_PLACEHOLDER[field] : "");
+    return {
+      ...drawnSettings,
+      churchName: standIn("churchName", drawnSettings.churchName),
+      tagLine: standIn("tagLine", drawnSettings.tagLine),
+    };
+  }, [drawnSettings, editing]);
+
   const tagPreview = useMemo(
     () =>
-      metrics && drawnSettings ? composeTagPreview(drawnSettings, metrics, previewName) : null,
-    [metrics, drawnSettings, previewName],
+      metrics && previewSettings ? composeTagPreview(previewSettings, metrics, previewName) : null,
+    [metrics, previewSettings, previewName],
+  );
+
+  /*
+   * The preview, handing its own type back.
+   *
+   * The composer marks the two lines that came from a setting, so what is
+   * drawn on the tag is what gets typed into - no second copy of where the
+   * church name landed, no overlay to keep in step with the layout. Writing
+   * goes through the same set() the pane's own fields use, so the two are
+   * never out of step and Save means what it always did.
+   */
+  const editablePreview = useMemo(
+    () => ({
+      value: (field: string) =>
+        field === "churchName" ? (settings?.churchName ?? "") : (settings?.tagLine ?? ""),
+      placeholder: (field: string) => PREVIEW_PLACEHOLDER[field] ?? "",
+      onChange: (field: string, value: string) =>
+        set(field === "churchName" ? { churchName: value } : { tagLine: value }),
+      onFocus: (field: string) => setEditing(field),
+      onBlur: (field: string) => setEditing((current) => (current === field ? null : current)),
+    }),
+    [settings?.churchName, settings?.tagLine],
   );
 
   /**
@@ -739,12 +799,17 @@ export function TagsEditPage() {
                       height={tagPreview.height}
                       photoUrls={logoUrls}
                       typeface={tagPreview.typeface}
+                      editable={editablePreview}
                     />
                     {/* Two facts rather than a sentence: which rectangle, and
                         on whom. The second is the reason this is drawn on
                         somebody the directory prints. */}
                     <figcaption className="hint">
                       {TAG_SIZES[safeSettings.tagSize].label} · {previewName}
+                      <span className="tag-figure-tip">
+                        The church's name and the small print can be changed by clicking them on the
+                        tag.
+                      </span>
                     </figcaption>
                   </figure>
                 ) : (
