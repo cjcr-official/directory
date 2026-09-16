@@ -4081,10 +4081,17 @@ th.num {
   font-size: 0.85em;
 }
 
-/* --- the backup tab: download, restore, import ---------------------------- */
+/* --- panels: a page made of modules ---------------------------------------
+ *
+ * Two pages are built out of these now - Backup's three and Settings' two -
+ * and they are the same furniture in both: a head, a body, and a foot with
+ * the thing you press in it. The rules below belong to the system rather than
+ * to either page, so a third page wanting the same shape adds a class and
+ * nothing else.
+ * -------------------------------------------------------------------------- */
 
 /*
- * Three panels of one size, however wide the desk is.
+ * Panels of one size, however wide the desk is.
  *
  * They were a .grid.two with the import card dropped underneath, which on a
  * 1920 screen came out as two 800px cards over one 1616px card: three
@@ -4097,40 +4104,65 @@ th.num {
  * screen and "412 rows" on the other, with a thousand pixels of nothing in
  * between to read across.
  *
- * One auto-fit row of all three fixes every part of that at once, because the
- * panel width is what was wrong rather than anything inside it. The track
- * asks for 420px before it will make another column - the same number, and
- * the same argument, as the form grid higher up this file: columns wait until
- * there is room to fill them rather than arriving cramped. This is the layout
- * a tablet and a laptop get, and the one a desk falls back to when the window
- * is too short to divide (see the desk block below).
+ * One auto-fit row fixes every part of that at once, because the panel width
+ * is what was wrong rather than anything inside it. The track asks for 420px
+ * before it will make another column - the same number, and the same
+ * argument, as the form grid higher up this file: columns wait until there is
+ * room to fill them rather than arriving cramped. This is the layout a tablet
+ * and a laptop get, and the one a desk falls back to when the window is too
+ * short to divide (see the desk block below).
  *
- * align-items: start rather than stretch: the restore panel grows by half
- * again when a file is chosen, and there is no reason for the other two to
- * grow with it.
+ * align-items: start rather than stretch: away from a desk the panels flow at
+ * their own heights, and a panel that grows has no business dragging the ones
+ * beside it with it.
  *
- * On .grid rather than standing alone, so the three panels get the rule above
- * that drops the stacking margin from a card that follows another one. Left
- * to itself the row came out with the second and third headings sixteen
- * pixels below the first.
+ * On .grid rather than standing alone, so the panels get the rule above that
+ * drops the stacking margin from a card that follows another one. Left to
+ * itself the row came out with the second and third headings sixteen pixels
+ * below the first.
  */
-.grid.backup-panels {
+.grid.panels {
   grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
   align-items: start;
 }
 
 /*
- * One shape, three times: a head, a body, and the things you press.
+ * A pair has no third column to spend a wide screen on.
  *
- * The three panels do very different amounts of work - one is a button, one
- * grows a table and two tiles and a confirmation field once a file is chosen,
- * one grows a table - and as plain cards that difference was the whole look
- * of the page. Whatever a panel is doing, it is now a head saying what it is,
- * a body that holds however much it holds, and a foot holding what you press
- * to commit it. The foot is ruled off and pushed to the bottom, so the three
- * of them line up wherever the panels end.
+ * Left at 1fr the two Settings panels took 800px each at 1920, which put a
+ * hundred and ten characters on a line of the paragraph explaining why a
+ * password is not enough - and stranded the things inside them that are a
+ * fixed size, the QR code adrift in the middle of nothing and nineteen
+ * characters of setup key in a six-hundred-pixel bar.
+ *
+ * Capped as a width on the row rather than as a maximum on the track: a
+ * definite track maximum is what the repeat count gets worked out from, so
+ * minmax(420px, 660px) fits one track at 1440 and puts the pair in a single
+ * column on the laptop it was meant to help. Capping the row instead leaves
+ * the track 1fr, so the count still comes from the 420 and the two panels
+ * share whatever the row is: 660 each at 1920, 560 at 1440, 480 at 1280.
  */
-.backup-panels > .card {
+.grid.panels:not(:has(> :nth-child(3))) {
+  max-width: 1336px;
+}
+
+/*
+ * One shape, however many times: a head, a body, and the things you press.
+ *
+ * Panels on one page do very different amounts of work - on Backup one is a
+ * button and one grows a table, two tiles and a confirmation field the moment
+ * a file is chosen; on Settings one is three radios and one is a three-step
+ * enrolment with a QR code in it - and as plain cards that difference was the
+ * whole look of the page. Whatever a panel is doing, it is now a head saying
+ * what it is, a body that holds however much it holds, and a foot holding
+ * what you press. The foot is ruled off and pushed to the bottom, so they
+ * line up wherever the panels end.
+ *
+ * A foot with no button in it still earns its keep: it is where the panel
+ * says what it is currently doing - which theme is actually on, whether a
+ * code will be asked for at the next sign-in.
+ */
+.panels > .card {
   display: flex;
   flex-direction: column;
 }
@@ -4147,8 +4179,8 @@ th.num {
   border-radius: 0 0 var(--radius) var(--radius);
 }
 /* The note that rides along with the action - when the last backup was taken,
-   what the file holds. It takes what the buttons leave and wraps under them
-   rather than widening the panel. */
+   which theme is on, whether a code is asked for. It takes what the buttons
+   leave and wraps under them rather than widening the panel. */
 .panel-foot .note {
   flex: 1 1 8rem;
   min-width: 0;
@@ -4158,26 +4190,31 @@ th.num {
 }
 
 /*
- * A desk: three panels of one height, and never taller than the window.
+ * A desk: panels of one height, and never taller than the window.
  *
- * The complaint this answers is that the page was blocky, and differently
- * blocky depending on what was being done. It was: the three panels take
+ * The complaint this answers is that a page was blocky, and differently
+ * blocky depending on what was being done. Both pages were: the panels take
  * turns being the tallest - restore grows a table, two tiles and a
- * confirmation field the moment a file is chosen, import grows a table, the
- * download panel never grows at all - so they ended at three different
- * heights over a screen of empty canvas, and the arrangement reshuffled
- * itself every time a file was chosen or a mode picked.
+ * confirmation field the moment a file is chosen, two-step grows a QR code
+ * and three steps the moment it is set up, and the panels beside them never
+ * grow at all - so they ended at different heights over a screen of empty
+ * canvas, and the arrangement reshuffled itself every time something was
+ * chosen.
  *
- * Two rules settle it. Stretched, the three are whatever the tallest of them
+ * Two rules settle it. Stretched, the panels are whatever the tallest of them
  * needs, so they start and end together and the feet line up whatever is in
- * them. Capped, none of them can grow past the window, so choosing a file
- * fills a panel rather than moving the page - the body scrolls inside its own
- * panel and the foot it would have pushed off the bottom stays where it is.
+ * them. Capped, none of them can grow past the window, so choosing a file or
+ * starting an enrolment fills a panel rather than moving the page - the body
+ * scrolls inside its own panel and the foot it would have pushed off the
+ * bottom stays where it is.
  *
- * The cap is the window less the furniture above the row, which is the page's
- * own padding (26 and 64), the head and its margin (66 and 20), and the
- * figures and theirs (56 and 18) - 250px, near enough, and named so the
- * arithmetic is somewhere rather than sitting in a calc as a bare number.
+ * The cap is the window less the furniture above the row: the page's own
+ * padding (26 and 64) and the head with its margin (66 and 20), which comes
+ * to 176. A page that also carries a strip of figures says so and gets the
+ * 74 they cost added on, rather than every page paying for the one that has
+ * them - at 800px tall that difference is the whole of whether the enrolment
+ * steps fit without the panel scrolling. Named, so the arithmetic is written
+ * down somewhere rather than sitting in a calc as a bare number.
  *
  * Desk only: a pane that scrolls inside a page that also scrolls is a poor
  * trade on a touch screen, and the two form pages already draw this line in
@@ -4185,13 +4222,17 @@ th.num {
  * heights, which is the layout a phone and a tablet have always had.
  */
 @media (min-width: 1160px) and (min-height: 620px) and (pointer: fine) {
-  .backup-page {
-    --panel-cap: calc(100dvh - 250px);
+  .panel-page {
+    --panel-furniture: 176px;
+    --panel-cap: calc(100dvh - var(--panel-furniture));
   }
-  .grid.backup-panels {
+  .panel-page.with-figures {
+    --panel-furniture: 250px;
+  }
+  .grid.panels {
     align-items: stretch;
   }
-  .backup-panels > .card {
+  .panels > .card {
     max-height: var(--panel-cap);
     min-height: 0;
     overflow: hidden;
@@ -4199,7 +4240,7 @@ th.num {
   /* The scroller, on the panel that has outgrown the window rather than on
      the page. A gutter is kept open for the bar so the text does not step
      sideways the first time one of them needs it. */
-  .backup-panels > .card > .card-body {
+  .panels > .card > .card-body {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
@@ -4414,7 +4455,11 @@ th.num {
    the explanation is read. */
 .steps {
   --step-indent: 22px;
-  margin: 6px 0 18px;
+  /* No bottom margin: the buttons that used to follow the steps inside the
+     body are in the panel's foot now, which brings its own rule and padding.
+     Left in, it was eighteen pixels of nothing at the end of the list - and
+     on a laptop the eighteen pixels the panel had to scroll for. */
+  margin: 6px 0 0;
   padding-left: var(--step-indent);
   display: grid;
   gap: 20px;
@@ -4467,7 +4512,13 @@ th.num {
   margin-top: 10px;
 }
 .setup-key code {
+  /* Nineteen characters, so it stops at about the width of nineteen
+     characters. Left to grow it took whatever the panel gave it - six hundred
+     pixels of box around four groups of four, with Copy marooned at the far
+     end of it - and the key is read across to a second device, which is
+     easier the shorter the line is. */
   flex: 1 1 220px;
+  max-width: 30ch;
   min-width: 0;
   padding: 9px 11px;
   border: 1px solid var(--line);
@@ -4483,15 +4534,6 @@ th.num {
 .code-field {
   max-width: 210px;
   margin: 10px 0 0;
-}
-
-/* One button is the decision and the other is the way out. On a phone they
-   share the row rather than leaving the primary one stranded at the left, and
-   the cap stops them looking like a pair of banners on a desktop. */
-.enrol-actions .btn {
-  flex: 1 1 auto;
-  justify-content: center;
-  max-width: 220px;
 }
 
 /* Six digits, read off one screen and typed onto another. Spaced out and set

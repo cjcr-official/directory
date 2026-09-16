@@ -48,13 +48,11 @@ function Appearance() {
 
   return (
     <div className="card">
+      {/* A head says what the panel is; the reasons it works the way it does
+          belong under the control they explain, not over it. */}
       <div className="card-head column">
         <h2>Appearance</h2>
-        <span className="muted small">
-          Kept on this device, not on the account: the phone in a pocket and the office computer can
-          each have their own answer, and the sign-in screen is drawn before anybody knows who is
-          looking.
-        </span>
+        <span className="muted">How the app looks on this device.</span>
       </div>
       <div className="card-body">
         <fieldset>
@@ -82,12 +80,21 @@ function Appearance() {
         </fieldset>
 
         <p className="hint" style={{ marginTop: 14 }}>
+          Kept on this device rather than on the account: the phone in a pocket and the office
+          computer can each have their own answer, and the sign-in screen is drawn before anybody
+          knows who is looking. The printed book and its preview stay black on white either way —
+          paper does not have a dark mode.
+        </p>
+      </div>
+      {/* Nothing to press, so the foot says what the choice above has actually
+          come to - which is a different question from which tile is lit, for
+          anybody on "match this device". */}
+      <div className="panel-foot">
+        <span className="note">
           {choice === "system"
             ? `This device is asking for the ${theme} theme at the moment.`
-            : `Every screen is in the ${theme} theme, whatever this device is set to.`}{" "}
-          The printed book and its preview stay black on white either way — paper does not have a
-          dark mode.
-        </p>
+            : `Every screen is in the ${theme} theme, whatever this device is set to.`}
+        </span>
       </div>
     </div>
   );
@@ -185,9 +192,7 @@ function TwoStep() {
     <div className="card">
       <div className="card-head column">
         <h2>Two-step sign-in</h2>
-        <span className="muted small">
-          A six-digit code from an app on your phone, on top of your password.
-        </span>
+        <span className="muted">A six-digit code from your phone, on top of your password.</span>
       </div>
       <div className="card-body">
         <p className="small">
@@ -196,15 +201,14 @@ function TwoStep() {
           has the password still cannot get in without the phone in your pocket.
         </p>
 
-        {factors === null ? (
-          <span className="row tight">
-            <span className="spinner" aria-hidden />
-            <span className="muted small">Checking this account…</span>
-          </span>
-        ) : on ? (
+        {factors === null ? null : on ? (
           <>
+            {/* What it buys, rather than what it does - the foot below says a
+                code is asked for, and saying it twice on one panel reads as
+                two different facts. */}
             <Notice kind="ok">
-              <strong>On.</strong> You will be asked for a code each time you sign in.
+              <strong>On.</strong> Somebody who has your password still cannot get in without your
+              phone.
             </Notice>
             {factors.map((factor) => (
               <div key={factor.id} className="row factor">
@@ -225,7 +229,9 @@ function TwoStep() {
             ))}
           </>
         ) : enrolment ? (
-          <form onSubmit={finish}>
+          /* The steps are the form; the button that submits them is in the
+             foot, tied back by id so Enter in the code field still works. */
+          <form id="enrol-form" onSubmit={finish}>
             <ol className="steps">
               <li>
                 <strong>Scan this with an authenticator app.</strong> Google Authenticator,
@@ -276,44 +282,12 @@ function TwoStep() {
                 </div>
               </li>
             </ol>
-
-            <div className="row enrol-actions">
-              <button
-                type="submit"
-                className="btn primary"
-                disabled={busy || code.length !== CODE_LENGTH}
-              >
-                {busy ? "Checking…" : "Turn on"}
-              </button>
-              <button
-                type="button"
-                className="btn ghost"
-                disabled={busy}
-                onClick={() => {
-                  setEnrolment(null);
-                  setError(null);
-                }}
-              >
-                Cancel
-              </button>
-            </div>
           </form>
         ) : (
-          <>
-            <Notice>
-              <strong>Off.</strong> Your password is the only thing between this directory and
-              anyone who learns it.
-            </Notice>
-            <button
-              type="button"
-              className="btn primary"
-              disabled={busy}
-              onClick={() => void start()}
-              style={{ marginTop: 14 }}
-            >
-              {busy ? "Working…" : "Set up an authenticator app"}
-            </button>
-          </>
+          <Notice>
+            <strong>Off.</strong> Your password is the only thing between this directory and anyone
+            who learns it.
+          </Notice>
         )}
 
         {error ? (
@@ -336,6 +310,52 @@ function TwoStep() {
           </p>
         ) : null}
       </div>
+
+      {/* The same foot the panels next door keep. Every state of this one has
+          something to put in it: the button that starts the setup, the two
+          that finish it, or - when it is already on and there is nothing to
+          press - what being on actually costs you at the next sign-in. */}
+      <div className="panel-foot">
+        {factors === null ? (
+          <>
+            <span className="spinner" aria-hidden />
+            <span className="note">Checking this account…</span>
+          </>
+        ) : on ? (
+          <span className="note">A code is asked for at every sign-in, in every browser.</span>
+        ) : enrolment ? (
+          <>
+            <button
+              type="submit"
+              form="enrol-form"
+              className="btn primary"
+              disabled={busy || code.length !== CODE_LENGTH}
+            >
+              {busy ? "Checking…" : "Turn on"}
+            </button>
+            <button
+              type="button"
+              className="btn ghost"
+              disabled={busy}
+              onClick={() => {
+                setEnrolment(null);
+                setError(null);
+              }}
+            >
+              Cancel
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            className="btn primary"
+            disabled={busy}
+            onClick={() => void start()}
+          >
+            {busy ? "Working…" : "Set up an authenticator app"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -348,7 +368,7 @@ function TwoStep() {
  */
 export function SettingsPage() {
   return (
-    <div className="page">
+    <div className="page panel-page">
       <div className="page-head">
         <div className="grow">
           <h1>Settings</h1>
@@ -356,7 +376,11 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <div className="grid two" style={{ alignItems: "start" }}>
+      {/* The same two panels Backup is built from, and for the same reason:
+          two-step grows a QR code and three steps the moment it is set up, and
+          as a plain pair of cards that left appearance sitting beside four
+          hundred pixels of nothing. */}
+      <div className="grid panels">
         <Appearance />
         <TwoStep />
       </div>

@@ -91,7 +91,7 @@ export function BackupPage() {
   const age = describeAge(lastBackup);
 
   return (
-    <div className="page backup-page">
+    <div className="page panel-page with-figures">
       <div className="page-head">
         <div className="grow">
           <h1>Backup</h1>
@@ -128,7 +128,7 @@ export function BackupPage() {
           head saying what it is, a body holding however much it holds, and a
           foot holding what you press. The stylesheet keeps them the same
           height as each other and no taller than the window. */}
-      <div className="grid backup-panels">
+      <div className="grid panels">
         <div className="card">
           <div className="card-head column">
             <h2>Download a backup</h2>
