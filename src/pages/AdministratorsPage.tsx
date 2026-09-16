@@ -15,7 +15,7 @@ const NO_ACCESS = "none";
 
 /** The whole ladder, most to least, ending at nothing. */
 const LEVELS: { value: string; label: string; blurb: string }[] = [
-  { value: "owner", label: "Owner", blurb: "Everything, this page included." },
+  { value: "owner", label: "Owner", blurb: "Does everything, this page included." },
   { value: "editor", label: "Editor", blurb: "Adds and edits records." },
   { value: "viewer", label: "Viewer", blurb: "Browses and prints." },
   { value: NO_ACCESS, label: "No access", blurb: "Can sign in and see nothing." },
@@ -46,7 +46,7 @@ function toneOf(value: string): string {
 }
 
 function Bubble({ value, label }: { value: string; label: string }) {
-  return <span className={`pill ${toneOf(value)}`}>{label}</span>;
+  return <span className={`pill role-bubble ${toneOf(value)}`}>{label}</span>;
 }
 
 /**
@@ -159,7 +159,7 @@ function RoleMenu({
       <button
         type="button"
         ref={trigger}
-        className={`pill role-trigger ${toneOf(value)}`}
+        className={`pill role-bubble role-trigger ${toneOf(value)}`}
         disabled={busy}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -365,7 +365,7 @@ export function AdministratorsPage() {
             better spent explaining them than stretching them. */}
         <aside className="card admins-aside">
           <div className="card-head">
-            <h3>Roles</h3>
+            <h3>Roles and access</h3>
           </div>
           <div className="card-body">
             <dl className="role-key">
