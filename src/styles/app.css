@@ -2134,14 +2134,34 @@ th.num {
 /* --- the proof screen ------------------------------------------------------
  *
  * Where a book is checked before it costs paper. The sheets are the subject,
- * so they sit as real pages on a dark ground with the light behind them, and
- * everything else - the bar, the captions - stays quiet and out of the way.
+ * so everything around them - the bar, the captions - stays quiet and out of
+ * the way.
+ *
+ * It is the app's own screen, on the app's own ground. It used to be painted
+ * near-black from edge to edge, whichever theme had been chosen - so the one
+ * screen a church looks at longest was the one screen that ignored the
+ * setting, and on a light morning it opened like another program over the top
+ * of this one. The ground is the page's canvas now, the same as every other
+ * screen, and the paper is told from it the way the cover on the directory's
+ * own form already is: a hairline and a little lift.
+ *
+ * The bar above it keeps the app's chrome colour, for the reason written on
+ * it.
  *
  * This screen renders outside the app shell, which is why it carries its own
  * safe-area padding: without it the back button sits under the status bar on
  * a phone and cannot be tapped.
  * -------------------------------------------------------------------------- */
 
+/*
+ * The bar keeps the app's own chrome colour - the phone's top bar, the band
+ * the logo sits on, the sign-in screen - rather than becoming another white
+ * surface. Installed to the Home Screen this screen runs under a translucent
+ * status bar whose glyphs iOS paints white and will not be talked out of, and
+ * they are drawn over the top of whatever this is. That is also why the whole
+ * bar is dark at every width rather than only on a phone: one bar with one set
+ * of colours, which cannot drift from a second copy of itself.
+ */
 .preview-bar {
   position: sticky;
   top: 0;
@@ -2153,6 +2173,7 @@ th.num {
   padding-top: calc(10px + env(safe-area-inset-top));
   background: var(--brand-dark);
   color: #fff;
+  /* An edge, for the theme where the ground under it is near-black too. */
   box-shadow: 0 1px 0 rgb(255 255 255 / 8%);
 }
 
@@ -2264,6 +2285,17 @@ th.num {
   outline: 2px solid rgb(255 255 255 / 70%);
   outline-offset: 1px;
 }
+/* The pill this shares with the sizes beside it is drawn for buttons that
+   bring their own padding. A label does not, so its two words sat hard
+   against the rounded ends. */
+.preview-check {
+  align-items: center;
+  gap: 7px;
+  padding: 6px 13px 6px 11px;
+  font-size: 0.82rem;
+  color: rgb(255 255 255 / 82%);
+  cursor: pointer;
+}
 .preview-check input[type="checkbox"] {
   accent-color: var(--accent);
 }
@@ -2296,16 +2328,24 @@ th.num {
 .preview-notice {
   padding: 14px calc(18px + env(safe-area-inset-right)) 0 calc(18px + env(safe-area-inset-left));
 }
+/* A notice is filled with the canvas, because everywhere else in the app it is
+   set into a card. Here the ground is that canvas and there is no card, so the
+   plain one came out as a rectangle of exactly the colour behind it. Raised,
+   like the card it would have been sitting in. The tinted ones - the warning
+   about how many sheets are drawn, an error - already carry their own colour
+   and are left alone. */
+.preview-notice .notice:not(.error):not(.warn):not(.ok) {
+  background: var(--raised);
+}
 
-/* The ground, painted once for the whole screen. Dark, so a sheet of paper
-   reads as paper rather than as more screen, and lit from above like
-   something on a light table. It lives on the wrapper rather than the canvas
-   so the notices do not sit in a pale band between two dark areas. */
+/* The ground, painted once for the whole screen: the same canvas every other
+   page in the app is laid out on, so this one follows the theme with them. It
+   lives on the wrapper rather than on the canvas element so the notices do not
+   sit in a band of a different colour above the sheets. */
 .preview {
   min-height: 100vh;
   min-height: 100dvh;
-  background:
-    radial-gradient(90% 46% at 50% 0%, var(--brand-dark-2) 0%, transparent 62%), var(--brand-dark);
+  background: var(--canvas);
 }
 
 .preview-canvas {
@@ -2349,19 +2389,23 @@ th.num {
   font-size: 0.72rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgb(255 255 255 / 42%);
+  color: var(--ink-3);
 }
 
 /* The frame is the paper: it carries the size, so the scaled sheet inside can
-   be taken out of the layout entirely. */
+   be taken out of the layout entirely.
+
+   A hairline and a little lift, which is what tells white paper from a pale
+   canvas - the same pairing the cover on the directory's form uses. The
+   shadow it had before was built for a near-black ground and printed as a
+   bruise on anything lighter. */
 .sheet-frame {
   position: relative;
   overflow: hidden;
   background: var(--sheet);
+  border: 1px solid var(--line-strong);
   border-radius: 3px;
-  box-shadow:
-    0 1px 2px rgb(0 0 0 / 34%),
-    0 26px 54px -20px rgb(0 0 0 / 72%);
+  box-shadow: var(--shadow);
 }
 
 .sheet {
@@ -2776,6 +2820,11 @@ th.num {
     display: none !important;
   }
 
+  /* Both, because at phone width the document itself carries the page's
+     colour - and the root element's background is the one that fills the
+     canvas, so painting body alone leaves the ground of the app behind every
+     printed sheet on anyone who has background graphics turned on. */
+  html,
   body {
     background: #fff;
   }
@@ -2801,10 +2850,13 @@ th.num {
   }
 
   /* Both sizes are set inline from the zoom, which has no business deciding
-     how large a printed page is. */
+     how large a printed page is. The hairline goes with them: it is there to
+     tell paper from the screen behind it, and on paper it is a box ruled
+     around every page. */
   .sheet-frame {
     width: auto !important;
     height: auto !important;
+    border: none;
     border-radius: 0;
     box-shadow: none;
     overflow: visible;
@@ -3011,15 +3063,16 @@ th.num {
    * iOS paints the strip behind the home indicator with the document's own
    * background - not with whatever element is drawn over it, which stops at
    * the viewport. So the document has to be told which screen is up, or a
-   * light screen ends on a dark band belonging to nothing. Dark for the three
-   * that are dark all over; the page's own canvas for everything else.
+   * light screen ends on a dark band belonging to nothing. Dark for the two
+   * that are dark all over; the page's own canvas for everything else - which
+   * now includes the proof screen, laid out on that canvas like every other
+   * page.
    */
   html,
   body {
     background: var(--canvas);
   }
   html:has(.auth-screen),
-  html:has(.preview),
   html:has(.update-screen) {
     background: var(--brand-dark);
   }
