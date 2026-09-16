@@ -782,22 +782,116 @@ p:last-child {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
-/* The three roles are a key to the table above them, not three separate
-   things worth a card each - and as three cards they orphaned the last one
-   beside a gap as soon as the grid dropped to two across. */
+/* The key to the bubbles, in the same bubbles, so that what the table shows
+   and what the menu offers are recognisably one thing. */
 .role-key {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 22px;
+  gap: 14px 22px;
   margin: 0;
 }
+/*
+ * One column beside the table and two under it.
+ *
+ * Above 1200 the key is in the pane on the right, which is 300px and takes one;
+ * below it the key is under the list with the whole page to itself, and four
+ * bubbles down the left of eight hundred pixels of nothing is not a key, it is
+ * a list of what the page is missing. Two rather than as many as fit, because
+ * four items across three columns leave the fourth alone beside a gap - which
+ * is what the key looked like as three cards.
+ */
+@media (min-width: 620px) and (max-width: 1199px) {
+  .role-key {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 .role-key-item dt {
-  font-weight: 650;
-  letter-spacing: -0.011em;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
 }
 .role-key-item dd {
   margin: 0;
+}
+
+/*
+ * A roster and its key, on a desk.
+ *
+ * Four short columns and a church office's three or four people do not want
+ * eighteen hundred pixels: stretched across one, the role sat a foot from the
+ * name it belonged to and the Delete another foot past that, which is a table
+ * you read with a ruler. The list is capped at about the width its own
+ * contents ask for and what is left goes to the key, which is the thing on
+ * this page that was a full-width card underneath saying what a page of
+ * bubbles already half says.
+ *
+ * 1200 rather than the 1080 the two panes first fit in: the list needs about
+ * 810px before a double-barrelled surname stops wrapping and an address stops
+ * breaking in two, and a split that squeezes the table to buy room for the
+ * note about it has the page the wrong way round. Below that they stack, in
+ * the order they are written: the list first, because it is what the page is
+ * for.
+ */
+.admins-layout {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+@media (min-width: 1200px) {
+  .admins-layout {
+    grid-template-columns: minmax(0, 960px) minmax(240px, 300px);
+    align-items: start;
+  }
+}
+/* The note above the list is part of the list's column, so the two share a
+   right edge. Left to the page it ran to its own measure and stopped in the
+   gap between the two panes, which reads as a third column nobody drew. */
+.admins-main {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+.admins-main .notice {
+  max-width: none;
+}
+.admins-aside .role-key-item dd {
+  /* The blurb is read against the bubble above it, so it is indented to the
+     text inside one rather than to the edge of the pane. */
+  padding-left: 2px;
+}
+
+/*
+ * Who somebody is takes the width; what they can do takes what it needs.
+ *
+ * A table is told to fill its card and shares the room out by column, so the
+ * two columns holding a bubble and a word were being handed a quarter of the
+ * page each and their contents left floating in the middle of it. At 1% they
+ * shrink to what is in them and the slack goes where a long address and a
+ * double-barrelled surname can use it.
+ */
+.admins-role-head,
+.admins-role,
+.admins-remove-head,
+.admins-remove {
+  width: 1%;
+  white-space: nowrap;
+}
+.admins-remove-head,
+.admins-remove {
+  text-align: right;
+}
+.admins-remove .row {
+  justify-content: flex-end;
+}
+/* A row of this table is a person, not a line of a ledger: the two lines of
+   name and address the phone stacks are one line here, and it is given the
+   height to be read at. */
+.admins-table td {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.admins-who {
+  font-weight: 560;
+}
+.admins-you {
+  margin-left: 7px;
 }
 
 .row {
@@ -1010,53 +1104,127 @@ input[type="radio"] {
 }
 
 /*
- * A menu that draws its own caret.
+ * The bubble that opens onto bubbles.
  *
- * Every browser draws one and no two draw the same one: Chrome a small
- * chevron, Firefox a triangle, iOS Safari a stacked pair with a wide inset of
- * its own - and the inset is what matters here, because a menu standing in the
- * corner of a list row pays for it out of the name beside it. This is a glyph
- * in the hint colour, a third of the width, and the same on every phone the
- * app is opened on.
- *
- * The wrapper is what the caret is positioned against: the cell around a menu
- * is not always the shape of the menu, so the select's own right edge is the
- * only thing worth measuring from.
+ * A role is stated in a pill everywhere else on this page, so the control that
+ * changes one is the same pill with a caret on it, and what it opens is four
+ * more of them. It replaced a <select>, which no browser draws twice the same
+ * way and every browser draws as a field - an empty box waiting to be filled,
+ * which a menu showing the answer is not.
  */
-.chip-select {
+.role-menu {
   position: relative;
   display: inline-flex;
-  max-width: 100%;
 }
-.chip-select select {
-  appearance: none;
-  -webkit-appearance: none;
-  /* As wide as the word it is showing, not as wide as the cell it is in. */
-  width: auto;
-  padding: 0 19px 0 7px;
-  /* A tint rather than a border. A field is drawn with an outline because it
-     is an empty box waiting to be filled; this is never empty - it is showing
-     the answer, and it is doing it once a row. Twenty rows of outlined boxes
-     is a form, and this is a list. The border is kept and made transparent so
-     that focus can colour it without the control changing width. */
-  border-color: transparent;
+.role-trigger {
+  /* A pill is set for a label; this one is pressed, so it is given the height
+     of a small button and the padding to be hit on a phone. */
+  min-height: var(--control-h-sm);
+  padding: 2px 8px 2px 10px;
+  gap: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.role-trigger:hover:not(:disabled) {
+  border-color: var(--line-strong);
+}
+/* Open, it is holding the menu below it rather than standing on its own, and
+   says so the way the group names do. */
+.role-trigger[aria-expanded="true"] {
+  border-color: var(--ink-3);
+}
+.role-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.role-trigger:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.role-caret {
+  /* The glyph sits low in its own line box, so the nudge is what centres the
+     mark rather than the box around it. */
+  color: var(--ink-3);
+  font-size: 0.9rem;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
+/*
+ * The four of them, over whatever the row was showing.
+ *
+ * Right-aligned because the trigger is in the right-hand corner of a row on a
+ * phone, and a panel hung from its left edge would run off the screen. It
+ * flips above the trigger when the row is near the bottom of the window, which
+ * the component works out and says with a class - a menu that opens downwards
+ * into nothing is the one thing a table of people is guaranteed to do at the
+ * end of the list.
+ */
+.role-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  /* Over the table, under the drawer and the top bar, which start at 35. */
+  z-index: 20;
+  /* As wide as the longest bubble in it and no wider. Absolutely positioned,
+     its own width would otherwise be shrunk to fit the trigger it hangs from
+     and the bubbles would be drawn outside it, across the Delete beside
+     them. */
+  width: max-content;
+  min-width: 100%;
+  padding: 6px;
+  display: grid;
+  gap: 2px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.role-panel.up {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+.role-choice {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 7px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.role-choice:hover,
+.role-choice:focus-visible {
   background: var(--canvas);
 }
-.chip-select::after {
-  content: "⌄";
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  /* The glyph sits low in its own line box, so centring it centres the box
-     rather than the mark. */
-  transform: translateY(-68%);
-  font-size: 0.95rem;
-  color: var(--ink-3);
+/* Inside the panel's own border, so the ring is not clipped by it. */
+.role-choice:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+/* The pill inside a choice is a label and not a second button: the whole row
+   is the target, so nothing inside it takes the press. */
+.role-choice .pill {
   pointer-events: none;
 }
-/* Whatever the field beside it does. */
-.chip-select:has(select:disabled)::after {
-  opacity: 0.5;
+/* The one it is already set to. The tick has a column of its own whether or
+   not it is in it, so the four bubbles keep their left edge and the menu does
+   not shuffle sideways as the answer changes. */
+.role-tick {
+  min-width: 0.8em;
+  color: var(--accent);
+  font-size: 0.8rem;
+  line-height: 1;
+}
+.role-choice[aria-checked="true"] {
+  background: var(--canvas);
 }
 
 .check {
@@ -1562,6 +1730,19 @@ th.num {
 }
 .pill.role {
   text-transform: capitalize;
+}
+/* Who else can change this list, findable at a glance in a column of names -
+   and, faded, the row that is on the list without being in it. Editor and
+   viewer stay the plain bubble: four tints would be four colours to learn for
+   a fact each bubble already states in a word. */
+.pill.tone-owner {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent-deep);
+}
+.pill.tone-off {
+  color: var(--ink-3);
+  border-style: dashed;
 }
 /* Not an error - two families may genuinely want one name - but worth seeing. */
 .pill.warn {
@@ -3561,12 +3742,10 @@ th.num {
    * Administrators, on a phone: who somebody is on the left, what they can do
    * on the right, one line of each.
    *
-   * Four columns - name, email, role, access - cannot be four columns at
-   * 393px, and the block they first became was still four lines tall: a name,
-   * an address, a menu and a Delete, each with a line of its own. That is
-   * ninety-five pixels for one administrator, and a church office has three or
-   * four of them, under two paragraphs of explanation that have not finished
-   * either.
+   * Name, email, role and a Delete cannot be four columns at 393px, and the
+   * block they first became was four lines tall: a name, an address, a menu
+   * and a Delete, each with a line of its own. That is ninety-five pixels for
+   * one administrator, and a church office has three or four of them.
    *
    * A name and the address beneath it are one thing - a person - so they are
    * set as a pair in the left column, and the controls stand beside them
@@ -3590,7 +3769,7 @@ th.num {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
       "who   role"
-      "email access";
+      "email role";
     align-items: center;
     /* 1.5 is the measure for a paragraph. These two lines are a name and the
        address belonging to it, and they are read as one thing. */
@@ -3612,12 +3791,15 @@ th.num {
   .admins-table td {
     padding: 0;
     border: none;
+    /* The desk table shrinks its two control columns with a percentage width.
+       Here the cells are grid items in a row of their own, where 1% is three
+       pixels with a bubble hanging out the side of it. */
+    width: auto;
   }
 
   .admins-who {
     grid-area: who;
     font-size: 0.97rem;
-    font-weight: 560;
     /* This column is what is left when the controls have taken what they need,
        and a double-barrelled surname is wider than that. It wraps - a name cut
        off at the edge of a phone is worse than a name on two lines - and it is
@@ -3641,25 +3823,20 @@ th.num {
   }
   /*
    * A row is its own grid and nothing lines one up with the next, so what the
-   * rows are made to share is their right edge: the menu, the pill on the
-   * frozen row and the access word all end in the same place, whatever width
-   * each of them needs. Left to itself the pill floated off to the far right,
-   * over the column of Deletes, reading as though it were one.
+   * rows are made to share is their right edge: the menu and the pill on the
+   * frozen row end in the same place, whatever width each of them needs. Left
+   * to itself the pill floated off to the far right, over the column of
+   * Deletes, reading as though it were one.
    */
   .admins-role {
     grid-area: role;
     justify-self: end;
-  }
-  .admins-access {
-    grid-area: access;
-    justify-self: end;
+    align-self: center;
   }
 
   /*
-   * An owner's table carries a Delete on every row and no access column - the
-   * menu ends in "No access", so there was never anything for that column to
-   * add that the control beside it was not already saying. The two controls
-   * share the corner instead.
+   * An owner's table carries a Delete on every row as well, so the two
+   * controls share the corner between them.
    */
   .admins-table.owner tr {
     /* Which the Delete column can only do if it is the same width on the row
@@ -3733,9 +3910,16 @@ th.num {
     display: none;
   }
 
-  .role-key {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 14px;
+  /* A thumb, not a pointer: the bubble takes the full height of a control on
+     a phone, which is also what keeps the row the height it has always been -
+     the Delete beside it is set to the same. */
+  .role-trigger {
+    min-height: var(--control-h);
+    padding: 3px 9px 3px 12px;
+    font-size: 0.82rem;
+  }
+  .role-choice {
+    padding: 8px 8px;
   }
 
   /*
@@ -3746,11 +3930,10 @@ th.num {
    * 390pt iPhone turned up that way reports 320. Somebody who has asked for
    * everything to be bigger is the last person to take a name off.
    *
-   * A menu reading "No access" is about 110px and cannot be less - iOS zooms
-   * the page at any control under 16px - so beside a Delete it leaves 85px of
-   * those 320 for the name, and "Christabel" came apart in the middle. The
-   * Delete goes back under the menu below this width: a row thirty pixels
-   * taller, and a name in one piece.
+   * The bubble reading "No access" is about 110px, and beside a Delete that
+   * leaves 85px of those 320 for the name: "Christabel" came apart in the
+   * middle. The Delete goes back under the bubble below this width: a row
+   * thirty pixels taller, and a name in one piece.
    */
   @media (max-width: 359px) {
     .admins-table.owner tr {
