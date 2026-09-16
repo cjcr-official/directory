@@ -67,3 +67,16 @@ at 393px or on iOS specifically. Where a change is something a person would
 see or touch, drive the built app in a browser and check the actual behaviour
 rather than reasoning about the CSS. `/sample` renders a full directory from
 invented data and needs no database, so it is the cheapest page to test on.
+
+## A migration is not applied by merging it
+
+A file in `supabase/migrations/` is SQL sitting in a repository the church
+office cannot run. Deploying does not apply it. Somebody has to open the
+Supabase dashboard, go to the SQL editor, paste it in and press Run - and
+until they do, the screen that needs it is broken in a way the deploy cannot
+explain.
+
+So when a change needs one, print the whole of the SQL in the reply, in plain
+text, in the order it has to run, as well as committing the file. Do not link
+to it, summarise it or say which file it is in: paste it, and say what stays
+broken until it has been run. Every time.
