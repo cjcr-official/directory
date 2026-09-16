@@ -5,14 +5,14 @@ import { useAuth } from "@/auth/AuthProvider";
 import { EmptyState, LoadingScreen, Notice } from "@/components/ui";
 import { fetchProjects } from "@/lib/queries";
 import type { ProjectRow } from "@/lib/database.types";
-import { TAG_SIZES, normalizeSettings, recordsPerSheet } from "@/lib/layout/settings";
+import { TAG_SIZES, normalizeSettings, paperName, recordsPerSheet } from "@/lib/layout/settings";
 import { tagsPerSheet } from "@/lib/layout/tags";
 import { message } from "@/lib/format";
 
 const WORDS = {
   book: {
     title: "Directories",
-    sub: "Each one is a saved recipe for a printable book — who is in it, and how it looks. The data stays live, so reprinting next year is one click.",
+    sub: "A saved book: who is in it, and how it prints. The records stay live, so next year is one click.",
     add: "New directory",
     empty: "No directories yet",
     first: "Create the main directory",
@@ -20,7 +20,7 @@ const WORDS = {
   },
   tags: {
     title: "Name tags",
-    sub: "Tags for the people in a directory — pick which one, and everybody in it gets a tag. How they look is set here; change who is in the directory and the tags follow.",
+    sub: "A tag each for the people in a directory. Change who is in the directory and the tags follow.",
     add: "New directory",
     empty: "No directories yet",
     first: "Create the main directory",
@@ -66,7 +66,7 @@ export function ProjectsPage({ tags = false }: { tags?: boolean }) {
       {error ? <Notice kind="error">{error}</Notice> : null}
 
       {projects?.length ? (
-        <div className="grid two">
+        <div className="grid project-grid">
           {projects.map((project) => {
             const settings = normalizeSettings(project.settings);
             return (
@@ -87,24 +87,13 @@ export function ProjectsPage({ tags = false }: { tags?: boolean }) {
                   <p className="muted small" style={{ marginTop: 8 }}>
                     {tags ? (
                       <>
-                        {TAG_SIZES[settings.tagSize].label} · {tagsPerSheet(settings)} to a sheet of{" "}
-                        {settings.pageSize === "a4"
-                          ? "A4"
-                          : settings.pageSize === "legal"
-                            ? "Legal"
-                            : "Letter"}{" "}
-                        portrait
+                        {TAG_SIZES[settings.tagSize].label} · {tagsPerSheet(settings)} to a sheet ·{" "}
+                        {paperName(settings.pageSize)} portrait
                       </>
                     ) : (
                       <>
-                        {settings.rows} per half-page · {recordsPerSheet(settings)} records to a
-                        sheet ·{" "}
-                        {settings.pageSize === "a4"
-                          ? "A4"
-                          : settings.pageSize === "legal"
-                            ? "Legal"
-                            : "Letter"}{" "}
-                        landscape
+                        {paperName(settings.pageSize)} landscape · {recordsPerSheet(settings)} to a
+                        sheet
                         {settings.bookletOrder ? " · booklet order" : ""}
                       </>
                     )}

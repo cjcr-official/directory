@@ -766,6 +766,22 @@ p:last-child {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
+/*
+ * A pair of fields inside the settings column is measured against that
+ * column, not against the page.
+ *
+ * The rule above asks for a 420px track before it will make a second column,
+ * which is right for a form that has the whole width and impossible here: the
+ * settings pane is 660px at most on a desk and the whole form 820 without the
+ * split, so two of those tracks and the gap between them never fit, and a name
+ * beside its kind or a title beside its subtitle came out stacked. Last in the
+ * file, so it is the answer wherever both rules match.
+ */
+.page.form .desk-settings .grid.two,
+.page.form .desk-settings .grid.two:not(:has(> :nth-child(3))) {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
 /* The three roles are a key to the table above them, not three separate
    things worth a card each - and as three cards they orphaned the last one
    beside a gap as soon as the grid dropped to two across. */
@@ -1639,6 +1655,35 @@ th.num {
   flex: 1;
   min-width: 200px;
   max-width: 380px;
+}
+
+/*
+ * The saved directories, as cards of a settled size.
+ *
+ * They were in the page's auto-fit grid, which collapses the columns it has
+ * no cards for and hands what is left to the ones it has - so a church with
+ * one directory got a single card the full width of a desk monitor, a name in
+ * the top left corner of it and a great deal of nothing to the right.
+ * auto-fill keeps the columns, and the cap keeps a lone card the size it
+ * would have been with three beside it.
+ */
+.project-grid {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 420px));
+}
+
+/* The checklist a hand-picked directory is chosen from: a search line, and
+   under it every record in the congregation, scrolling inside its own box so
+   that picking eleven people out of four hundred does not turn the form into
+   a page four hundred rows long. */
+.picker-toolbar {
+  margin-bottom: 8px;
+}
+.picker-list {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px;
 }
 
 .letter-bar {

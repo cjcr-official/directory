@@ -28,6 +28,7 @@ import {
   TAG_SIZES,
   TAG_STYLES,
   normalizeSettings,
+  paperName,
   recordsPerSheet,
   type CardStyle,
   type PageSizeName,
@@ -258,31 +259,35 @@ export function ProjectEditPage() {
   );
 
   // What the three panels below come to, said in a few words so they are worth
-  // reading shut. A list of what is on beats a count of how many.
+  // reading shut. A list of what is on beats a count of how many, and every one
+  // of them is separated the same way - the panels read as a set, and a comma
+  // inside an item would not be told apart from the one between two of them.
   const listOr = (parts: (string | false)[], none: string) =>
-    parts.filter(Boolean).join(", ") || none;
+    parts.filter(Boolean).join(" · ") || none;
 
-  const pageSummary = [
-    `${PAGE_SIZES[safeSettings.pageSize].label} landscape`,
-    `${recordsPerSheet(safeSettings)} to a sheet`,
-    TYPEFACE_LABELS[safeSettings.typeface].toLowerCase(),
-    safeSettings.textScale === "large" ? "large text" : "normal text",
-    safeSettings.bookletOrder && "booklet order",
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const pageSummary = listOr(
+    [
+      `${paperName(safeSettings.pageSize)} landscape`,
+      `${recordsPerSheet(safeSettings)} to a sheet`,
+      TYPEFACE_LABELS[safeSettings.typeface].toLowerCase(),
+      safeSettings.textScale === "large" ? "large text" : "normal text",
+      safeSettings.bookletOrder && "booklet order",
+    ],
+    "",
+  );
 
   // What the name tags currently come to, for the card that leads to them.
-  const tagSummary = [
-    TAG_SIZES[safeSettings.tagSize].label,
-    `${tagsPerSheet(safeSettings)} to a sheet`,
-    TAG_STYLES[safeSettings.tagStyle].label.toLowerCase(),
-    TYPEFACE_LABELS[safeSettings.tagNameFont].toLowerCase(),
-    `${safeSettings.tagNamePt}pt names`,
-    safeSettings.tagLine.trim() !== "" && "a line underneath",
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const tagSummary = listOr(
+    [
+      TAG_SIZES[safeSettings.tagSize].label,
+      `${tagsPerSheet(safeSettings)} to a sheet`,
+      TAG_STYLES[safeSettings.tagStyle].label.toLowerCase(),
+      TYPEFACE_LABELS[safeSettings.tagNameFont].toLowerCase(),
+      `${safeSettings.tagNamePt}pt names`,
+      safeSettings.tagLine.trim() !== "" && "a line underneath",
+    ],
+    "",
+  );
 
   const cardSummary = listOr(
     [
@@ -478,7 +483,7 @@ export function ProjectEditPage() {
           ) : null}
         </Notice>
       ) : null}
-      {savedAt ? <Notice kind="ok">Saved. Open the preview to see it laid out.</Notice> : null}
+      {savedAt ? <Notice kind="ok">Saved.</Notice> : null}
 
       <form onSubmit={save}>
         {/* Everything that sets the book on the left, the book itself on the
@@ -497,47 +502,54 @@ export function ProjectEditPage() {
             reach the picture of what it is making. */}
         <div className="desk">
           <div className="desk-settings">
-            <div className="card">
-              <div className="card-head">
-                <h2>About this directory</h2>
+            {/* Said once, on the head, rather than under all three fields:
+                none of them prints, and the cover's own title is a field of
+                its own further down. */}
+            <section className="card" aria-labelledby="book-details">
+              <div className="card-head column">
+                <h2 id="book-details">Details</h2>
+                <span className="muted small">For your list of directories, not for the book</span>
               </div>
               <div className="card-body">
-                <Field label="Name" hint="For your own list of directories." htmlFor="project_name">
-                  <input
-                    id="project_name"
-                    type="text"
-                    value={name}
-                    disabled={!canEdit}
-                    onChange={(event) => setName(event.target.value)}
-                  />
-                </Field>
+                <div className="grid two">
+                  <Field label="Name" htmlFor="project_name">
+                    <input
+                      id="project_name"
+                      type="text"
+                      value={name}
+                      disabled={!canEdit}
+                      onChange={(event) => setName(event.target.value)}
+                    />
+                  </Field>
 
-                <Field label="Kind" htmlFor="project_kind">
-                  <select
-                    id="project_kind"
-                    value={kind}
-                    disabled={!canEdit}
-                    onChange={(event) => setKind(event.target.value as ProjectKind)}
-                  >
-                    <option value="directory">Main directory</option>
-                    <option value="event">Smaller / event directory</option>
-                  </select>
-                </Field>
+                  <Field label="Kind" htmlFor="project_kind">
+                    <select
+                      id="project_kind"
+                      value={kind}
+                      disabled={!canEdit}
+                      onChange={(event) => setKind(event.target.value as ProjectKind)}
+                    >
+                      <option value="directory">Main directory</option>
+                      <option value="event">Event directory</option>
+                    </select>
+                  </Field>
+                </div>
 
-                <Field label="Description" htmlFor="project_description">
+                <Field label="Description" hint="Optional." htmlFor="project_description">
                   <textarea
                     id="project_description"
+                    rows={2}
                     value={description}
                     disabled={!canEdit}
                     onChange={(event) => setDescription(event.target.value)}
                   />
                 </Field>
               </div>
-            </div>
+            </section>
 
-            <div className="card">
+            <section className="card" aria-labelledby="book-people">
               <div className="card-head">
-                <h2>Who is in it</h2>
+                <h2 id="book-people">People</h2>
               </div>
               <div className="card-body">
                 <Field label="Include" htmlFor="mode">
@@ -562,12 +574,16 @@ export function ProjectEditPage() {
                       onChange={setTagIds}
                     />
 
-                    {/* The pills above run right up to this label without it. */}
+                    {/* The pills above run right up to this label without it.
+
+                        What each choice does is said in the option itself
+                        rather than in a paragraph under the box: the answer is
+                        the part worth reading, and it was three sentences. */}
                     <div style={{ marginTop: 14 }}>
                       <Field
-                        label="When one person is in a group"
+                        label="Who prints"
                         htmlFor="group_scope"
-                        hint="A family that is in a group itself always prints as a family."
+                        hint="Groups stay live: anyone added to one prints next time."
                       >
                         <select
                           id="group_scope"
@@ -577,18 +593,13 @@ export function ProjectEditPage() {
                             set({ groupWholeFamily: event.target.value === "family" })
                           }
                         >
-                          <option value="family">Print their whole family</option>
-                          <option value="person">Print that person on their own</option>
+                          <option value="family">The whole family of anyone in a group</option>
+                          <option value="person">
+                            Only the people in the groups, one record each
+                          </option>
                         </select>
                       </Field>
                     </div>
-
-                    <p className="hint">
-                      {settings.groupWholeFamily
-                        ? "A family is included when the family or any member carries one of these groups."
-                        : "Only the people in these groups print, each on their own record — a deacons' list without their families. Their own photograph prints where they have one, and their family's where they do not."}{" "}
-                      New people added to a group appear here automatically.
-                    </p>
                   </>
                 ) : null}
 
@@ -607,25 +618,41 @@ export function ProjectEditPage() {
                   </p>
                 ) : null}
               </div>
-            </div>
+            </section>
 
-            <div className="card">
+            <section className="card" aria-labelledby="book-cover">
               <div className="card-head">
-                <h2>The cover</h2>
+                <h2 id="book-cover">Cover</h2>
               </div>
               {/* In the order it prints, top of the cover to the bottom, so
-                  filling the form in reads down the page it makes. */}
+                  filling the form in reads down the page it makes. The one
+                  thing out of that order is the switch that decides whether
+                  any of it prints at all, which leads. */}
               <div className="card-body">
-                <div className="grid two">
-                  {/* One hint apiece: PhotoInput carries its own, so a hint on
-                      the Field as well just stacks two paragraphs under every
-                      picture. */}
+                <Checkbox
+                  label="Print a cover page"
+                  hint="Off starts the book at the first record."
+                  checked={settings.includeCover}
+                  disabled={!canEdit}
+                  onChange={(value) => set({ includeCover: value })}
+                />
+
+                {/* A row each rather than a pair of columns: the wide slot
+                    for the photograph and the square one for the logo are
+                    different widths, so side by side one of them wrapped its
+                    button under its picture and the other did not.
+
+                    One hint apiece: PhotoInput carries its own, so a hint on
+                    the Field as well just stacks two paragraphs under every
+                    picture. They end without a full stop because the component
+                    adds one after the size of the picture chosen. */}
+                <div className="form-decision">
                   <Field label="Logo">
                     <PhotoInput
                       path={coverRemoved.logo ? null : settings.coverLogoPath || null}
                       initials=""
                       shape="square"
-                      hint="Sits at the very top, any shape — fitted whole, never cropped."
+                      hint="At the very top, any shape — fitted whole, never cropped"
                       disabled={!canEdit}
                       onChange={(blob, removed) => {
                         setCoverBlobs((current) => ({ ...current, logo: blob }));
@@ -638,7 +665,7 @@ export function ProjectEditPage() {
                       path={coverRemoved.photo ? null : settings.coverPhotoPath || null}
                       initials=""
                       shape="wide"
-                      hint="Under the title — the building, or the sign. Landscape prints best, and large photos are shrunk automatically."
+                      hint="Under the title — the building, or the sign. Landscape prints best"
                       disabled={!canEdit}
                       onChange={(blob, removed) => {
                         setCoverBlobs((current) => ({ ...current, photo: blob }));
@@ -648,26 +675,26 @@ export function ProjectEditPage() {
                   </Field>
                 </div>
 
-                {/* The three short lines across the top of the cover: a
-                    name, a title, a season. Three across because there
-                    are three of them and none is longer than a few
-                    words - a row of the thing being described. */}
-                <div className="grid three">
-                  <Field
-                    label="Church name"
-                    hint="Small, above the title — and along the top of every page inside."
-                    htmlFor="church_name"
-                  >
-                    <input
-                      id="church_name"
-                      type="text"
-                      value={settings.churchName}
-                      placeholder="Fairhaven Community Church"
-                      disabled={!canEdit}
-                      onChange={(event) => set({ churchName: event.target.value })}
-                    />
-                  </Field>
+                {/* The church's name is the width of the card and the two
+                    short lines share a row: three across came out as two and
+                    an orphan in a column this wide, and the name is the
+                    longest of the three anyway. */}
+                <Field
+                  label="Church name"
+                  hint="Above the title, and along the top of every page inside."
+                  htmlFor="church_name"
+                >
+                  <input
+                    id="church_name"
+                    type="text"
+                    value={settings.churchName}
+                    placeholder="Fairhaven Community Church"
+                    disabled={!canEdit}
+                    onChange={(event) => set({ churchName: event.target.value })}
+                  />
+                </Field>
 
+                <div className="grid two">
                   <Field label="Title" hint="The big line." htmlFor="cover_title">
                     <input
                       id="cover_title"
@@ -694,13 +721,13 @@ export function ProjectEditPage() {
                     lines above do not. */}
                 <div className="grid two">
                   <Field
-                    label="In your own words"
-                    hint="A vision, a welcome, a verse. Its own paragraph, under the photograph."
+                    label="Mission or welcome"
+                    hint="Its own paragraph, under the photograph."
                     htmlFor="cover_statement"
                   >
                     <textarea
                       id="cover_statement"
-                      rows={4}
+                      rows={5}
                       value={settings.coverStatement}
                       placeholder={"OUR MISSION\nTo know Christ, and to make him known."}
                       disabled={!canEdit}
@@ -709,8 +736,8 @@ export function ProjectEditPage() {
                   </Field>
 
                   <Field
-                    label="How to reach the church"
-                    hint="The foot of the cover. One line here is one line there."
+                    label="Contact details"
+                    hint="The foot of the cover, line for line."
                     htmlFor="cover_contact"
                   >
                     <textarea
@@ -725,16 +752,8 @@ export function ProjectEditPage() {
                     />
                   </Field>
                 </div>
-
-                <Checkbox
-                  label="Print a cover page"
-                  hint="Off prints the records straight away, with no cover."
-                  checked={settings.includeCover}
-                  disabled={!canEdit}
-                  onChange={(value) => set({ includeCover: value })}
-                />
               </div>
-            </div>
+            </section>
 
             {/* Name tags are set under Name tags, not here.
 
@@ -745,25 +764,27 @@ export function ProjectEditPage() {
                 settings live on this same row either way, so what is left here
                 is what they currently come to and the way over. */}
             {!isNew && id ? (
-              <div className="card">
-                <div className="card-head">
-                  <h2>Name tags</h2>
+              <section className="card" aria-labelledby="book-tags">
+                <div className="card-head column">
+                  <h2 id="book-tags">Name tags</h2>
+                  <span className="muted small">
+                    One each for everyone in this directory, set under Name tags
+                  </span>
                 </div>
                 <div className="card-body">
                   <p className="muted small">{tagSummary}</p>
-                  <p className="hint">
-                    The same people, printed as badges rather than as a book — one each, a family
-                    included. How they look is set under Name tags.
-                  </p>
                   <Link className="btn" to={`/tags/${id}`}>
-                    Name tags for this directory
+                    Set up name tags
                   </Link>
                 </div>
-              </div>
+              </section>
             ) : null}
 
-            <Disclosure title="The page" summary={pageSummary}>
-              <Field label="Paper" htmlFor="page_size">
+            <Disclosure title="Page setup" summary={pageSummary}>
+              {/* Named for both of the things it sets. A book of half-pages is
+                  printed on landscape paper whichever size is picked, and
+                  "Paper" alone left that to be discovered in the options. */}
+              <Field label="Paper &amp; orientation" htmlFor="page_size">
                 <select
                   id="page_size"
                   value={settings.pageSize}
@@ -804,10 +825,9 @@ export function ProjectEditPage() {
               </div>
 
               <Notice>
-                <strong>{recordsPerSheet(safeSettings)} records on one sheet of paper</strong> —{" "}
-                {safeSettings.rows} down each half, {safeSettings.columns} halves across. Fold the
-                sheet down the middle for a {safeSettings.pageSize === "a4" ? "A5" : "half-letter"}{" "}
-                booklet.
+                <strong>{recordsPerSheet(safeSettings)} to a sheet</strong> — {safeSettings.rows}{" "}
+                down each half, {safeSettings.columns} across. Folded down the middle, that is a{" "}
+                {safeSettings.pageSize === "a4" ? "A5" : "half-letter"} booklet.
               </Notice>
 
               <Field label="Typeface" htmlFor="typeface">
@@ -838,14 +858,14 @@ export function ProjectEditPage() {
 
               <Checkbox
                 label="Booklet page order"
-                hint="Reorders pages for double-sided printing, folding and stapling the spine. Leave off for a straight-through PDF."
+                hint="Reorders the pages to fold and staple. Off prints straight through."
                 checked={settings.bookletOrder}
                 disabled={!canEdit || settings.columns !== 2}
                 onChange={(value) => set({ bookletOrder: value })}
               />
             </Disclosure>
 
-            <Disclosure title="What each card shows" summary={cardSummary}>
+            <Disclosure title="Each record" summary={cardSummary}>
               <Checkbox
                 label="Photographs"
                 checked={settings.showPhotos}
@@ -855,8 +875,8 @@ export function ProjectEditPage() {
               {settings.showPhotos ? (
                 <div className="check-child">
                   <Field
-                    label="Photo shape"
-                    hint="Cropping gives every card the same shape, which is tidiest on the page."
+                    label="Shape"
+                    hint="Cropping keeps every record the same shape."
                     htmlFor="photo_fit"
                   >
                     <select
@@ -879,7 +899,7 @@ export function ProjectEditPage() {
               />
               {settings.showMembers ? (
                 <div className="check-child">
-                  <Field label="Member style" htmlFor="member_style">
+                  <Field label="Listed as" htmlFor="member_style">
                     <select
                       id="member_style"
                       value={settings.memberStyle}
@@ -925,7 +945,7 @@ export function ProjectEditPage() {
                 onChange={(value) => set({ showAnniversary: value })}
               />
               <div className="form-decision">
-                <Field label="How records are separated" htmlFor="card_style">
+                <Field label="Separator" htmlFor="card_style">
                   <select
                     id="card_style"
                     value={settings.cardStyle}
@@ -940,22 +960,10 @@ export function ProjectEditPage() {
               </div>
             </Disclosure>
 
+            {/* In the order the summary reads them, and the typed field
+                last: four things that are on or off, then the one line
+                somebody has to write. */}
             <Disclosure title="Inside the book" summary={bookSummary}>
-              <Field
-                label="Footer note"
-                hint="Along the bottom of every page."
-                htmlFor="footer_text"
-              >
-                <input
-                  id="footer_text"
-                  type="text"
-                  value={settings.footerText}
-                  placeholder="Please keep this directory for church use only."
-                  disabled={!canEdit}
-                  onChange={(event) => set({ footerText: event.target.value })}
-                />
-              </Field>
-
               <Checkbox
                 label="Alphabetical index at the back"
                 hint="Every person by surname, with the page their family is on."
@@ -981,18 +989,33 @@ export function ProjectEditPage() {
                 disabled={!canEdit}
                 onChange={(value) => set({ showPageNumbers: value })}
               />
+
+              <div className="form-decision">
+                <Field
+                  label="Footer note"
+                  hint="Along the bottom of every page. Leave empty for none."
+                  htmlFor="footer_text"
+                >
+                  <input
+                    id="footer_text"
+                    type="text"
+                    value={settings.footerText}
+                    placeholder="Please keep this directory for church use only."
+                    disabled={!canEdit}
+                    onChange={(event) => set({ footerText: event.target.value })}
+                  />
+                </Field>
+              </div>
             </Disclosure>
 
             {canEdit ? (
+              /* Preview & print is not repeated here - it is in the head,
+                 and a screen with two of the same button has one of them too
+                 many. */
               <div className="row" style={{ marginTop: 18 }}>
                 <button type="submit" className="btn primary" disabled={saving}>
                   {saving ? "Saving…" : isNew ? "Create directory" : "Save changes"}
                 </button>
-                {!isNew ? (
-                  <Link className="btn" to={`/projects/${id}/preview`}>
-                    Preview &amp; print
-                  </Link>
-                ) : null}
                 <Link className="btn ghost" to="/projects">
                   Back
                 </Link>
@@ -1021,9 +1044,9 @@ export function ProjectEditPage() {
           </div>
 
           <div className="desk-stage">
-            <div className="card">
+            <section className="card" aria-labelledby="book-preview">
               <div className="card-head">
-                <h2>As it will print</h2>
+                <h2 id="book-preview">Cover preview</h2>
               </div>
               <div className="card-body">
                 {coverPage ? (
@@ -1035,21 +1058,21 @@ export function ProjectEditPage() {
                       photoUrls={coverUrls}
                       typeface={coverPage.typeface}
                     />
+                    {/* Two facts rather than a sentence: which paper, and the
+                        face it is set in. That it redraws as you type is
+                        something the drawing itself says. */}
                     <figcaption className="hint">
-                      {PAGE_SIZES[safeSettings.pageSize].label}, set in{" "}
-                      {TYPEFACE_LABELS[safeSettings.typeface].toLowerCase()}. Redraws as you type.
+                      {paperName(safeSettings.pageSize)} landscape ·{" "}
+                      {TYPEFACE_LABELS[safeSettings.typeface].toLowerCase()}
                     </figcaption>
                   </figure>
                 ) : safeSettings.includeCover ? (
                   <p className="hint cover-figure">Drawing the cover…</p>
                 ) : (
-                  <p className="hint cover-figure">
-                    This directory prints without a cover. Turn one on under The cover to see it
-                    here.
-                  </p>
+                  <p className="hint cover-figure">No cover page. Turn one on under Cover.</p>
                 )}
               </div>
-            </div>
+            </section>
           </div>
         </div>
       </form>
@@ -1126,7 +1149,7 @@ function ManualPicker({
 
   return (
     <div>
-      <div className="toolbar" style={{ marginBottom: 8 }}>
+      <div className="toolbar picker-toolbar">
         <input
           className="search"
           type="search"
@@ -1147,15 +1170,7 @@ function ManualPicker({
         ) : null}
       </div>
 
-      <div
-        style={{
-          maxHeight: 320,
-          overflowY: "auto",
-          border: "1px solid var(--line)",
-          borderRadius: "var(--radius-sm)",
-          padding: 10,
-        }}
-      >
+      <div className="picker-list">
         {visible.map((entry) => {
           const key = `${entry.type}:${entry.id}`;
           return (
