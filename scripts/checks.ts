@@ -16,6 +16,7 @@
 
 import "./invariants";
 import "./restore-check";
+import "./import-check";
 import "./batch-check";
 import "./names-check";
 import "./text-check";
