@@ -872,6 +872,12 @@ p:last-child {
   width: 1%;
   white-space: nowrap;
 }
+/* Right, like the column of Deletes beside it and like the same bubbles on a
+   phone. Left, the five of them ended wherever their own word happened to end
+   - Owner short, No access long - and a ragged edge against a column of
+   buttons reads as something that failed to line up rather than as a list. */
+.admins-role-head,
+.admins-role,
 .admins-remove-head,
 .admins-remove {
   text-align: right;
@@ -1141,9 +1147,10 @@ input[type="radio"] {
   min-height: var(--control-h-sm);
 }
 .role-trigger {
-  /* The caret takes the room on the right that the word would have had. */
-  padding-right: 8px;
-  gap: 4px;
+  /* The mark takes the room on the right that the word would have had, and
+     stands a little closer to it than the bubble's own edges are. */
+  padding-right: 9px;
+  gap: 5px;
   cursor: pointer;
 }
 .role-trigger:hover:not(:disabled) {
@@ -1163,12 +1170,10 @@ input[type="radio"] {
   cursor: default;
 }
 .role-caret {
-  /* The glyph sits low in its own line box, so the nudge is what centres the
-     mark rather than the box around it. */
+  flex: none;
+  width: 12px;
+  height: 8px;
   color: var(--ink-3);
-  font-size: 0.9rem;
-  line-height: 1;
-  transform: translateY(-1px);
 }
 
 /*

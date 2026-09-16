@@ -172,9 +172,25 @@ function RoleMenu({
         onClick={() => setOpen((was) => !was)}
       >
         {level.label}
-        <span className="role-caret" aria-hidden>
-          ⌄
-        </span>
+        {/* Drawn rather than typed. "⌄" is a character, and a character sits
+            where its font puts it: low in its own line box, by a different
+            amount in every face the app might fall back to, so the mark came
+            out under the word rather than beside it and no single nudge
+            centred it everywhere. A box of a known size does centre - the
+            bubble is a flex row, and this is its second item. */}
+        <svg
+          className="role-caret"
+          viewBox="0 0 12 8"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          aria-hidden
+        >
+          {/* The box is the mark: the stroke runs corner to corner of it, so
+              the gap beside the word is the gap the rule asks for rather than
+              that plus whatever empty margin the drawing carried. */}
+          <path d="M2 2l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       </button>
       {open ? (
         <div
