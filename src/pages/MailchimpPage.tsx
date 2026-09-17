@@ -1,0 +1,329 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { useDirectory } from "@/data/DirectoryContext";
+import { useAuth } from "@/auth/AuthProvider";
+import { EmptyState, Field, LoadingScreen, Notice } from "@/components/ui";
+import { rosterFor } from "@/lib/mailchimp";
+import { audiences as fetchAudiences, settings, syncGroup } from "@/lib/mailchimpClient";
+import type { Audience, SyncOutcome } from "@/lib/mailchimpClient";
+import { message } from "@/lib/format";
+
+/** So the audience is chosen once rather than every time the screen opens. */
+const AUDIENCE_KEY = "church-directory:mailchimp-audience";
+
+function remembered(): string {
+  try {
+    return localStorage.getItem(AUDIENCE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+interface Running {
+  tagId: string;
+  note: string;
+}
+
+/**
+ * Groups, as Mailchimp sees them.
+ *
+ * The directory already knows who is in the choir, and keeping that list a
+ * second time inside Mailchimp is how the two drift apart - somebody joins in
+ * March, and the April email goes to the list somebody typed in January. So
+ * nothing is typed here: each group is pushed across as a Mailchimp tag with
+ * exactly the people the directory currently has in it, and anybody who has
+ * left the group has the tag taken off.
+ *
+ * Writing and sending the email stays in Mailchimp, which is the part
+ * Mailchimp is actually good at - templates, an unsubscribe link that is
+ * legally required and correct, and a record of what was sent. This screen
+ * only keeps the "to" line honest.
+ */
+export function MailchimpPage() {
+  const { tags, entries, loading } = useDirectory();
+  const { canEdit } = useAuth();
+
+  const [ready, setReady] = useState<boolean | null>(null);
+  const [missing, setMissing] = useState<string[]>([]);
+  const [list, setList] = useState<Audience[]>([]);
+  const [audienceId, setAudienceId] = useState(remembered);
+  const [error, setError] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [running, setRunning] = useState<Running | null>(null);
+  const [outcomes, setOutcomes] = useState<Record<string, SyncOutcome>>({});
+  const [failures, setFailures] = useState<Record<string, string>>({});
+
+  /** Who each group would actually reach, worked out once for the whole page. */
+  const rosters = useMemo(
+    () => new Map(tags.map((tag) => [tag.id, rosterFor(entries, tag.id)])),
+    [tags, entries],
+  );
+
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      try {
+        const state = await settings();
+        if (!live) return;
+        setReady(state.ready);
+        setMissing(state.missing);
+        if (!state.ready) return;
+
+        const found = await fetchAudiences();
+        if (!live) return;
+        setList(found);
+        // One audience is the overwhelmingly common case, and picking it saves
+        // a decision that has only one answer.
+        setAudienceId((current) =>
+          current && found.some((one) => one.id === current)
+            ? current
+            : found.length === 1
+              ? found[0].id
+              : "",
+        );
+      } catch (cause) {
+        if (live) setError(message(cause));
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (audienceId) localStorage.setItem(AUDIENCE_KEY, audienceId);
+    } catch {
+      // Remembering the audience is a nicety, not the feature.
+    }
+  }, [audienceId]);
+
+  if (loading && !tags.length) return <LoadingScreen label="Loading groups…" />;
+
+  async function sync(tagId: string, name: string) {
+    const roster = rosters.get(tagId);
+    if (!roster || !audienceId) return;
+
+    setRunning({ tagId, note: "Starting…" });
+    setFailures((all) => ({ ...all, [tagId]: "" }));
+    try {
+      const outcome = await syncGroup(audienceId, name, roster.recipients, (note) =>
+        setRunning({ tagId, note }),
+      );
+      setOutcomes((all) => ({ ...all, [tagId]: outcome }));
+    } catch (cause) {
+      setFailures((all) => ({ ...all, [tagId]: message(cause) }));
+    } finally {
+      setRunning(null);
+    }
+  }
+
+  const chosen = list.find((one) => one.id === audienceId);
+
+  return (
+    <div className="page">
+      <div className="page-head">
+        <div className="grow">
+          <h1>Mailchimp</h1>
+          <div className="sub">
+            Send each group its own email without keeping the list twice. Write and send in
+            Mailchimp; this keeps who is on it correct.
+          </div>
+        </div>
+      </div>
+
+      {error ? <Notice kind="error">{error}</Notice> : null}
+
+      {ready === false ? (
+        <Notice kind="warn">
+          This deploy is not connected to Mailchimp yet. {missing.join(", ")}{" "}
+          {missing.length === 1 ? "is" : "are"} not set on the Worker — the README’s Mailchimp
+          section has the three values and where they go. Nothing on this screen will work until
+          they are set.
+        </Notice>
+      ) : null}
+
+      {ready === null && !error ? <LoadingScreen label="Asking Mailchimp…" /> : null}
+
+      {ready ? (
+        <>
+          <div className="card">
+            <div className="card-head">
+              <h2>Audience</h2>
+            </div>
+            <div className="card-body">
+              {list.length ? (
+                <Field
+                  label="Which audience"
+                  htmlFor="mailchimp_audience"
+                  hint="Groups become tags inside this audience. Most accounts have one."
+                >
+                  <select
+                    id="mailchimp_audience"
+                    value={audienceId}
+                    onChange={(event) => setAudienceId(event.target.value)}
+                  >
+                    <option value="">Choose an audience…</option>
+                    {list.map((one) => (
+                      <option key={one.id} value={one.id}>
+                        {one.name} — {one.members} contacts
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              ) : (
+                <Notice kind="warn">
+                  This Mailchimp account has no audiences yet. Make one in Mailchimp first — it is
+                  the list a campaign is sent to.
+                </Notice>
+              )}
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-head">
+              <h2>Groups</h2>
+            </div>
+            {tags.length ? (
+              <ul className="group-list">
+                {tags.map((tag) => {
+                  const roster = rosters.get(tag.id);
+                  const count = roster?.recipients.length ?? 0;
+                  const open = openId === tag.id;
+                  const panelId = `mailchimp-group-${tag.id}`;
+                  const busy = running?.tagId === tag.id;
+                  const outcome = outcomes[tag.id];
+                  const failed = failures[tag.id];
+
+                  return (
+                    <li key={tag.id} className="group-item">
+                      <div className="group-row">
+                        <span className="group-dot" style={{ background: tag.color }} />
+                        <button
+                          type="button"
+                          className="group-name-button"
+                          aria-expanded={open}
+                          aria-controls={panelId}
+                          onClick={() => setOpenId(open ? null : tag.id)}
+                        >
+                          <span className="group-name-label">{tag.name}</span>
+                          <span className="group-name-mark" aria-hidden>
+                            ⌄
+                          </span>
+                        </button>
+
+                        <span className="group-count">
+                          {count === 0
+                            ? "Nobody to email"
+                            : count === 1
+                              ? "1 address"
+                              : `${count} addresses`}
+                        </span>
+
+                        {canEdit ? (
+                          <span className="group-actions">
+                            <button
+                              type="button"
+                              className="btn"
+                              disabled={!audienceId || !count || Boolean(running)}
+                              onClick={() => void sync(tag.id, tag.name)}
+                            >
+                              {busy ? "Syncing…" : "Sync"}
+                            </button>
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {busy || outcome || failed || open ? (
+                        <div className="group-members" id={panelId}>
+                          {busy ? <p className="hint">{running?.note}</p> : null}
+
+                          {failed ? <Notice kind="error">{failed}</Notice> : null}
+
+                          {outcome && !busy ? (
+                            <Notice kind={outcome.rejected.length ? "warn" : "ok"}>
+                              <strong>
+                                {outcome.tagged} tagged “{tag.name}” in{" "}
+                                {chosen?.name ?? "Mailchimp"}.
+                              </strong>{" "}
+                              {outcome.added} added, {outcome.removed} removed, {outcome.created}{" "}
+                              new to the audience.
+                              {outcome.rejected.length ? (
+                                <>
+                                  {" "}
+                                  Mailchimp would not take {outcome.rejected.length}:{" "}
+                                  {outcome.rejected
+                                    .slice(0, 3)
+                                    .map((row) => `${row.email} (${row.reason})`)
+                                    .join("; ")}
+                                  {outcome.rejected.length > 3 ? "…" : ""}
+                                </>
+                              ) : null}
+                              {outcome.stillRunning ? (
+                                <>
+                                  {" "}
+                                  Mailchimp is still working through the tag changes — it will
+                                  finish on its own.
+                                </>
+                              ) : null}
+                            </Notice>
+                          ) : null}
+
+                          {open ? (
+                            <>
+                              {roster?.recipients.length ? (
+                                <ul className="group-member-list">
+                                  {roster.recipients.map((recipient) => (
+                                    <li key={recipient.email} className="group-member">
+                                      <span className="group-member-name">{recipient.label}</span>
+                                      <span className="group-member-who">
+                                        {recipient.email}
+                                        {recipient.via === "household"
+                                          ? " — the family’s address"
+                                          : ""}
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <p className="hint" style={{ margin: 0 }}>
+                                  Nobody in this group has an email address, so there is nothing to
+                                  send to.
+                                </p>
+                              )}
+
+                              {roster?.unreachable.length ? (
+                                <p className="hint">
+                                  No email address on record for{" "}
+                                  {roster.unreachable.slice(0, 6).join(", ")}
+                                  {roster.unreachable.length > 6
+                                    ? `, and ${roster.unreachable.length - 6} more`
+                                    : ""}
+                                  . They are in the group but will not receive this.
+                                </p>
+                              ) : null}
+                            </>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <EmptyState title="No groups yet">
+                Make a group under <Link to="/groups">Groups</Link> first — a group is what becomes
+                a tag in Mailchimp.
+              </EmptyState>
+            )}
+          </div>
+
+          <p className="muted small">
+            Syncing never changes anybody’s subscription. Somebody who has unsubscribed stays
+            unsubscribed, and Mailchimp adds the unsubscribe link to what you send.
+          </p>
+        </>
+      ) : null}
+    </div>
+  );
+}

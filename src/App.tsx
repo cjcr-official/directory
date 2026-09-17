@@ -17,6 +17,7 @@ import { FamilyEditPage } from "@/pages/FamilyEditPage";
 import { PeoplePage } from "@/pages/PeoplePage";
 import { PersonEditPage } from "@/pages/PersonEditPage";
 import { GroupsPage } from "@/pages/GroupsPage";
+import { MailchimpPage } from "@/pages/MailchimpPage";
 import { ProjectsPage } from "@/pages/ProjectsPage";
 import { ProjectEditPage } from "@/pages/ProjectEditPage";
 import { ProjectPreviewPage } from "@/pages/ProjectPreviewPage";
@@ -121,6 +122,7 @@ function Protected() {
             <Route path="people/new" element={<PersonEditPage />} />
             <Route path="people/:id" element={<PersonEditPage />} />
             <Route path="groups" element={<GroupsPage />} />
+            <Route path="mailchimp" element={<MailchimpPage />} />
             <Route path="projects" element={<ProjectsPage />} />
             <Route path="tags" element={<ProjectsPage tags />} />
             <Route path="tags/:id" element={<TagsEditPage />} />
