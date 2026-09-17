@@ -18,7 +18,7 @@ import { buildEntries, type DirectoryData } from "@/lib/entries";
 import { chunk, isEmailish, rosterFor, tagChanges } from "@/lib/mailchimp";
 import { md5, subscriberHash } from "../worker/md5";
 import { missingSettings, settingsOf } from "../worker/settings";
-import { describeKey } from "../worker/mailchimp";
+import { describeKey, keyFingerprint } from "../worker/mailchimp";
 import type { HouseholdRow, PersonRow } from "@/lib/database.types";
 import { createHash } from "node:crypto";
 import { check, same } from "./check";
@@ -546,6 +546,18 @@ console.log("\nsaying what is wrong with a key without saying the key");
 
   const weird = describeKey(`${"a1b2c3d4".repeat(4)}\u00a0-us14`);
   check("a stray character in the middle is named", weird.includes("should not be in a key"));
+
+  const fingerprint = keyFingerprint(shaped);
+  check("the fingerprint is six hex characters", /^[0-9a-f]{6}$/.test(fingerprint));
+  check("it is in the message", whole.includes(fingerprint));
+  same("the same key always marks the same", keyFingerprint(shaped), fingerprint);
+  check(
+    "a different key marks differently, which is the whole point after a rotation",
+    keyFingerprint(`${"b2c3d4e5".repeat(4)}-us14`) !== fingerprint,
+  );
+  // Salted, so the mark is not a value anybody could have precomputed against a
+  // key they already hold.
+  check("and the mark is not simply the key's own digest", fingerprint !== md5(shaped).slice(0, 6));
 
   // The whole point: none of this hands the key to whoever is reading.
   for (const description of [whole, half, weird]) {

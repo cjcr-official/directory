@@ -1,4 +1,4 @@
-import { subscriberHash } from "./md5";
+import { md5, subscriberHash } from "./md5";
 
 /**
  * The Mailchimp half of the Worker: everything that needs the API key.
@@ -60,6 +60,24 @@ function datacenter(key: string): string {
  * neither reveals a usable secret. The datacenter is already in the error above
  * it, and is not secret either: it names a region, not an account.
  */
+/**
+ * A short, one-way mark that changes when the key changes.
+ *
+ * The question a rotation leaves behind is not "is this key good" but "is this
+ * the key I just pasted" - and nobody can answer it. Mailchimp shows a key once,
+ * Cloudflare holds it write-only, and a rotated key that never reached the
+ * deploy fails in exactly the way a bad key does, because it IS a bad key now:
+ * rotating revokes the old one.
+ *
+ * Six hex characters of a salted digest settles it without revealing anything.
+ * Replace the secret, reload, and if this has not changed then the new value did
+ * not save. Twenty-four bits is far too few to walk back to a key, and a key is
+ * thirty-two random hex characters in the first place.
+ */
+export function keyFingerprint(key: string): string {
+  return md5(`church-directory fingerprint:${key}`).slice(0, 6);
+}
+
 export function describeKey(key: string): string {
   const full = /^[0-9a-f]{32}-[a-z]{2}\d+$/.test(key);
   const at = key.lastIndexOf("-");
@@ -69,9 +87,11 @@ export function describeKey(key: string): string {
     return (
       `The key on this deploy is ${key.length} characters and ends "-${dc}", which is the ` +
       `shape a Mailchimp key has — so it is the key itself being refused, not the way it was ` +
-      `pasted. In Mailchimp, under Account & billing → Extras → API keys, check that this key ` +
-      `is still Active, and that the address bar there begins "${dc}." — a key made on one ` +
-      `account cannot be used on another.`
+      `pasted. Its fingerprint is ${keyFingerprint(key)}: replace the key in Cloudflare, reload ` +
+      `this page, and if that fingerprint has not changed then the new value did not save. If it ` +
+      `does change and this still fails, the key is being refused by Mailchimp — check under ` +
+      `Account & billing → Extras → API keys that it is Active, and that the address bar there ` +
+      `begins "${dc}.", since a key made on one account cannot be used on another.`
     );
   }
 
