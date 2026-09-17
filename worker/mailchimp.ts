@@ -44,6 +44,49 @@ function datacenter(key: string): string {
   return suffix;
 }
 
+/**
+ * What can be said about a key without saying the key.
+ *
+ * "API Key Invalid — Your API key may be invalid, or you've attempted to access
+ * the wrong datacenter" is Mailchimp's whole answer, and it is the same answer
+ * whether the key was revoked, half-pasted, or belongs to another account. A
+ * church office cannot act on that, and neither can anybody reading it over
+ * their shoulder: the key is in a dashboard behind a password, shown once, and
+ * cannot be read back to be compared with anything.
+ *
+ * So the deploy is asked to describe what it is holding. A length and a shape
+ * separate the two cases that need different fixes - a key that arrived in one
+ * piece and is genuinely refused, and a key that only half arrived - and
+ * neither reveals a usable secret. The datacenter is already in the error above
+ * it, and is not secret either: it names a region, not an account.
+ */
+export function describeKey(key: string): string {
+  const full = /^[0-9a-f]{32}-[a-z]{2}\d+$/.test(key);
+  const at = key.lastIndexOf("-");
+  const dc = at === -1 ? "" : key.slice(at + 1);
+
+  if (full) {
+    return (
+      `The key on this deploy is ${key.length} characters and ends "-${dc}", which is the ` +
+      `shape a Mailchimp key has — so it is the key itself being refused, not the way it was ` +
+      `pasted. In Mailchimp, under Account & billing → Extras → API keys, check that this key ` +
+      `is still Active, and that the address bar there begins "${dc}." — a key made on one ` +
+      `account cannot be used on another.`
+    );
+  }
+
+  const odd = [...key].some((c) => c.codePointAt(0)! < 33 || c.codePointAt(0)! > 126);
+  return (
+    `The key on this deploy is ${key.length} characters` +
+    (dc ? ` and ends "-${dc}"` : "") +
+    `, which is not the shape of a Mailchimp key — those are 32 characters, a dash, then the ` +
+    `datacenter, like "-us14"` +
+    (odd ? `, and this one carries a character that should not be in a key` : "") +
+    `. It looks like only part of it was pasted. Create a fresh key in Mailchimp and replace ` +
+    `MAILCHIMP_API_KEY, copying the whole of it — Mailchimp shows a key once and never again.`
+  );
+}
+
 async function call<T>(
   key: string,
   method: string,
@@ -74,7 +117,13 @@ async function call<T>(
       // A gateway error page rather than JSON. The first 400 characters of it
       // are more use than "request failed".
     }
-    throw new MailchimpFailure(response.status, detail || `Mailchimp returned ${response.status}.`);
+    // A refused key is the one failure whose cause is invisible from the
+    // outside, so it is the one that gets told what the deploy is holding.
+    const message =
+      response.status === 401
+        ? `${detail || "Mailchimp refused the key."} ${describeKey(key)}`
+        : detail || `Mailchimp returned ${response.status}.`;
+    throw new MailchimpFailure(response.status, message);
   }
 
   return (text ? JSON.parse(text) : {}) as T;

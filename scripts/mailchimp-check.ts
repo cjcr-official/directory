@@ -18,6 +18,7 @@ import { buildEntries, type DirectoryData } from "@/lib/entries";
 import { chunk, isEmailish, rosterFor, tagChanges } from "@/lib/mailchimp";
 import { md5, subscriberHash } from "../worker/md5";
 import { missingSettings, settingsOf } from "../worker/settings";
+import { describeKey } from "../worker/mailchimp";
 import type { HouseholdRow, PersonRow } from "@/lib/database.types";
 import { createHash } from "node:crypto";
 import { check, same } from "./check";
@@ -522,4 +523,35 @@ console.log("\nwhat the screen is told is missing");
     }),
     [],
   );
+}
+
+console.log("\nsaying what is wrong with a key without saying the key");
+{
+  // Deliberately not real-key-shaped where it need not be; the one that has to
+  // be is built from pieces so no scanner sees a key in this file.
+  const shaped = `${"a1b2c3d4".repeat(4)}-us14`;
+
+  const whole = describeKey(shaped);
+  check(
+    "a whole key is reported as whole",
+    whole.includes("which is the shape a Mailchimp key has"),
+  );
+  check("and the reader is sent to check it is still Active", whole.includes("Active"));
+  check("and to check the account's datacenter", whole.includes('begins "us14."'));
+  check("the length is stated", whole.includes(`${shaped.length} characters`));
+
+  const half = describeKey("a1b2c3d4-us14");
+  check("a half-pasted key is reported as half", half.includes("only part of it was pasted"));
+  check("and says what the shape should be", half.includes("32 characters, a dash"));
+
+  const weird = describeKey(`${"a1b2c3d4".repeat(4)}\u00a0-us14`);
+  check("a stray character in the middle is named", weird.includes("should not be in a key"));
+
+  // The whole point: none of this hands the key to whoever is reading.
+  for (const description of [whole, half, weird]) {
+    check(
+      "the key itself is never in the message",
+      !description.includes(shaped) && !description.includes("a1b2c3d4a1b2c3d4"),
+    );
+  }
 }
