@@ -115,6 +115,50 @@ export function describeKey(key: string): string {
   );
 }
 
+/** The two schemes Mailchimp documents for the Marketing API. */
+type Scheme = "Basic" | "Bearer";
+
+function authorization(key: string, scheme: Scheme): string {
+  // Basic takes any username with the key as the password; Bearer takes the key
+  // on its own. Mailchimp accepts both, and says so - but only one of them can
+  // be the one a given account is actually answering, and which it is is not
+  // something this side can know in advance.
+  return scheme === "Basic" ? `Basic ${btoa(`church-directory:${key}`)}` : `Bearer ${key}`;
+}
+
+function send(
+  key: string,
+  method: string,
+  path: string,
+  body: unknown,
+  signal: AbortSignal | undefined,
+  scheme: Scheme,
+): Promise<Response> {
+  return fetch(`https://${datacenter(key)}.api.mailchimp.com/3.0${path}`, {
+    method,
+    headers: {
+      Authorization: authorization(key, scheme),
+      "Content-Type": "application/json",
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal,
+  });
+}
+
+/** Mailchimp's own words out of an error body, or the first of whatever came back. */
+function explain(text: string): string {
+  try {
+    const problem = JSON.parse(text) as Partial<MailchimpError>;
+    // "API Key Invalid", "Resource Not Found", "Invalid Resource" with the field
+    // named - all better than anything invented here.
+    return [problem.title, problem.detail].filter(Boolean).join(" — ") || text.slice(0, 400);
+  } catch {
+    // A gateway error page rather than JSON. The first 400 characters of it are
+    // more use than "request failed".
+    return text.slice(0, 400);
+  }
+}
+
 async function call<T>(
   key: string,
   method: string,
@@ -122,36 +166,58 @@ async function call<T>(
   body?: unknown,
   signal?: AbortSignal,
 ): Promise<T> {
-  const response = await fetch(`https://${datacenter(key)}.api.mailchimp.com/3.0${path}`, {
-    method,
-    headers: {
-      // Any username, the key as the password - Mailchimp's documented scheme.
-      Authorization: `Basic ${btoa(`church-directory:${key}`)}`,
-      "Content-Type": "application/json",
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-    signal,
-  });
+  let response = await send(key, method, path, body, signal, "Basic");
+
+  /**
+   * Basic is what Mailchimp's own quick start uses, so it is what goes first.
+   * But a key that is demonstrably the right key - right shape, right
+   * datacenter, matching the opening characters of the Active key in the
+   * account's own list - has been refused with it, and Mailchimp documents
+   * Bearer as an equal alternative rather than a fallback. So a 401 is asked
+   * again the other way before it is believed.
+   *
+   * The body is a string by the time it gets here, not a stream, so sending it
+   * twice is free and safe.
+   */
+  let refusedBoth = false;
+  if (response.status === 401) {
+    const bearer = await send(key, method, path, body, signal, "Bearer");
+    if (bearer.status === 401) refusedBoth = true;
+    else response = bearer;
+  }
 
   const text = await response.text();
   if (!response.ok) {
-    let detail = text.slice(0, 400);
-    try {
-      const problem = JSON.parse(text) as Partial<MailchimpError>;
-      // Mailchimp's own words are better than anything invented here: "API Key
-      // Invalid", "Resource Not Found", "Invalid Resource" with the field named.
-      detail = [problem.title, problem.detail].filter(Boolean).join(" — ") || detail;
-    } catch {
-      // A gateway error page rather than JSON. The first 400 characters of it
-      // are more use than "request failed".
+    const detail = explain(text) || `Mailchimp returned ${response.status}.`;
+    if (response.status !== 401) throw new MailchimpFailure(response.status, detail);
+
+    /**
+     * Both schemes refused. That is worth one more request, to the one endpoint
+     * that takes no arguments and touches no data: if /ping is also refused then
+     * the account will not answer this key at all, and nothing about the way
+     * this app asks for audiences is involved. If /ping answers, the key is
+     * fine and the fault is in the call above it - which is this app's to fix,
+     * and worth knowing rather than guessing at.
+     */
+    let ping = "";
+    if (refusedBoth) {
+      try {
+        const probe = await send(key, "GET", "/ping", undefined, signal, "Basic");
+        ping =
+          probe.status === 200
+            ? " Mailchimp's /ping endpoint accepts this key, so the key is good and the fault is " +
+              "in this app's request rather than in your Mailchimp account — please report this."
+            : ` Mailchimp's /ping endpoint refuses it too (${probe.status}), so the account will ` +
+              `not answer this key at all.`;
+      } catch {
+        // The probe is a courtesy; its failure must not replace the real error.
+      }
     }
-    // A refused key is the one failure whose cause is invisible from the
-    // outside, so it is the one that gets told what the deploy is holding.
-    const message =
-      response.status === 401
-        ? `${detail || "Mailchimp refused the key."} ${describeKey(key)}`
-        : detail || `Mailchimp returned ${response.status}.`;
-    throw new MailchimpFailure(response.status, message);
+
+    const both = refusedBoth
+      ? " Both Basic and Bearer authorization were refused, so this is not the authorization scheme."
+      : "";
+    throw new MailchimpFailure(401, `${detail} ${describeKey(key)}${both}${ping}`);
   }
 
   return (text ? JSON.parse(text) : {}) as T;
