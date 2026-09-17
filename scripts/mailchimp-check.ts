@@ -532,10 +532,7 @@ console.log("\nsaying what is wrong with a key without saying the key");
   const shaped = `${"a1b2c3d4".repeat(4)}-us14`;
 
   const whole = describeKey(shaped);
-  check(
-    "a whole key is reported as whole",
-    whole.includes("which is the shape a Mailchimp key has"),
-  );
+  check("a whole key is reported as whole", whole.includes("the shape a Mailchimp key has"));
   check("and the reader is sent to check it is still Active", whole.includes("Active"));
   check("and to check the account's datacenter", whole.includes('begins "us14."'));
   check("the length is stated", whole.includes(`${shaped.length} characters`));
@@ -546,6 +543,15 @@ console.log("\nsaying what is wrong with a key without saying the key");
 
   const weird = describeKey(`${"a1b2c3d4".repeat(4)}\u00a0-us14`);
   check("a stray character in the middle is named", weird.includes("should not be in a key"));
+
+  check(
+    "the opening four characters are shown, which is what Mailchimp's own key list shows",
+    whole.includes(`starts "${shaped.slice(0, 4)}"`),
+  );
+  check(
+    "and the reader is told what a missing or struck-through entry means",
+    whole.includes("struck") && whole.includes("holding an old key"),
+  );
 
   const fingerprint = keyFingerprint(shaped);
   check("the fingerprint is six hex characters", /^[0-9a-f]{6}$/.test(fingerprint));
@@ -559,11 +565,17 @@ console.log("\nsaying what is wrong with a key without saying the key");
   // key they already hold.
   check("and the mark is not simply the key's own digest", fingerprint !== md5(shaped).slice(0, 6));
 
-  // The whole point: none of this hands the key to whoever is reading.
+  // The whole point: four characters is what Mailchimp already prints; the
+  // twenty-eight that actually protect the account never appear.
+  const secretPart = shaped.slice(4, shaped.lastIndexOf("-"));
   for (const description of [whole, half, weird]) {
     check(
       "the key itself is never in the message",
-      !description.includes(shaped) && !description.includes("a1b2c3d4a1b2c3d4"),
+      !description.includes(shaped) && !description.includes(secretPart),
     );
   }
+  check(
+    "and nor is any run of it beyond the four Mailchimp shows",
+    !whole.includes(shaped.slice(0, 5)),
+  );
 }

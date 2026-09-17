@@ -63,16 +63,13 @@ function datacenter(key: string): string {
 /**
  * A short, one-way mark that changes when the key changes.
  *
- * The question a rotation leaves behind is not "is this key good" but "is this
- * the key I just pasted" - and nobody can answer it. Mailchimp shows a key once,
- * Cloudflare holds it write-only, and a rotated key that never reached the
- * deploy fails in exactly the way a bad key does, because it IS a bad key now:
- * rotating revokes the old one.
+ * Kept alongside the opening characters below because the two answer different
+ * questions: this one changes whenever the value changes, even between two keys
+ * that happen to open the same way.
  *
- * Six hex characters of a salted digest settles it without revealing anything.
- * Replace the secret, reload, and if this has not changed then the new value did
- * not save. Twenty-four bits is far too few to walk back to a key, and a key is
- * thirty-two random hex characters in the first place.
+ * Six hex characters of a salted digest. Twenty-four bits is far too few to walk
+ * back to a key, and a key is thirty-two random hex characters in the first
+ * place.
  */
 export function keyFingerprint(key: string): string {
   return md5(`church-directory fingerprint:${key}`).slice(0, 6);
@@ -84,14 +81,25 @@ export function describeKey(key: string): string {
   const dc = at === -1 ? "" : key.slice(at + 1);
 
   if (full) {
+    // Mailchimp's own API keys page prints the first four characters of every
+    // key beside the date it was made, and strikes through the revoked ones. So
+    // four characters is exactly what it already shows its owner, and printing
+    // the same four turns "is this the key I pasted" into one glance at a table
+    // they have open anyway - which matters most in the case that is otherwise
+    // invisible, a rotation where the new key never reached the deploy. The old
+    // one is revoked the moment the new one is made, so it fails exactly as a
+    // bad key does, because it has become one.
+    const opening = key.slice(0, 4);
     return (
-      `The key on this deploy is ${key.length} characters and ends "-${dc}", which is the ` +
-      `shape a Mailchimp key has — so it is the key itself being refused, not the way it was ` +
-      `pasted. Its fingerprint is ${keyFingerprint(key)}: replace the key in Cloudflare, reload ` +
-      `this page, and if that fingerprint has not changed then the new value did not save. If it ` +
-      `does change and this still fails, the key is being refused by Mailchimp — check under ` +
-      `Account & billing → Extras → API keys that it is Active, and that the address bar there ` +
-      `begins "${dc}.", since a key made on one account cannot be used on another.`
+      `The key on this deploy starts "${opening}", ends "-${dc}", and is ${key.length} ` +
+      `characters — the shape a Mailchimp key has, so it is the key itself being refused rather ` +
+      `than the way it was pasted. Open Account & billing → Extras → API keys in Mailchimp: it ` +
+      `lists the first four characters of every key. If "${opening}" is not there, or is struck ` +
+      `through as revoked, this deploy is holding an old key — paste the current one over ` +
+      `MAILCHIMP_API_KEY. If "${opening}" is there and Active, the key is right and Mailchimp is ` +
+      `refusing it for another reason; check the address bar on that page begins "${dc}.", since ` +
+      `a key made on one account cannot be used on another. (Fingerprint ${keyFingerprint(key)}, ` +
+      `which changes whenever the stored value does.)`
     );
   }
 
