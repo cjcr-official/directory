@@ -17,6 +17,7 @@
 import { buildEntries, type DirectoryData } from "@/lib/entries";
 import { chunk, isEmailish, rosterFor, tagChanges } from "@/lib/mailchimp";
 import { md5, subscriberHash } from "../worker/md5";
+import { missingSettings, settingsOf } from "../worker/settings";
 import type { HouseholdRow, PersonRow } from "@/lib/database.types";
 import { createHash } from "node:crypto";
 import { check, same } from "./check";
@@ -447,5 +448,78 @@ console.log("\nMD5, which is how Mailchimp names a contact");
     "a contact is keyed by the lower-cased address, however it was typed",
     subscriberHash(" Ana@Example.ORG "),
     md5("ana@example.org"),
+  );
+}
+
+console.log("\nwhat a key looks like after somebody pastes it on a phone");
+{
+  // The exact failure this exists for: a leading space that the datacenter
+  // check accepts - "-us14" still parses off the end - and that Mailchimp then
+  // rejects as an invalid key, sending the office off to regenerate a key that
+  // was never wrong.
+  //
+  // Deliberately not shaped like a real key. Written as thirty-two hex
+  // characters and a datacenter, which is what a Mailchimp key looks like, this
+  // fixture is indistinguishable from the real thing to a scanner - and GitHub
+  // push protection duly refused the commit that first carried it. A test
+  // fixture is not worth teaching anybody to click past that warning.
+  const pasted = settingsOf({
+    MAILCHIMP_API_KEY: " example-not-a-real-key-us14\n",
+    SUPABASE_URL: "  https://abcdefgh.supabase.co///  ",
+    SUPABASE_ANON_KEY: "\tanon.key.value ",
+  });
+
+  same(
+    "a space in front of the key is not part of the key",
+    pasted.key,
+    "example-not-a-real-key-us14",
+  );
+  same("nor is a newline behind it", pasted.key.endsWith("us14"), true);
+  same(
+    "trailing slashes come off the Supabase URL",
+    pasted.supabaseUrl,
+    "https://abcdefgh.supabase.co",
+  );
+  same("and the anon key is trimmed too", pasted.anonKey, "anon.key.value");
+
+  // The URL is joined to a path directly, so this is the thing that actually
+  // broke: //rest/v1/rpc/is_editor is not a route Supabase answers.
+  same(
+    "so the editor check is asked at a real address",
+    `${pasted.supabaseUrl}/rest/v1/rpc/is_editor`,
+    "https://abcdefgh.supabase.co/rest/v1/rpc/is_editor",
+  );
+
+  same(
+    "a URL with no slash to strip is left alone",
+    settingsOf({ SUPABASE_URL: "https://a.supabase.co" }).supabaseUrl,
+    "https://a.supabase.co",
+  );
+}
+
+console.log("\nwhat the screen is told is missing");
+{
+  same("nothing set at all", missingSettings({}), [
+    "MAILCHIMP_API_KEY",
+    "SUPABASE_URL",
+    "SUPABASE_ANON_KEY",
+  ]);
+  same(
+    "a setting that holds only spaces is missing, not set",
+    missingSettings({
+      MAILCHIMP_API_KEY: "   ",
+      SUPABASE_URL: "https://a.supabase.co",
+      SUPABASE_ANON_KEY: "k",
+    }),
+    ["MAILCHIMP_API_KEY"],
+  );
+  same(
+    "all three in place",
+    missingSettings({
+      MAILCHIMP_API_KEY: "k-us14",
+      SUPABASE_URL: "https://a.supabase.co",
+      SUPABASE_ANON_KEY: "k",
+    }),
+    [],
   );
 }
