@@ -18,7 +18,7 @@ import { buildEntries, type DirectoryData } from "@/lib/entries";
 import { chunk, isEmailish, rosterFor, tagChanges } from "@/lib/mailchimp";
 import { md5, subscriberHash } from "../worker/md5";
 import { missingSettings, settingsOf } from "../worker/settings";
-import { describeKey, keyFingerprint } from "../worker/mailchimp";
+import { describeKey, keyFingerprint, listAudiences } from "../worker/mailchimp";
 import type { HouseholdRow, PersonRow } from "@/lib/database.types";
 import { createHash } from "node:crypto";
 import { check, same } from "./check";
@@ -578,4 +578,93 @@ console.log("\nsaying what is wrong with a key without saying the key");
     "and nor is any run of it beyond the four Mailchimp shows",
     !whole.includes(shaped.slice(0, 5)),
   );
+}
+
+console.log("\nasking the other way when the first way is refused");
+{
+  const KEY = "example-not-a-real-key-us20";
+  const real = globalThis.fetch;
+
+  /** Stands in for Mailchimp, recording how each request was authorized. */
+  function stub(reply: (url: string, scheme: string) => { status: number; body: string }) {
+    const seen: { url: string; scheme: string }[] = [];
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      const header = String((init?.headers as Record<string, string>)?.Authorization ?? "");
+      const scheme = header.split(" ")[0] ?? "";
+      seen.push({ url, scheme });
+      const { status, body } = reply(url, scheme);
+      return new Response(body, { status, headers: { "Content-Type": "application/json" } });
+    }) as typeof globalThis.fetch;
+    return seen;
+  }
+
+  const audiences = JSON.stringify({ lists: [{ id: "a", name: "A", stats: { member_count: 2 } }] });
+  const refused = JSON.stringify({
+    title: "API Key Invalid",
+    detail: "Your API key may be invalid.",
+  });
+
+  // Basic works, as it normally does: asked once, and not asked again.
+  {
+    const seen = stub(() => ({ status: 200, body: audiences }));
+    const found = await listAudiences(KEY);
+    same("Basic alone is one request", seen.length, 1);
+    same("and it is Basic", seen[0].scheme, "Basic");
+    same("and the audiences come back", found.length, 1);
+  }
+
+  // Basic refused, Bearer accepted: the screen should never see an error.
+  {
+    const seen = stub((_url, scheme) =>
+      scheme === "Basic" ? { status: 401, body: refused } : { status: 200, body: audiences },
+    );
+    const found = await listAudiences(KEY);
+    same("a refused Basic is asked again", seen.length, 2);
+    same("the second time as Bearer", seen[1].scheme, "Bearer");
+    same("and the answer is used rather than the refusal", found[0].name, "A");
+  }
+
+  // Both refused: the error has to say so, and say what /ping made of it.
+  {
+    const seen = stub((url) =>
+      url.endsWith("/ping") ? { status: 200, body: "{}" } : { status: 401, body: refused },
+    );
+    let message = "";
+    try {
+      await listAudiences(KEY);
+    } catch (cause) {
+      message = cause instanceof Error ? cause.message : String(cause);
+    }
+    check(
+      "both schemes are tried and then /ping",
+      seen.length === 3 && seen[2].url.endsWith("/ping"),
+    );
+    check("the message rules the scheme out", message.includes("not the authorization scheme"));
+    check(
+      "and says the fault is this app's when /ping accepts the key",
+      message.includes("fault is in this app's request"),
+    );
+    check("Mailchimp's own words survive", message.includes("API Key Invalid"));
+  }
+
+  // Both refused and /ping refused too: the account will not answer this key.
+  {
+    stub(() => ({ status: 401, body: refused }));
+    let message = "";
+    try {
+      await listAudiences(KEY);
+    } catch (cause) {
+      message = cause instanceof Error ? cause.message : String(cause);
+    }
+    check(
+      "a refused /ping is reported as the account refusing",
+      message.includes("refuses it too"),
+    );
+    // This stand-in is deliberately not shaped like a real key, so describeKey
+    // takes its other branch - which is still a description of what is held.
+    check("and the key is still described", message.includes("not the shape of a Mailchimp key"));
+  }
+
+  globalThis.fetch = real;
 }
