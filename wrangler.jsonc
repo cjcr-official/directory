@@ -1,16 +1,31 @@
 {
-  // Cloudflare Workers static assets. Only needed if you deploy with the CLI
-  // (`npm run deploy`); the Pages Git integration reads none of this and just
-  // needs build command `npm run build` and output directory `dist`.
+  // Cloudflare Workers: the built site, plus the small API in worker/ that the
+  // Mailchimp screen talks to. Only needed if you deploy with the CLI
+  // (`npm run deploy`) or the GitHub Action.
+  //
+  // The Pages Git integration reads none of this. It can still serve the app -
+  // build command `npm run build`, output directory `dist` - but it has no
+  // Worker, so /api/* would 404 and the Mailchimp screen would not work. If you
+  // want that screen, deploy this way.
   "name": "church-directory",
   "compatibility_date": "2026-01-01",
+  "main": "worker/index.ts",
   "assets": {
     "directory": "./dist",
+    // How worker/index.ts reaches the built files for everything it does not
+    // handle itself.
+    "binding": "ASSETS",
     // Client-side routing: unknown paths serve index.html rather than 404.
     // This replaces a _redirects file - Workers rejects the usual
     // "/* /index.html 200" rule as an infinite loop, since /index.html
     // matches /* and re-triggers itself.
     "not_found_handling": "single-page-application",
+    // Without this the rule above would swallow the API: /api/mailchimp/sync
+    // matches no file, so it would be answered with index.html - a 200 full of
+    // HTML where the screen expected JSON. Naming the routes the Worker runs
+    // for keeps every other path on the fast path, served straight from the
+    // edge without invoking it.
+    "run_worker_first": ["/api/*"],
   },
   "observability": {
     "enabled": true,

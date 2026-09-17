@@ -151,6 +151,10 @@ Either route works. The first needs no command line.
 
 Every push to `main` redeploys, and `public/_headers` sets the security headers.
 
+This route serves the built files and nothing else, so it has no `/api` — which
+means **the Mailchimp screen will not work on it**. Everything else does. If you
+want to email groups from the app, take Route B.
+
 One extra step on this route: Pages does not fall back to `index.html` on its
 own, so refreshing a page like `/families` would 404. In the project's
 **Settings → Build → Single Page Application**, turn the SPA fallback on. (The
@@ -174,6 +178,22 @@ Without them the job skips rather than deploying an app pointed at nothing.
 > The two `VITE_` values are read **at build time** and baked into the bundle.
 > After changing either, trigger a fresh deploy — editing the variable alone
 > changes nothing.
+
+### Optional: emailing groups through Mailchimp
+
+This route deploys `worker/` alongside the site, which is what serves `/api` and
+holds the Mailchimp key. Nothing here is needed unless you want that screen.
+
+After the first deploy has created the Worker, add three **Secrets** under
+Cloudflare → **Workers & Pages** → `church-directory` → **Settings** →
+**Variables and Secrets**: `MAILCHIMP_API_KEY`, `SUPABASE_URL` and
+`SUPABASE_ANON_KEY`. The last two are the same values as the `VITE_` pair above;
+the Worker needs them at run time to check that whoever is asking is a
+signed-in editor before it will talk to Mailchimp for them.
+
+Unlike the `VITE_` pair these are read at run time, so a change takes effect
+without a rebuild. Until all three are set the Mailchimp screen says which are
+missing. The README's **Sending email to a group** has the rest.
 
 ---
 
@@ -213,6 +233,17 @@ variables were not set at build time. Set them and redeploy.
 **A route 404s on refresh** — the single-page-app fallback is off. On the
 Actions route that comes from `not_found_handling` in `wrangler.jsonc`; on the
 Pages route it is a setting in the project's build configuration.
+
+**The Mailchimp screen says there is no API behind this deploy** — it is running
+on the Pages route, which serves files only. Deploy it the Actions way, or with
+`npm run deploy`.
+
+**The Mailchimp screen says Supabase refused the check** — the Worker asks the
+database `is_editor()` on your behalf and something said no. Confirm
+`SUPABASE_URL` and `SUPABASE_ANON_KEY` on the Worker, and, if the project's
+default function grants were ever tightened,
+`grant execute on function public.is_editor() to authenticated;` in the SQL
+editor.
 
 **Sign-in works but every screen is empty** — expected for a new account that has
 not been granted a role. Sign in as the owner and check Administrators.

@@ -21,7 +21,7 @@ function Item({ to, label, count }: { to: string; label: string; count?: number 
 }
 
 export function AppShell() {
-  const { profile, role, isOwner, signOut } = useAuth();
+  const { profile, role, canEdit, isOwner, signOut } = useAuth();
   const { households, people, tags, entries } = useDirectory();
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
@@ -105,6 +105,13 @@ export function AppShell() {
         <div className="nav-section">Printing</div>
         <Item to="/projects" label="Directories" />
         <Item to="/tags" label="Name tags" />
+
+        {canEdit ? (
+          <>
+            <div className="nav-section">Email</div>
+            <Item to="/mailchimp" label="Mailchimp" />
+          </>
+        ) : null}
 
         <div className="nav-section">Settings</div>
         <Item to="/settings" label="Settings" />

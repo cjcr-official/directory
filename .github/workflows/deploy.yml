@@ -13,8 +13,15 @@ name: Deploy
 # Never add the Supabase service_role key here. It bypasses every security
 # policy, and nothing in the browser bundle should be able to.
 #
+# The Mailchimp screen needs three more - MAILCHIMP_API_KEY, SUPABASE_URL and
+# SUPABASE_ANON_KEY - but those are set on the Worker in the Cloudflare
+# dashboard, not here: they are read at run time rather than baked into the
+# build, and the API key must never reach a bundle. Nothing below needs them,
+# and the rest of the app works without them.
+#
 # Prefer clicking? Connect the repository under Workers & Pages instead and
-# skip this file entirely - see docs/DEPLOY.md.
+# skip this file entirely - see docs/DEPLOY.md. That route serves the built
+# files only, so it has no /api and the Mailchimp screen will not work on it.
 
 on:
   push:

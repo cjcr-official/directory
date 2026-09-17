@@ -1,0 +1,31 @@
+{
+  // The Cloudflare Worker in worker/.
+  //
+  // Its own project because it is neither the app nor a node script: it runs in
+  // a Worker, which has fetch, Request, Response and crypto but no document and
+  // no node built-ins. Compiling it under tsconfig.app.json's DOM types would
+  // let it reach for a window that is not there and still typecheck.
+  //
+  // WebWorker rather than @cloudflare/workers-types: everything worker/ uses is
+  // standard - fetch, TextEncoder, btoa - and the one Cloudflare-specific thing,
+  // the ASSETS binding, is declared by hand in index.ts. That is a smaller
+  // surface than a dependency, and it is checked by `npm run typecheck` either
+  // way.
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "WebWorker"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  },
+  "include": ["worker"]
+}

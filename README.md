@@ -26,6 +26,13 @@ who is not in a family gets their own card.
 you can print a booklet for just that group later, without picking names again.
 Tagging one chorister pulls their whole family into the choir booklet.
 
+**Emailing a group.** Groups are pushed across to Mailchimp as tags, so the
+choir's email goes to the choir and nowhere else. Add a chorister in March and
+the April email includes them; someone who leaves the group loses the tag and
+stops receiving it. You write and send in Mailchimp — this only keeps the "to"
+line honest. Needs a Mailchimp API key on the deploy; see **Sending email to a
+group** below.
+
 **Directories.** A _directory_ is a saved recipe for one printable book: who is
 in it, and how it looks. Keep a main directory for the whole congregation and as
 many small ones as you like for events. The data stays live, so reprinting next
@@ -153,6 +160,82 @@ this from your own machine, and never put it in `.env.local` or Cloudflare.
 
 ---
 
+## Sending email to a group
+
+The directory already knows who is in the choir. Keeping that list a second time
+inside Mailchimp is how the two drift apart, so the app pushes each group across
+as a Mailchimp **tag** and keeps it correct: everyone currently in the group gets
+the tag, and anyone who has left it loses the tag. Then you send to that tag from
+Mailchimp, which is the part Mailchimp is good at — templates, a correct
+unsubscribe link, and a record of what went out.
+
+**Who actually gets the email.** Not the same people the booklet prints. A choir
+booklet prints the whole Alvarez family because Ana sings, which is right on a
+printed card and wrong for email — it would reach her husband and both children
+every week. So an email to a group goes to the people the group actually names,
+at their own addresses. The exception is a family somebody tagged _as a family_:
+that one is written to at the family's address, or at its members' addresses if
+the family has none. The screen lists exactly who before you press anything, and
+names anyone in the group with no address on record.
+
+**Syncing never changes anybody's subscription.** Somebody who has unsubscribed
+stays unsubscribed. The app only ever tells Mailchimp what status to use _if the
+address is new to the audience_, so pressing Sync twice — or pressing it for
+someone who opted out last spring — cannot put them back on the list.
+
+### What you need to set
+
+The Mailchimp API key is account-wide, and Mailchimp both blocks browser calls
+and says in as many words not to put the key in client code. So it cannot live in
+the bundle like the Supabase keys do. It lives on the Cloudflare Worker in
+`worker/`, which is the only thing that ever sees it, and the browser talks to
+that instead of to Mailchimp.
+
+Three settings, set once, on the Worker — **Cloudflare dashboard → Workers &
+Pages → church-directory → Settings → Variables and Secrets**. Add each as a
+**Secret**:
+
+| Name                | Where it comes from                                                                                                    |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `MAILCHIMP_API_KEY` | Mailchimp → your avatar → Account & billing → Extras → API keys → Create a key. It ends in a datacenter, like `-us14`. |
+| `SUPABASE_URL`      | The same value as `VITE_SUPABASE_URL` — Supabase → Project Settings → API.                                             |
+| `SUPABASE_ANON_KEY` | The same value as `VITE_SUPABASE_ANON_KEY`, the "anon public" one.                                                     |
+
+The last two are how the Worker checks that whoever is asking is a signed-in
+editor of _this_ directory before it will talk to Mailchimp on their behalf. It
+asks the database that question using `is_editor()` — the same function every
+row level security policy is written in terms of — so an account that has an
+authenticator app but has not been through it this session is refused here too.
+
+Until all three are set the Mailchimp screen says so, and names the ones that
+are missing rather than failing quietly.
+
+**No migration is needed.** `is_editor()` has existed since `0001`, and Postgres
+grants EXECUTE on it to PUBLIC by default. If your project has been hardened
+past that default, the screen will say Supabase refused the check, and one line
+in the SQL editor fixes it:
+
+```sql
+grant execute on function public.is_editor() to authenticated;
+```
+
+### It has to be deployed as a Worker
+
+`/api/*` is served by `worker/index.ts`. The GitHub Action and `npm run deploy`
+both deploy it, because both use `wrangler.jsonc`. The **Pages Git integration
+does not** — it serves the built files and nothing else, so `/api` would answer
+with the app's own index page. The screen notices that and says so instead of
+failing with a JSON parse error, but the fix is to deploy the Worker way.
+
+### Then, in Mailchimp
+
+Groups arrive as tags on the audience you chose. To send to one: **Create →
+Email → Regular**, pick the audience, and under _To_ choose **Contacts that
+match** → _Tags_ → the group's name. The tag is kept up to date by the app; the
+campaign is yours.
+
+---
+
 ## Is the data safe?
 
 The anon key ships inside the browser bundle. That is how Supabase is designed
@@ -264,6 +347,8 @@ src/
     backgroundChecks.ts  when a check was done, and when the next one is due
     photos.ts          resize in the browser, upload, signed URLs
     queries.ts         every database read and write
+    mailchimp.ts       who a group's email reaches, and at which address
+    mailchimpClient.ts the browser's side of the Mailchimp sync
     demo.ts            the invented congregation used by /sample
     mfa.ts             enrolling and answering an authenticator app
     theme.ts           light, dark, or whatever the device asked for
@@ -274,6 +359,10 @@ src/
 scripts/
   sample-book.ts       render a sample PDF from the command line
   seed.ts              fill a Supabase project with demo data
+worker/                the only server-side code: everything needing a secret
+  index.ts             routes /api/*, and checks the caller is an editor
+  mailchimp.ts         the Marketing API calls, and the key they need
+  md5.ts               how Mailchimp names a contact in a URL
 ```
 
 Formatting is Prettier, checked in CI (`npm run format`). There is no ESLint
