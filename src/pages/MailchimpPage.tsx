@@ -46,6 +46,17 @@ export function MailchimpPage() {
   const [ready, setReady] = useState<boolean | null>(null);
   const [missing, setMissing] = useState<string[]>([]);
   const [list, setList] = useState<Audience[]>([]);
+  /**
+   * Whether the audiences were actually asked for and answered.
+   *
+   * Separate from the list being empty, because the two look identical from
+   * here and mean opposite things. An account with no audiences should be told
+   * to go and make one; an account whose key was refused has already been told
+   * why at the top of the screen, and saying "no audiences yet" underneath it
+   * is a second, false statement about their Mailchimp account sending them to
+   * fix something that is not broken.
+   */
+  const [asked, setAsked] = useState(false);
   const [audienceId, setAudienceId] = useState(remembered);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -72,6 +83,7 @@ export function MailchimpPage() {
         const found = await fetchAudiences();
         if (!live) return;
         setList(found);
+        setAsked(true);
         // One audience is the overwhelmingly common case, and picking it saves
         // a decision that has only one answer.
         setAudienceId((current) =>
@@ -171,11 +183,15 @@ export function MailchimpPage() {
                     ))}
                   </select>
                 </Field>
-              ) : (
+              ) : asked ? (
                 <Notice kind="warn">
                   This Mailchimp account has no audiences yet. Make one in Mailchimp first — it is
                   the list a campaign is sent to.
                 </Notice>
+              ) : (
+                <p className="hint" style={{ margin: 0 }}>
+                  Your audiences could not be fetched — see above.
+                </p>
               )}
             </div>
           </div>

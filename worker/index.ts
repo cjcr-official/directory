@@ -1,3 +1,4 @@
+import { missingSettings, settingsOf } from "./settings";
 import {
   MailchimpFailure,
   batchStatus,
@@ -48,15 +49,6 @@ function problem(status: number, error: string): Response {
   return json({ error }, status);
 }
 
-/** Which settings the deploy is missing, named so the screen can say so. */
-function missingSettings(env: Env): string[] {
-  const missing: string[] = [];
-  if (!env.MAILCHIMP_API_KEY) missing.push("MAILCHIMP_API_KEY");
-  if (!env.SUPABASE_URL) missing.push("SUPABASE_URL");
-  if (!env.SUPABASE_ANON_KEY) missing.push("SUPABASE_ANON_KEY");
-  return missing;
-}
-
 /**
  * Is the caller somebody the database would let write?
  *
@@ -73,16 +65,17 @@ function missingSettings(env: Env): string[] {
  * function runs, so a forged or expired one never gets an answer at all.
  */
 async function editorOnly(request: Request, env: Env): Promise<Response | null> {
+  const { supabaseUrl, anonKey } = settingsOf(env);
   const header = request.headers.get("Authorization") ?? "";
   const token = header.toLowerCase().startsWith("bearer ") ? header.slice(7).trim() : "";
   if (!token) return problem(401, "Sign in again — this request arrived without a session.");
 
   let allowed: unknown;
   try {
-    const response = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/is_editor`, {
+    const response = await fetch(`${supabaseUrl}/rest/v1/rpc/is_editor`, {
       method: "POST",
       headers: {
-        apikey: env.SUPABASE_ANON_KEY ?? "",
+        apikey: anonKey,
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
@@ -184,7 +177,7 @@ async function api(request: Request, env: Env, route: string): Promise<Response>
   const refused = await editorOnly(request, env);
   if (refused) return refused;
 
-  const key = env.MAILCHIMP_API_KEY as string;
+  const { key } = settingsOf(env);
 
   if (route === "audiences" && request.method === "GET") {
     return json({ audiences: await listAudiences(key, request.signal) });
