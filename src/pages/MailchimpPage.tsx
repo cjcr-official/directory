@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useDirectory } from "@/data/DirectoryContext";
 import { useAuth } from "@/auth/AuthProvider";
-import { EmptyState, Field, LoadingScreen, Notice } from "@/components/ui";
+import { EmptyState, LoadingScreen, Notice } from "@/components/ui";
 import { rosterFor } from "@/lib/mailchimp";
 import { audiences as fetchAudiences, settings, syncGroup } from "@/lib/mailchimpClient";
 import type { Audience, SyncOutcome } from "@/lib/mailchimpClient";
@@ -203,7 +203,6 @@ export function MailchimpPage() {
     }
   }
 
-  const chosen = list.find((one) => one.id === audienceId);
   const syncable = tags.filter((tag) => (rosters.get(tag.id)?.recipients.length ?? 0) > 0);
 
   return (
@@ -211,10 +210,7 @@ export function MailchimpPage() {
       <div className="page-head">
         <div className="grow">
           <h1>Mailchimp</h1>
-          <div className="sub">
-            Send each group its own email without keeping the list twice. Write and send in
-            Mailchimp; this keeps who is on it correct.
-          </div>
+          <div className="sub">Email a group. The list keeps itself right.</div>
         </div>
       </div>
 
@@ -264,29 +260,26 @@ export function MailchimpPage() {
             </div>
             <div className="card-body">
               {list.length ? (
-                <Field
-                  label="Which audience"
-                  htmlFor="mailchimp_audience"
-                  hint="Groups become tags inside this audience. Most accounts have one."
+                /* No Field wrapper: the card is already headed "Audience", and a
+                   second label saying it twice is noise. An empty label would
+                   have been worse than noise - it is an unlabelled control to
+                   anything reading the page aloud - so the name lives on the
+                   select itself. */
+                <select
+                  aria-label="Audience"
+                  id="mailchimp_audience"
+                  value={audienceId}
+                  onChange={(event) => setAudienceId(event.target.value)}
                 >
-                  <select
-                    id="mailchimp_audience"
-                    value={audienceId}
-                    onChange={(event) => setAudienceId(event.target.value)}
-                  >
-                    <option value="">Choose an audience…</option>
-                    {list.map((one) => (
-                      <option key={one.id} value={one.id}>
-                        {one.name} — {one.members} contacts
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                  <option value="">Choose an audience…</option>
+                  {list.map((one) => (
+                    <option key={one.id} value={one.id}>
+                      {one.name} — {one.members} contacts
+                    </option>
+                  ))}
+                </select>
               ) : asked ? (
-                <Notice kind="warn">
-                  This Mailchimp account has no audiences yet. Make one in Mailchimp first — it is
-                  the list a campaign is sent to.
-                </Notice>
+                <Notice kind="warn">No audiences in Mailchimp yet. Make one there first.</Notice>
               ) : (
                 <p className="hint" style={{ margin: 0 }}>
                   Your audiences could not be fetched — see above.
@@ -369,63 +362,51 @@ export function MailchimpPage() {
                         <div className="group-members" id={panelId}>
                           {busy ? <p className="hint">{running?.note}</p> : null}
 
-                          {/* Not in the row above. That row budgets its width
-                              to the pixel - the name shrinks to an ellipsis
-                              rather than push the count off the end - so three
-                              more words there cost "Worship Team" its name.
-                              Here there is room, and this is the group being
-                              looked at anyway. */}
-                          {when && !busy ? (
-                            <p className="hint" style={{ marginTop: 0 }}>
-                              Last synced {when} from this browser.
-                            </p>
-                          ) : null}
-
                           {failed ? <Notice kind="error">{failed}</Notice> : null}
 
                           {outcome && !busy ? (
                             <Notice kind={outcome.rejected.length ? "warn" : "ok"}>
-                              <strong>
-                                {outcome.tagged} tagged “{tag.name}” in{" "}
-                                {chosen?.name ?? "Mailchimp"}.
-                              </strong>{" "}
-                              {outcome.added} added, {outcome.removed} removed, {outcome.created}{" "}
-                              new to the audience.
+                              <strong>{outcome.tagged} tagged.</strong> {outcome.added} added ·{" "}
+                              {outcome.removed} removed · {outcome.created} new
                               {outcome.rejected.length ? (
                                 <>
                                   {" "}
-                                  Mailchimp would not take {outcome.rejected.length}:{" "}
+                                  · {outcome.rejected.length} refused:{" "}
                                   {outcome.rejected
-                                    .slice(0, 3)
-                                    .map((row) => `${row.email} (${row.reason})`)
-                                    .join("; ")}
-                                  {outcome.rejected.length > 3 ? "…" : ""}
+                                    .slice(0, 2)
+                                    .map((row) => row.email)
+                                    .join(", ")}
+                                  {outcome.rejected.length > 2 ? "…" : ""}
                                 </>
                               ) : null}
                               {outcome.removalsSkipped ? (
-                                <>
-                                  {" "}
-                                  Nobody was untagged: who already has this tag could not be read (
-                                  {outcome.removalsSkipped}). Anyone who has left the group keeps it
-                                  until the next sync that can.
-                                </>
+                                <> · Nobody untagged — the current tags could not be read.</>
                               ) : null}
                               {outcome.stillRunning ? (
-                                <>
-                                  {" "}
-                                  Mailchimp is still working through the tag changes — it will
-                                  finish on its own.
-                                </>
+                                <> · Mailchimp is still finishing the tags.</>
                               ) : null}
                             </Notice>
                           ) : null}
 
-                          {open && canEdit && (roster?.recipients.length ?? 0) > 0 ? (
-                            <p style={{ margin: "0 0 10px" }}>
-                              <Link className="btn primary small" to={`/mailchimp/${tag.id}`}>
-                                Write an email to {tag.name}
-                              </Link>
-                            </p>
+                          {/* The action first, and the quiet fact beside it
+                              rather than stacked above it. "Synced today" is
+                              not in the row above because that row budgets its
+                              width to the pixel - the name shrinks to an
+                              ellipsis rather than push the count off the end,
+                              and three more words there cost "Worship Team" its
+                              name. */}
+                          {open && !busy ? (
+                            <div
+                              className="row"
+                              style={{ alignItems: "baseline", margin: "0 0 12px" }}
+                            >
+                              {canEdit && (roster?.recipients.length ?? 0) > 0 ? (
+                                <Link className="btn primary small" to={`/mailchimp/${tag.id}`}>
+                                  Write email
+                                </Link>
+                              ) : null}
+                              {when ? <span className="muted small">Synced {when}</span> : null}
+                            </div>
                           ) : null}
 
                           {open ? (
@@ -437,9 +418,7 @@ export function MailchimpPage() {
                                       <span className="group-member-name">{recipient.label}</span>
                                       <span className="group-member-who">
                                         {recipient.email}
-                                        {recipient.via === "household"
-                                          ? " — the family’s address"
-                                          : ""}
+                                        {recipient.via === "household" ? " · family" : ""}
                                       </span>
                                     </li>
                                   ))}
@@ -453,7 +432,7 @@ export function MailchimpPage() {
 
                               {roster?.unreachable.length ? (
                                 <p className="hint">
-                                  No email address on record for{" "}
+                                  {" "}
                                   {roster.unreachable.map((one, at) => (
                                     <span key={`${one.type}:${one.id}`}>
                                       {at > 0 ? ", " : ""}
@@ -472,8 +451,8 @@ export function MailchimpPage() {
                                         {one.name}
                                       </Link>
                                     </span>
-                                  ))}
-                                  . They are in the group but will not receive this.
+                                  ))}{" "}
+                                  {roster.unreachable.length === 1 ? "has" : "have"} no address.
                                 </p>
                               ) : null}
                             </>
@@ -486,16 +465,12 @@ export function MailchimpPage() {
               </ul>
             ) : (
               <EmptyState title="No groups yet">
-                Make a group under <Link to="/groups">Groups</Link> first — a group is what becomes
-                a tag in Mailchimp.
+                Make one under <Link to="/groups">Groups</Link>.
               </EmptyState>
             )}
           </div>
 
-          <p className="muted small">
-            Syncing never changes anybody’s subscription. Somebody who has unsubscribed stays
-            unsubscribed, and Mailchimp adds the unsubscribe link to what you send.
-          </p>
+          <p className="muted small">Unsubscribes are always respected.</p>
         </>
       ) : null}
     </div>
