@@ -18,7 +18,7 @@ import { buildEntries, type DirectoryData } from "@/lib/entries";
 import { chunk, isEmailish, rosterFor, tagChanges } from "@/lib/mailchimp";
 import { md5, subscriberHash } from "../worker/md5";
 import { missingSettings, settingsOf } from "../worker/settings";
-import { describeKey, keyFingerprint, listAudiences } from "../worker/mailchimp";
+import { describeKey, keyFingerprint, listAudiences, taggedAddresses } from "../worker/mailchimp";
 import type { HouseholdRow, PersonRow } from "@/lib/database.types";
 import { createHash } from "node:crypto";
 import { check, same } from "./check";
@@ -664,6 +664,79 @@ console.log("\nasking the other way when the first way is refused");
     // This stand-in is deliberately not shaped like a real key, so describeKey
     // takes its other branch - which is still a description of what is held.
     check("and the key is still described", message.includes("not the shape of a Mailchimp key"));
+  }
+
+  globalThis.fetch = real;
+}
+
+console.log("\nreading who has a tag off the contacts themselves");
+{
+  const KEY = "example-not-a-real-key-us20";
+  const real = globalThis.fetch;
+  const urls: string[] = [];
+
+  function serve(pages: { email_address: string; tags: { name: string }[] }[][]) {
+    urls.length = 0;
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const url = String(input);
+      urls.push(url);
+      const offset = Number(new URL(url).searchParams.get("offset") ?? "0");
+      const members = pages[offset / 1000] ?? [];
+      return new Response(JSON.stringify({ members, total_items: 0 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof globalThis.fetch;
+  }
+
+  const member = (email: string, ...tags: string[]) => ({
+    email_address: email,
+    tags: tags.map((name) => ({ name })),
+  });
+
+  // The ordinary case, and the one the segments endpoint used to answer.
+  {
+    serve([
+      [
+        member("ana@example.org", "Choir"),
+        member("ben@example.org", "Youth Group"),
+        member("cal@example.org", "choir"),
+      ],
+    ]);
+    const carrying = await taggedAddresses(KEY, "list1", "Choir");
+    same("only the contacts carrying the tag come back", carrying, [
+      "ana@example.org",
+      "cal@example.org",
+    ]);
+    check("matched however the tag was capitalised", carrying.includes("cal@example.org"));
+    same("and it took one call", urls.length, 1);
+    check(
+      "to the members endpoint, not to segments",
+      urls[0].includes("/members?") && !urls[0].includes("segments"),
+    );
+  }
+
+  // A tag nobody has yet - a group that has never been synced.
+  {
+    serve([[member("ana@example.org", "Youth Group")]]);
+    same(
+      "a tag nobody carries is nobody, not an error",
+      await taggedAddresses(KEY, "list1", "Choir"),
+      [],
+    );
+  }
+
+  // A congregation bigger than one page. A half-read answer would untag
+  // everybody past the first thousand, which is the bug worth preventing.
+  {
+    const first = Array.from({ length: 1000 }, (_, i) => member(`p${i}@example.org`, "Choir"));
+    const second = [member("last@example.org", "Choir")];
+    serve([first, second]);
+    const carrying = await taggedAddresses(KEY, "list1", "Choir");
+    same("a full page is followed by another", urls.length, 2);
+    same("and nobody past the first page is lost", carrying.length, 1001);
+    check("including the very last one", carrying.includes("last@example.org"));
+    check("the second call asks for the next page", urls[1].includes("offset=1000"));
   }
 
   globalThis.fetch = real;
