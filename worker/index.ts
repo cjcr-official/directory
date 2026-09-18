@@ -1,5 +1,7 @@
 import { missingSettings, settingsOf } from "./settings";
 import {
+  combinedSegment,
+  combinedSegmentName,
   MailchimpFailure,
   draftCampaign,
   sendCampaign,
@@ -155,6 +157,13 @@ function addresses(value: unknown, limit: number): string[] | null {
 
 /** At most one batch-subscribe call's worth, which is Mailchimp's own limit. */
 const CONTACTS_PER_CALL = 500;
+/**
+ * How many groups one email may go to, and how big their union may be. Neither
+ * is a Mailchimp limit - they are here so a malformed request cannot make this
+ * build an enormous segment, the same reason the tag batch is bounded.
+ */
+const GROUPS_PER_EMAIL = 12;
+const MAX_UNION = 20_000;
 /** A ceiling on one tag batch, so a bad request cannot queue an unbounded job. */
 const TAG_OPERATIONS = 5000;
 
@@ -223,25 +232,62 @@ async function api(request: Request, env: Env, route: string): Promise<Response>
   }
 
   if (route === "draft") {
-    const tag = text(body.tag);
+    // One group arrives as "tag", several as "tags". Both are read, so a tab
+    // left open across a deploy does not break mid-send.
+    const many = Array.isArray(body.tags) ? body.tags.map((one) => text(one)).filter(Boolean) : [];
+    const tags = many.length ? many : [text(body.tag)].filter(Boolean);
     const subject = text(body.subject);
     const fromName = text(body.fromName);
     const replyTo = text(body.replyTo).toLowerCase();
     const html = typeof body.html === "string" ? body.html : "";
     const plain = typeof body.text === "string" ? body.text : "";
-    if (!tag) return problem(400, "Which group?");
+    if (!tags.length) return problem(400, "Which group?");
+    if (tags.length > GROUPS_PER_EMAIL) {
+      return problem(400, `One email goes to at most ${GROUPS_PER_EMAIL} groups.`);
+    }
     if (!subject) return problem(400, "An email needs a subject line.");
     if (!fromName) return problem(400, "An email needs a name to be from.");
     if (!replyTo.includes("@")) return problem(400, "An email needs a reply-to address.");
     if (!html.trim() || !plain.trim()) return problem(400, "An email needs something in it.");
 
-    const segmentId = await tagSegmentId(key, listId, tag, request.signal);
-    if (segmentId === null) {
-      return problem(
-        409,
-        `Mailchimp has no “${tag}” tag yet, so there is nobody for a campaign to go to. ` +
-          `Press Sync on that group first, then write the email.`,
+    let segmentId: number;
+    if (tags.length === 1) {
+      // The ordinary case, unchanged: a group's own tag is already a segment,
+      // and aiming at it leaves nothing behind in the account.
+      const found = await tagSegmentId(key, listId, tags[0], request.signal);
+      if (found === null) {
+        return problem(
+          409,
+          `Mailchimp has no “${tags[0]}” tag yet, so there is nobody for a campaign to go to. ` +
+            `Press Sync on that group first, then write the email.`,
+        );
+      }
+      segmentId = found;
+    } else {
+      // Several groups: one segment holding the union the browser worked out
+      // and de-duplicated. Mailchimp keeps only the addresses already in the
+      // audience, so a group nobody has synced yet makes a segment smaller than
+      // was asked for - worth saying, rather than quietly emailing fewer people
+      // than the screen promised.
+      const people = addresses(body.emails, MAX_UNION);
+      if (!people || !people.length) {
+        return problem(400, "Sending to several groups needs the list of who is in them.");
+      }
+      const made = await combinedSegment(
+        key,
+        listId,
+        combinedSegmentName(tags),
+        people,
+        request.signal,
       );
+      if (made.members === 0) {
+        return problem(
+          409,
+          `None of those ${people.length} addresses are in the audience yet. ` +
+            `Press Sync on each group first, then write the email.`,
+        );
+      }
+      segmentId = made.id;
     }
 
     return json(
@@ -253,7 +299,7 @@ async function api(request: Request, env: Env, route: string): Promise<Response>
           subject,
           fromName,
           replyTo,
-          title: `${tag} — ${subject}`,
+          title: `${tags.join(" + ")} — ${subject}`,
           html,
           text: plain,
         },

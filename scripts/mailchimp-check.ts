@@ -18,6 +18,7 @@ import { buildEntries, type DirectoryData } from "@/lib/entries";
 import {
   chunk,
   composeEmail,
+  groupList,
   isEmailish,
   isPublicMailbox,
   rosterFor,
@@ -25,7 +26,13 @@ import {
 } from "@/lib/mailchimp";
 import { md5, subscriberHash } from "../worker/md5";
 import { missingSettings, settingsOf } from "../worker/settings";
-import { describeKey, keyFingerprint, listAudiences, taggedAddresses } from "../worker/mailchimp";
+import {
+  combinedSegmentName,
+  describeKey,
+  keyFingerprint,
+  listAudiences,
+  taggedAddresses,
+} from "../worker/mailchimp";
 import type { HouseholdRow, PersonRow } from "@/lib/database.types";
 import { createHash } from "node:crypto";
 import { check, same } from "./check";
@@ -804,4 +811,177 @@ console.log("\nan address Mailchimp cannot authenticate");
     check(`not flagged: ${owned}`, !isPublicMailbox(owned));
   }
   check("nothing typed is not flagged", !isPublicMailbox(""));
+}
+
+console.log("\none email to two groups");
+{
+  /*
+   * The case this exists for: the choir and the deacons get the same notice,
+   * and Ana is in both.
+   *
+   * Sent as two emails she gets it twice, and the office cannot see the
+   * overlap to work around it - the two group screens each say what they hold
+   * and neither says what they share. One email to the union is the answer,
+   * and the union has to count her once.
+   */
+  const DEACONS = {
+    id: "t-deacons",
+    name: "Deacons",
+    color: "#c2643a",
+    description: null,
+    created_at: "",
+  };
+
+  const data = {
+    households: [],
+    people: [
+      person({ id: "ana", first_name: "Ana", last_name: "Alvarez", email: "ana@example.org" }),
+      person({ id: "ben", first_name: "Ben", last_name: "Alvarez", email: "ben@example.org" }),
+      person({ id: "dee", first_name: "Dee", last_name: "Diaz", email: "dee@example.org" }),
+    ],
+    tags: [CHOIR, DEACONS],
+    householdTags: [],
+    personTags: [
+      { person_id: "ana", tag_id: CHOIR.id },
+      { person_id: "ben", tag_id: CHOIR.id },
+      // Ana is a deacon as well as a chorister. She is the whole point.
+      { person_id: "ana", tag_id: DEACONS.id },
+      { person_id: "dee", tag_id: DEACONS.id },
+    ],
+  };
+
+  const entries = buildEntries(data);
+  const choir = rosterFor(entries, CHOIR.id);
+  const deacons = rosterFor(entries, DEACONS.id);
+  const both = rosterFor(entries, [CHOIR.id, DEACONS.id]);
+
+  same("the choir alone is two", choir.recipients.length, 2);
+  same("the deacons alone are two", deacons.recipients.length, 2);
+  same(
+    "and sending to each separately would reach four addresses",
+    choir.recipients.length + deacons.recipients.length,
+    4,
+  );
+
+  same("but the two groups together are three people", both.recipients.length, 3);
+  same("each of them once", both.recipients.map((one) => one.email).sort(), [
+    "ana@example.org",
+    "ben@example.org",
+    "dee@example.org",
+  ]);
+  same(
+    "Ana, who is in both, is counted once",
+    both.recipients.filter((one) => one.email === "ana@example.org").length,
+    1,
+  );
+
+  // A single group still behaves exactly as it did, whichever way it is asked.
+  same(
+    "one group passed bare is unchanged",
+    rosterFor(entries, CHOIR.id).recipients.map((one) => one.email),
+    ["ana@example.org", "ben@example.org"],
+  );
+  same(
+    "and the same group passed as a list of one agrees with it",
+    rosterFor(entries, [CHOIR.id]).recipients.map((one) => one.email),
+    ["ana@example.org", "ben@example.org"],
+  );
+}
+
+console.log("\nsomebody with no address, in two groups at once");
+{
+  /* The unreachable list is a union too, and would read badly saying the same
+     name twice. resolveEntries filtering once is what prevents it. */
+  const ELDERS = {
+    id: "t-elders",
+    name: "Elders",
+    color: "#7c5cbf",
+    description: null,
+    created_at: "",
+  };
+  const data = {
+    households: [],
+    people: [person({ id: "eve", first_name: "Eve", last_name: "Ellis", email: null })],
+    tags: [CHOIR, ELDERS],
+    householdTags: [],
+    personTags: [
+      { person_id: "eve", tag_id: CHOIR.id },
+      { person_id: "eve", tag_id: ELDERS.id },
+    ],
+  };
+
+  const both = rosterFor(buildEntries(data), [CHOIR.id, ELDERS.id]);
+  same("she is reported as unreachable once, not once per group", both.unreachable.length, 1);
+  same("by name", both.unreachable[0]?.name, "Eve Ellis");
+  same("and there is nobody to write to", both.recipients.length, 0);
+}
+
+console.log("\nnaming several groups");
+{
+  same("one group is just itself", groupList(["Choir"]), "Choir");
+  same("two are joined for the office", groupList(["Choir", "Deacons"]), "Choir and Deacons");
+  same(
+    "three read as a list",
+    groupList(["Choir", "Deacons", "Elders"]),
+    "Choir, Deacons and Elders",
+  );
+  same(
+    "and the footer says or, because a reader is in one of them",
+    groupList(["Choir", "Deacons"], "or"),
+    "Choir or Deacons",
+  );
+  same("nothing chosen says nothing", groupList([]), "");
+  same("a name repeated is said once", groupList(["Choir", "Choir"]), "Choir");
+}
+
+console.log("\nthe footer tells a reader why it reached them");
+{
+  const one = composeEmail("Hello.", "Choir");
+  check(
+    "one group is named in the singular",
+    one.text.includes("you are in the Choir group in our church directory"),
+    one.text.slice(-200),
+  );
+
+  const two = composeEmail("Hello.", ["Choir", "Deacons"]);
+  check(
+    "two groups are named, in the plural, joined with or",
+    two.text.includes("you are in the Choir or Deacons groups in our church directory"),
+    two.text.slice(-200),
+  );
+  // The literal merge tag, not a constant imported from the module under test:
+  // if somebody renames it, this should fail rather than follow it. A campaign
+  // without it is one Mailchimp refuses to send.
+  check("and the unsubscribe merge tag survives it", two.html.includes("*|UNSUB|*"), two.html);
+  check("as does the postal address Mailchimp requires", two.text.includes("*|LIST:ADDRESS|*"), "");
+}
+
+console.log("\nthe segment a multi-group send is aimed at");
+{
+  /*
+   * This name is not cosmetic: combinedSegment deletes what it finds under it
+   * before writing it again, so two sends to the same pair of groups must
+   * agree on the name exactly, and it must never collide with something a
+   * person made by hand.
+   */
+  same(
+    "the two orders of the same pair name one segment",
+    combinedSegmentName(["Deacons", "Choir"]),
+    combinedSegmentName(["Choir", "Deacons"]),
+  );
+  same(
+    "and that name says which app owns it",
+    combinedSegmentName(["Choir", "Deacons"]),
+    "Choir + Deacons (church directory)",
+  );
+  same(
+    "a repeated group does not appear twice in it",
+    combinedSegmentName(["Choir", "Choir", "Deacons"]),
+    "Choir + Deacons (church directory)",
+  );
+  check(
+    "a plain group name could never collide with it",
+    combinedSegmentName(["Choir"]) !== "Choir",
+    combinedSegmentName(["Choir"]),
+  );
 }

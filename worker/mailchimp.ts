@@ -372,6 +372,86 @@ export async function taggedAddresses(
   return carrying;
 }
 
+/**
+ * What this app calls the segment it builds for a send to several groups.
+ *
+ * Sorted, so that picking the deacons and then the choir names the same
+ * segment as picking the choir and then the deacons - which is what lets the
+ * next send replace the last one instead of leaving a year of near-identical
+ * segments in the account.
+ *
+ * Marked as this app's, because combinedSegment deletes what it finds under
+ * this name before writing it again, and it must never do that to a segment
+ * somebody at the church built by hand.
+ */
+export function combinedSegmentName(tags: string[]): string {
+  const names = [...new Set(tags.map((one) => one.trim()).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b),
+  );
+  return `${names.join(" + ")} (church directory)`;
+}
+
+/**
+ * A segment holding exactly the addresses given, for one email to several
+ * groups.
+ *
+ * Mailchimp aims a campaign at one segment, and there is no tag that means
+ * "the choir and the deacons". The alternative to this is two campaigns, which
+ * sends twice to everybody in both - and the office cannot see that overlap to
+ * work around it.
+ *
+ * A static segment - the same thing a tag is underneath - rather than a
+ * segment built from conditions on the two tags. The conditions form would not
+ * need the addresses passed in, but its exact shape is not something this could
+ * be sure of without an account to try it against, and a wrong guess there
+ * fails at send time. This shape is the one the app already relies on, the
+ * membership is a list this app worked out itself, and if it is refused it is
+ * refused while drafting, before anything has gone out.
+ *
+ * Addresses not in the audience are ignored by Mailchimp rather than added, so
+ * a group that has never been synced makes a smaller segment rather than an
+ * error - which is why the caller compares what came back against what it
+ * asked for.
+ */
+export async function combinedSegment(
+  key: string,
+  listId: string,
+  name: string,
+  emails: string[],
+  signal?: AbortSignal,
+): Promise<{ id: number; members: number }> {
+  const list = encodeURIComponent(listId);
+
+  // Replace rather than accumulate. Only ever a segment carrying this app's
+  // own generated name, matched exactly.
+  const existing = await call<{ segments?: { id?: number; name?: string }[] }>(
+    key,
+    "GET",
+    `/lists/${list}/segments?count=1000&type=static&fields=segments.id,segments.name`,
+    undefined,
+    signal,
+  );
+  const wanted = name.trim().toLowerCase();
+  for (const segment of existing.segments ?? []) {
+    if (!segment.id) continue;
+    if ((segment.name ?? "").trim().toLowerCase() !== wanted) continue;
+    await call(key, "DELETE", `/lists/${list}/segments/${segment.id}`, undefined, signal);
+  }
+
+  const made = await call<{ id?: number; member_count?: number }>(
+    key,
+    "POST",
+    `/lists/${list}/segments?fields=id,member_count`,
+    { name, static_segment: emails },
+    signal,
+  );
+
+  if (!made.id) {
+    throw new MailchimpFailure(502, "Mailchimp made the group segment but did not name it.");
+  }
+  return { id: made.id, members: made.member_count ?? 0 };
+}
+
 export interface BatchStatus {
   id: string;
   status: string;

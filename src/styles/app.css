@@ -4857,3 +4857,17 @@ th.num {
 .card-body .notice:not(:last-child) {
   margin-bottom: 14px;
 }
+
+/* A group ticked on the compose screen, in the row of ones this email could
+   also go to. The repo's own convention for a pressed toggle: the class plus
+   .on, and aria-pressed carrying the same fact to a screen reader. */
+.btn.on {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent-deep);
+}
+
+.pick-head {
+  display: block;
+  margin: 0 0 8px;
+}
