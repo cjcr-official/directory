@@ -40,6 +40,45 @@ export function EmptyState({
 }
 
 /**
+ * The mark that says "this opens".
+ *
+ * One drawing, everywhere: the role menu on Administrators, the lid of a
+ * disclosure card, a group's name, the Columns button, and - as the --caret
+ * token, which is this same path written out as a picture - every <select> in
+ * the app.
+ *
+ * There were four marks before this, for one gesture. This chevron, on
+ * Administrators. The character "⌄" at 1.1rem on a disclosure card and at
+ * 0.8rem on a group name - a character sits where its font puts it rather than
+ * where the row wants it, and lands differently in every face the app might
+ * fall back to. And whatever the browser draws on a select, which is a filled
+ * triangle in Chrome, a grey pill in iOS Safari and an arrowhead in Firefox.
+ *
+ * Drawn rather than typed, in a box of a known size, so it centres against the
+ * word beside it by being the second item of a flex row rather than by a nudge
+ * that only works in one font. The stroke runs corner to corner of the box, so
+ * the gap beside the word is the gap the rule asks for rather than that plus
+ * whatever empty margin the drawing carried.
+ *
+ * currentColor, so a caret on a tinted bubble takes that bubble's ink; .caret
+ * sets the default grey for everywhere else.
+ */
+export function Caret({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className ? `caret ${className}` : "caret"}
+      viewBox="0 0 12 8"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      aria-hidden
+    >
+      <path d="M2 2l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/**
  * A card that stays shut until it is wanted.
  *
  * Every setting on a directory has a default that prints a good book, so a
@@ -66,9 +105,7 @@ export function Disclosure({
           <span className="disclosure-title">{title}</span>
           <span className="disclosure-summary">{summary}</span>
         </span>
-        <span className="disclosure-mark" aria-hidden>
-          ⌄
-        </span>
+        <Caret className="disclosure-mark" />
       </summary>
       <div className="card-body">{children}</div>
     </details>
