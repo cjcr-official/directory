@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useDirectory } from "@/data/DirectoryContext";
 import { useAuth } from "@/auth/AuthProvider";
-import { EmptyState, LoadingScreen, Notice } from "@/components/ui";
+import { Caret, EmptyState, LoadingScreen, Notice } from "@/components/ui";
 import { rosterFor } from "@/lib/mailchimp";
 import {
   audiences as fetchAudiences,
@@ -397,9 +397,7 @@ export function MailchimpPage() {
                           onClick={() => setOpenId(open ? null : tag.id)}
                         >
                           <span className="group-name-label">{tag.name}</span>
-                          <span className="group-name-mark" aria-hidden>
-                            ⌄
-                          </span>
+                          <Caret className="group-name-mark" />
                         </button>
 
                         <span className="group-count">

@@ -20,6 +20,9 @@
  * enough to be pretty on a near-black card is very easily not lifted far
  * enough to be read on it.
  *
+ * It also guards the one colour in the sheet that is written down twice - see
+ * the caret at the bottom.
+ *
  * Run with: npm run contrast:check
  */
 
@@ -56,6 +59,25 @@ const light = tokens(":root");
  * by accident gets caught.
  */
 const dark = new Map([...light, ...tokens(':root[data-theme="dark"]')]);
+
+/**
+ * The grey the caret in a <select> is drawn in, read back out of --caret.
+ *
+ * Every dropdown in the app wears the same caret, and every one of them draws
+ * it in --ink-3 - except a <select>, which cannot hold a child element to draw
+ * one in and so carries it as a background image instead. A data URI cannot
+ * read a custom property, so that one copy of the grey is written out by hand.
+ * The check at the bottom is what keeps it honest: nudge --ink-3 for contrast,
+ * forget the caret, and every select in the app is quietly the old colour.
+ */
+function caret(selector: string): string {
+  const at = css.indexOf(`${selector} {`);
+  if (at === -1) throw new Error(`${selector} is not in the stylesheet any more`);
+  const block = css.slice(at, css.indexOf("}", at));
+  const match = /--caret:[^;]*stroke='%23([0-9a-fA-F]{3,8})'/.exec(block);
+  if (!match) throw new Error(`${selector} does not draw a caret any more`);
+  return `#${match[1]}`;
+}
 
 function channel(value: number): number {
   return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
@@ -146,4 +168,18 @@ for (const [theme, palette] of [
       got >= need,
     );
   }
+}
+
+console.log("\n  the caret a <select> is drawn with\n");
+for (const [theme, palette, selector] of [
+  ["light", light, ":root"],
+  ["dark", dark, ':root[data-theme="dark"]'],
+] as const) {
+  const want = colour(palette, "--ink-3");
+  const got = caret(selector);
+  check(
+    `${theme}: the caret in a <select> is --ink-3`,
+    got.toLowerCase() === want.toLowerCase(),
+    `--caret is drawn in ${got}, --ink-3 is ${want}`,
+  );
 }

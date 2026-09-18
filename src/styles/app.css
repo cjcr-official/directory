@@ -72,6 +72,13 @@
      paper. This is the #2f6d63 the composer prints the cover's own rules in. */
   --sheet-accent: #2f6d63;
 
+  /* The same caret the Caret component draws, as a picture, for the one
+     control that cannot hold a child to draw it in: a <select>. A data URI
+     cannot read a custom property, so the grey below is --ink-3 written out a
+     second time - the one duplicated colour in the sheet. contrast:check
+     compares the two and fails if they ever part company. */
+  --caret: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='none' stroke='%23637371' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 2l4 4 4-4'/%3E%3C/svg%3E");
+
   /* What the browser should draw the things the sheet cannot reach with - the
      scrollbars, the date picker, the wash over an autofilled field. lib/theme
      sets this on the element too, from the theme it resolves; this is the
@@ -136,6 +143,9 @@
      near-black card: the light theme's soft grey-green lift is invisible here.
      Black, and deeper, so a card still sits above the page. */
   --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 8px 22px -14px rgb(0 0 0 / 70%);
+
+  /* --ink-3 after dark, for the same reason as above. */
+  --caret: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='none' stroke='%2394a7a4' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 2l4 4 4-4'/%3E%3C/svg%3E");
 
   color-scheme: dark;
 }
@@ -1143,6 +1153,73 @@ select {
   height: var(--control-h);
 }
 
+/*
+ * The mark that says "this opens", wherever something opens.
+ *
+ * One box, one size, one grey: the role menu on Administrators, the lid of a
+ * disclosure card, a group's name, the Columns button. Sized here rather than
+ * per place, because a caret that is 12px in one row and 1.1rem of some font in
+ * the next is the thing this was meant to stop.
+ *
+ * The colour is a default, not a rule - the caret is drawn in currentColor, so
+ * anywhere it sits on a tinted bubble it can simply be left to take that
+ * bubble's own ink.
+ */
+.caret {
+  flex: none;
+  width: 12px;
+  height: 8px;
+  color: var(--ink-3);
+}
+
+/* Turned over while what it opens is open, and taking a moment about it.
+   Named one by one rather than keyed off aria-expanded for everything that has
+   it: the role menu on Administrators opens upwards when its row is near the
+   bottom of the window, which on a phone is most of them, and a caret that
+   always pointed up there would be saying the one thing that is not true half
+   the time. */
+.disclosure-mark,
+.group-name-mark,
+.column-picker .btn .caret {
+  transition: transform 0.15s ease;
+}
+.disclosure[open] .disclosure-mark,
+.group-name-button[aria-expanded="true"] .group-name-mark,
+.column-picker .btn[aria-expanded="true"] .caret {
+  transform: rotate(180deg);
+}
+
+/*
+ * The same caret on a <select>, in place of the browser's own.
+ *
+ * A select is the one dropdown here that draws its own mark, and it draws a
+ * different one everywhere: a filled triangle in Chrome, a double-ended chevron
+ * in a grey pill on iOS, an outlined arrowhead in Firefox. Beside the caret
+ * above, which every other dropdown in the app now wears, that made one gesture
+ * look like three or four unrelated controls depending on which screen you were
+ * on and which browser you had opened it in.
+ *
+ * appearance: none takes the browser's mark away and --caret puts ours back.
+ * As a background image, because a select is the one control that can hold
+ * neither a child element nor a ::after to draw one in. The padding is what
+ * keeps a long option - "Portrait, cropped to a circle" - off it.
+ *
+ * background-image rather than the shorthand, so the --paper set above is still
+ * the ground this is drawn on. Only the list that opens on a tap is the
+ * platform's now, which is right: that is the part that should be the phone's.
+ */
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: var(--caret);
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  /* The size the box was drawn at. Left to itself a background SVG with no
+     intrinsic size fills the whole field. */
+  background-size: 12px 8px;
+  padding-right: 30px;
+}
+
 textarea {
   min-height: 72px;
   resize: vertical;
@@ -1235,12 +1312,6 @@ input[type="radio"] {
 .role-trigger:disabled {
   opacity: 0.55;
   cursor: default;
-}
-.role-caret {
-  flex: none;
-  width: 12px;
-  height: 8px;
-  color: var(--ink-3);
 }
 
 /*
@@ -1562,19 +1633,6 @@ td {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* Says the name opens something rather than going somewhere - the same mark,
-   turning the same way, as the disclosure cards use. */
-.group-name-mark {
-  flex: none;
-  font-size: 0.8rem;
-  line-height: 1;
-  color: var(--ink-3);
-  transition: transform 0.15s ease;
-}
-.group-name-button[aria-expanded="true"] .group-name-mark {
-  transform: rotate(180deg);
 }
 
 /* Pushed to the right, which is what closes the band of empty space that a
@@ -2342,17 +2400,6 @@ th.num {
 .disclosure-summary {
   font-size: 0.8rem;
   color: var(--ink-3);
-}
-
-.disclosure-mark {
-  flex: none;
-  font-size: 1.1rem;
-  line-height: 1;
-  color: var(--ink-3);
-  transition: transform 0.15s ease;
-}
-.disclosure[open] .disclosure-mark {
-  transform: rotate(180deg);
 }
 
 /* --- family members -------------------------------------------------------

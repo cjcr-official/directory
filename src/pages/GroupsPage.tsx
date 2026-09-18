@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useDirectory } from "@/data/DirectoryContext";
 import { useAuth } from "@/auth/AuthProvider";
-import { ConfirmButton, EmptyState, Field, LoadingScreen, Notice } from "@/components/ui";
+import { Caret, ConfirmButton, EmptyState, Field, LoadingScreen, Notice } from "@/components/ui";
 import { createTag, deleteTag, updateTag } from "@/lib/queries";
 import { resolveEntries } from "@/lib/projectEntries";
 import { fileAsName, firstName, join, labelledHouseholdName, message } from "@/lib/format";
@@ -186,9 +186,7 @@ export function GroupsPage() {
                         onClick={() => toggle(tag)}
                       >
                         <span className="group-name-label">{tag.name}</span>
-                        <span className="group-name-mark" aria-hidden>
-                          ⌄
-                        </span>
+                        <Caret className="group-name-mark" />
                       </button>
 
                       <span className="group-count">

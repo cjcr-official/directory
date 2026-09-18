@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Checkbox } from "@/components/ui";
+import { Caret, Checkbox } from "@/components/ui";
 
 /**
  * The "Columns" button above a browse table, and the tick boxes it opens.
@@ -63,6 +63,7 @@ export function ColumnPicker<K extends string>({
       >
         Columns
         {hidden ? <span className="muted small">{hidden} hidden</span> : null}
+        <Caret />
       </button>
       {open ? (
         <>
