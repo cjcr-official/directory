@@ -1,5 +1,12 @@
 /**
- * That the stylesheet does not quietly redefine its own components.
+ * Rules about the stylesheet that a browser will never complain about.
+ *
+ * Both of the ones here produce a page that renders perfectly and is wrong,
+ * which is the kind CI is for: nothing throws, nothing overflows, and the
+ * screen that was being looked at in review is the one screen that looks
+ * right.
+ *
+ * ## A component is declared once
  *
  * One stylesheet, five thousand lines, and a class named for what it is rather
  * than for where it is used - `.panel-foot` is the ruled bar along the bottom
@@ -108,4 +115,46 @@ check(
   ".panel-foot is a card's foot and nothing else redefines it",
   (rules.get(".panel-foot") ?? []).length === 1,
   `declared at ${(rules.get(".panel-foot") ?? []).join(", ") || "nowhere"}`,
+);
+
+// ---------------------------------------------------------------------------
+// A list of people is bounded
+// ---------------------------------------------------------------------------
+
+/*
+ * The names inside a group on the Mailchimp screen scroll within the panel
+ * rather than stretching it.
+ *
+ * Eight hundred members - an ordinary congregation, not a stress test - drew
+ * forty-two thousand pixels of names: fifty phone screens, with the "Write
+ * email" button underneath all of them. Nothing was slow. Chromium built the
+ * whole list in 105ms and reported no overflow, because a page fifty screens
+ * tall is not an error. The button was simply out of reach.
+ *
+ * Checked here rather than in a browser because catching it in a browser needs
+ * a congregation of that size to exist in the test data, and the rule is
+ * simpler than the render: this list has a maximum height and scrolls inside
+ * it.
+ */
+const listRule = css.slice(
+  css.indexOf(".group-member-list {"),
+  css.indexOf("}", css.indexOf(".group-member-list {")),
+);
+
+check(
+  "a group's names are capped in height, so the button under them stays reachable",
+  /max-height:\s*[\d.]+r?em/.test(listRule),
+  listRule ? "no max-height on .group-member-list" : "no .group-member-list rule at all",
+);
+
+check(
+  "and they scroll inside that cap rather than being cut off",
+  /overflow-y:\s*auto/.test(listRule),
+  "no overflow-y: auto on .group-member-list",
+);
+
+check(
+  "a flick past the end of the names does not scroll the page behind",
+  /overscroll-behavior:\s*contain/.test(listRule),
+  "no overscroll-behavior: contain on .group-member-list",
 );
