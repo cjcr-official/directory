@@ -1,5 +1,12 @@
-import { Fragment, memo, useEffect, useRef, useState } from "react";
-import { COLORS, type BookModel, type BookPage, type TextRun } from "@/lib/layout/compose";
+import { Fragment, memo, useEffect, useMemo, useRef, useState } from "react";
+import {
+  COLORS,
+  type BookModel,
+  type BookPage,
+  type Box,
+  type PhotoSlot,
+  type TextRun,
+} from "@/lib/layout/compose";
 import { CSS_FONT_STACKS, type Typeface } from "@/lib/layout/metrics";
 
 interface Props {
@@ -57,6 +64,311 @@ export interface EditableRuns {
 }
 
 /**
+ * What a preview needs to let the parts of a cover be moved about on it.
+ *
+ * The composer marks every run, rule and picture with the part of the cover it
+ * belongs to; this says what to do when one of them is dragged. Movement is
+ * reported as a delta against the drawing as it currently stands rather than
+ * as a position, because the composer has the last word on where a part may
+ * sit - it keeps everything on the paper - and reporting it this way is what
+ * lets a drag that has run off the edge come straight back when it turns
+ * round, instead of first paying back the distance it went past it.
+ *
+ * A preview given none of this draws exactly the page it always did, which is
+ * what the book's preview and the name tag's both want.
+ */
+export interface MovableParts {
+  /** What this part is, in the words a handle can be labelled with. */
+  label: (part: string) => string;
+  /** Points right and down from where the part is drawn now. */
+  onMove: (part: string, dx: number, dy: number) => void;
+  /** A multiple of the size the picture is drawn at now. Pictures only. */
+  onResize: (part: string, by: number) => void;
+}
+
+/** The same, once the canvas has said what it is scaled to. */
+interface Moving extends MovableParts {
+  /** Screen pixels into points on the paper. */
+  points: (px: number) => number;
+}
+
+/** How far a pointer may wander before it is dragging something rather than aiming at it. */
+const DRAG_SLOP = 4;
+
+/**
+ * How long a finger has to be held still before it is holding something.
+ *
+ * The cover is most of a phone screen and the page under it scrolls, so a
+ * finger that arrives and moves is scrolling - that is what it has always done
+ * here - and only a finger that arrives and waits has said it means this
+ * particular line of type. The same bargain the phone's own home screen makes,
+ * for the same reason.
+ */
+const HOLD_MS = 320;
+
+/** How far in from the edge of the paper the handles sit, in screen pixels. */
+const GRIP_INSET = 13;
+
+/** A nudge from the keyboard, in points, and the same with Shift held. */
+const NUDGE = 1;
+const NUDGE_FAR = 10;
+/** And what + and - do to a picture. */
+const NUDGE_SCALE = 1.06;
+
+/**
+ * A pointer that might be about to drag something that has another use.
+ *
+ * Every part of this is about the other use. A line of type on the cover is
+ * also a field, and a cover on a phone is also a page that scrolls, so the
+ * pointer going down on one cannot mean "move this" until it has said so:
+ * with a mouse by moving a few pixels, and with a finger by staying still long
+ * enough that it cannot have meant to scroll. Until then nothing is prevented
+ * and nothing is captured, and the browser goes on doing what it would have
+ * done - which is the whole trick, because a scroll that has already started
+ * cannot be called back.
+ *
+ * `atOnce` is for a handle, which is a target somebody aimed at and has no
+ * other use to protect.
+ */
+function dragFrom(
+  event: React.PointerEvent,
+  onMove: (dx: number, dy: number) => void,
+  options: { atOnce?: boolean } = {},
+): void {
+  const from = event.currentTarget as HTMLElement;
+  const finger = event.pointerType === "touch";
+  const pointer = event.pointerId;
+  const started = { x: event.clientX, y: event.clientY };
+  let last = started;
+  let dragging = false;
+  let owed = { x: 0, y: 0 };
+  let frame = 0;
+  let held = 0;
+
+  /* A finger that is dragging a part is not scrolling the page. It has to be
+     said in a listener of its own, and a non-passive one: React's touch
+     handlers are passive and cannot refuse anything. It is added only once the
+     drag has begun - after HOLD_MS of stillness on a finger - so there is
+     never a scroll already under way to argue with. */
+  const stayPut = (moving: TouchEvent) => moving.preventDefault();
+
+  function begin() {
+    if (dragging) return;
+    dragging = true;
+    document.body.classList.add("moving-a-part");
+    window.addEventListener("touchmove", stayPut, { passive: false });
+    /* The pointer went down on something that takes a caret and the browser
+       has already given it one. This is a move, not a visit. */
+    if (!options.atOnce && document.activeElement === from) from.blur();
+    window.getSelection()?.removeAllRanges();
+  }
+
+  /* One report a frame, whatever rate the pointer speaks at. Every one of them
+     recomposes the cover and redraws it, and a gaming mouse has a thousand
+     things to say a second. */
+  function settle() {
+    frame = 0;
+    const { x, y } = owed;
+    owed = { x: 0, y: 0 };
+    if (x || y) onMove(x, y);
+  }
+
+  function move(moving: PointerEvent) {
+    if (moving.pointerId !== pointer) return;
+    if (!dragging) {
+      const far = Math.max(
+        Math.abs(moving.clientX - started.x),
+        Math.abs(moving.clientY - started.y),
+      );
+      if (far <= DRAG_SLOP) return;
+      // A finger that moved before it had been held still is scrolling the
+      // page, and the page is welcome to it.
+      if (finger) return finish(false);
+      begin();
+    }
+    owed = { x: owed.x + moving.clientX - last.x, y: owed.y + moving.clientY - last.y };
+    last = { x: moving.clientX, y: moving.clientY };
+    if (!frame) frame = requestAnimationFrame(settle);
+  }
+
+  function finish(moved = dragging) {
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", up);
+    window.removeEventListener("pointercancel", up);
+    window.removeEventListener("touchmove", stayPut);
+    if (held) window.clearTimeout(held);
+    if (frame) {
+      cancelAnimationFrame(frame);
+      settle();
+    }
+    document.body.classList.remove("moving-a-part");
+    if (moved) swallowTheClick();
+  }
+
+  function up() {
+    finish();
+  }
+
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", up);
+  window.addEventListener("pointercancel", up);
+
+  if (options.atOnce) begin();
+  else if (finger) held = window.setTimeout(begin, HOLD_MS);
+}
+
+/**
+ * The click at the end of a drag, which is not a click.
+ *
+ * Let through, it puts the caret in the line that has just been moved and
+ * opens the keyboard over the cover on a phone. It is taken in the capturing
+ * phase before it reaches anything, and given up on after a moment: a browser
+ * that never sends one would otherwise leave a listener behind to eat
+ * somebody's next real click.
+ */
+function swallowTheClick(): void {
+  const eat = (click: MouseEvent) => {
+    click.preventDefault();
+    click.stopPropagation();
+  };
+  window.addEventListener("click", eat, { capture: true, once: true });
+  window.setTimeout(() => window.removeEventListener("click", eat, { capture: true }), 400);
+}
+
+/** Which way a key moves a part, in points. */
+function nudgeFor(key: string, step: number): [number, number] | null {
+  if (key === "ArrowLeft") return [-step, 0];
+  if (key === "ArrowRight") return [step, 0];
+  if (key === "ArrowUp") return [0, -step];
+  if (key === "ArrowDown") return [0, step];
+  return null;
+}
+
+/**
+ * The handle on a part of the cover.
+ *
+ * It is the answer to three separate things, which is why it is worth the room
+ * it takes on the drawing. A line with the caret in it cannot be dragged by
+ * its own type - the pointer is placing the caret and selecting words there -
+ * and this can still move it. A keyboard cannot drag anything at all, and this
+ * is a button on the tab ring that the arrow keys nudge a point at a time, ten
+ * with Shift held. And a part that can be moved has to say so to somebody who
+ * has never been told, which nothing in a drawing of a finished page otherwise
+ * does.
+ *
+ * Drawn in screen pixels rather than in the paper's own points: the counter
+ * scale undoes whatever the canvas is scaled to, so the handle is the same
+ * size to a hand on a phone as on a desk, where the paper behind it is not.
+ *
+ * Every one of them sits in the margin down the left-hand edge of the paper,
+ * at the height of the part it belongs to, rather than against the part
+ * itself. A cover is set centred and its type runs nearly the full measure, so
+ * a handle at the left edge of the title's own box is a handle sitting on the
+ * first letter of the title - and the drawing has to go on being a drawing of
+ * the printed page.
+ */
+function PartGrip({
+  part,
+  box,
+  moving,
+  picture,
+}: {
+  part: string;
+  box: Box;
+  moving: Moving;
+  /** A picture can be made bigger as well as moved, so + and - do something. */
+  picture?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className="part-grip"
+      aria-label={`Move ${moving.label(part)}`}
+      style={{ left: `${moving.points(GRIP_INSET)}pt`, top: `${box.y + box.h / 2}pt` }}
+      onPointerDown={(event) => {
+        /* Or the browser takes the focus for the button, and a line that is
+           only on the cover for as long as it is being typed in would vanish
+           from under the hand that reached for it. */
+        event.preventDefault();
+        dragFrom(event, (dx, dy) => moving.onMove(part, moving.points(dx), moving.points(dy)), {
+          atOnce: true,
+        });
+      }}
+      onKeyDown={(event) => {
+        const by = nudgeFor(event.key, event.shiftKey ? NUDGE_FAR : NUDGE);
+        if (by) {
+          event.preventDefault();
+          moving.onMove(part, by[0], by[1]);
+          return;
+        }
+        if (!picture) return;
+        if (event.key === "+" || event.key === "=") {
+          event.preventDefault();
+          moving.onResize(part, NUDGE_SCALE);
+        } else if (event.key === "-") {
+          event.preventDefault();
+          moving.onResize(part, 1 / NUDGE_SCALE);
+        }
+      }}
+    >
+      {/* Six dots: the grip every list of draggable rows has worn for twenty
+          years, and the one shape that reads as "take hold of this" at eleven
+          pixels across. */}
+      <svg viewBox="0 0 10 16" aria-hidden>
+        {[3, 8, 13].map((y) => (
+          <Fragment key={y}>
+            <circle cx="3" cy={y} r="1.35" />
+            <circle cx="7" cy={y} r="1.35" />
+          </Fragment>
+        ))}
+      </svg>
+    </button>
+  );
+}
+
+/**
+ * The corner of a picture, which makes it bigger.
+ *
+ * The picture grows about its own middle - growing from a corner walks it down
+ * the page as it goes - so the corner has to be told how much bigger to make
+ * it rather than where it now is: how far the pointer moved straight out from
+ * the middle, against how far the corner already was from it. Which comes to
+ * the corner following the pointer exactly, as a corner should.
+ */
+function PartCorner({ part, box, moving }: { part: string; box: Box; moving: Moving }) {
+  return (
+    <button
+      type="button"
+      className="part-corner"
+      aria-label={`Resize ${moving.label(part)}`}
+      style={{ left: `${box.x + box.w}pt`, top: `${box.y + box.h}pt` }}
+      onPointerDown={(event) => {
+        event.preventDefault();
+        dragFrom(
+          event,
+          (dx, dy) => {
+            const diagonal = Math.hypot(box.w, box.h);
+            if (!diagonal) return;
+            const out = (moving.points(dx) * box.w + moving.points(dy) * box.h) / diagonal;
+            moving.onResize(part, 1 + out / (diagonal / 2));
+          },
+          { atOnce: true },
+        );
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "ArrowRight" || event.key === "ArrowUp" || event.key === "+") {
+          event.preventDefault();
+          moving.onResize(part, NUDGE_SCALE);
+        } else if (event.key === "ArrowLeft" || event.key === "ArrowDown" || event.key === "-") {
+          event.preventDefault();
+          moving.onResize(part, 1 / NUDGE_SCALE);
+        }
+      }}
+    />
+  );
+}
+
+/**
  * The runs of one page, with the ones a setting produced offered back.
  *
  * A block that wrapped over three lines is three runs carrying one field, and
@@ -70,6 +382,7 @@ function renderRuns(
   fontStack: string,
   prefix: string,
   editable?: EditableRuns,
+  moving?: Moving,
 ): React.ReactNode[] {
   const out: React.ReactNode[] = [];
   for (let i = 0; i < runs.length; i++) {
@@ -90,16 +403,31 @@ function renderRuns(
     // at: the gap between two of them is what it used, exactly. One line has no
     // gap to read, so it falls back to the ratio the book is set on.
     const leading = lines > 1 ? (last.y - run.y) / (lines - 1) : run.size * 1.25;
+    const height = last.y - run.y + leading;
     out.push(
       <EditableRun
         key={`${prefix}-${i}`}
         run={run as TextRun & { field: string }}
         fontStack={fontStack}
         editable={editable}
-        height={last.y - run.y + leading}
+        moving={moving}
+        height={height}
         leading={leading}
       />,
     );
+    // The handle sits against the block as a whole rather than against the
+    // line the pointer happened to land on, for the same reason the control
+    // does: what is being moved is the setting, not one line of its wrap.
+    if (moving) {
+      out.push(
+        <PartGrip
+          key={`${prefix}-${i}-grip`}
+          part={run.field}
+          box={{ x: run.x, y: run.y, w: run.w, h: height }}
+          moving={moving}
+        />,
+      );
+    }
     i = end;
   }
   return out;
@@ -120,12 +448,14 @@ function EditableRun({
   run,
   fontStack,
   editable,
+  moving,
   height,
   leading,
 }: {
   run: TextRun & { field: string };
   fontStack: string;
   editable: EditableRuns;
+  moving?: Moving;
   height: number;
   leading: number;
 }) {
@@ -137,6 +467,14 @@ function EditableRun({
     "aria-label": editable.placeholder(run.field),
     onFocus: () => editable.onFocus?.(run.field),
     onBlur: () => editable.onBlur?.(run.field),
+    /* Dragged where it is drawn, as long as it is not the line being typed in.
+       There the pointer is placing a caret, picking out a word, sweeping over
+       three of them - so a focused line is moved by its handle instead, which
+       is one of the things the handle is for. */
+    onPointerDown: (event: React.PointerEvent) => {
+      if (!moving || event.currentTarget.matches(":focus")) return;
+      dragFrom(event, (dx, dy) => moving.onMove(run.field, moving.points(dx), moving.points(dy)));
+    },
     style: {
       ...runStyle(run, fontStack),
       height: `${height}pt`,
@@ -210,6 +548,77 @@ function runStyle(run: TextRun, fontStack: string): React.CSSProperties {
 }
 
 /**
+ * One of the page's own pictures - the cover's logo and its photograph.
+ *
+ * A slot is a rectangle the composer set aside, and a picture that is fitted
+ * rather than filled does not use all of it: a square logo in a band the width
+ * of the page is drawn in the middle with white either side of it. Both
+ * renderers have always letterboxed it, and on paper that is the whole story.
+ *
+ * On a cover being arranged it is not, because the parts of the page can be
+ * taken hold of. The thing being taken hold of has to be the picture - not the
+ * band it was centred in, whose corner is an inch of empty paper away from the
+ * logo it would size, and whose left-hand end is empty paper that would drag
+ * the logo if it were pressed. So once the picture has loaded and its own
+ * shape is known, the element is drawn at the rectangle the picture actually
+ * occupies. It looks exactly the same; it is simply the picture.
+ */
+function PagePhoto({ slot, url, moving }: { slot: PhotoSlot; url: string; moving?: Moving }) {
+  const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
+  const part = slot.field;
+  const move = moving && part ? moving : null;
+  const box = slot.fit === "fit" && natural ? fittedIn(slot.box, natural) : slot.box;
+
+  return (
+    <Fragment>
+      <img
+        src={url}
+        alt=""
+        /* The browser's own picture drag - the one that ends in another tab or
+           in somebody's downloads - is not this one. */
+        draggable={false}
+        className={move ? "movable-picture" : undefined}
+        onLoad={(event) =>
+          setNatural({
+            w: event.currentTarget.naturalWidth,
+            h: event.currentTarget.naturalHeight,
+          })
+        }
+        onPointerDown={
+          move && part
+            ? (event) =>
+                dragFrom(event, (dx, dy) => move.onMove(part, move.points(dx), move.points(dy)))
+            : undefined
+        }
+        style={{
+          position: "absolute",
+          left: `${box.x}pt`,
+          top: `${box.y}pt`,
+          width: `${box.w}pt`,
+          height: `${box.h}pt`,
+          objectFit: slot.fit === "fill" ? "cover" : "contain",
+        }}
+      />
+      {move && part ? (
+        <Fragment>
+          <PartGrip part={part} box={box} moving={move} picture />
+          <PartCorner part={part} box={box} moving={move} />
+        </Fragment>
+      ) : null}
+    </Fragment>
+  );
+}
+
+/** The rectangle a picture of this shape actually occupies inside its slot. */
+function fittedIn(box: Box, natural: { w: number; h: number }): Box {
+  if (natural.w <= 0 || natural.h <= 0) return box;
+  const scale = Math.min(box.w / natural.w, box.h / natural.h);
+  const w = natural.w * scale;
+  const h = natural.h * scale;
+  return { x: box.x + (box.w - w) / 2, y: box.y + (box.h - h) / 2, w, h };
+}
+
+/**
  * One half-sheet.
  *
  * Memoised, and worth it: a page is a few hundred absolutely positioned
@@ -223,11 +632,14 @@ const Page = memo(function Page({
   photoUrls,
   fontStack,
   editable,
+  moving,
 }: {
   page: BookPage;
   photoUrls: Map<string, string>;
   fontStack: string;
   editable?: EditableRuns;
+  /** Given, the parts the composer marked can be dragged about the page. */
+  moving?: Moving;
 }) {
   return (
     <Fragment>
@@ -253,21 +665,7 @@ const Page = memo(function Page({
       {page.photos.map((slot, i) => {
         const url = slot.path ? photoUrls.get(slot.path) : undefined;
         if (!url) return null;
-        return (
-          <img
-            key={`page-photo-${i}`}
-            src={url}
-            alt=""
-            style={{
-              position: "absolute",
-              left: `${slot.box.x}pt`,
-              top: `${slot.box.y}pt`,
-              width: `${slot.box.w}pt`,
-              height: `${slot.box.h}pt`,
-              objectFit: slot.fit === "fill" ? "cover" : "contain",
-            }}
-          />
-        );
+        return <PagePhoto key={`page-photo-${i}-${url}`} slot={slot} url={url} moving={moving} />;
       })}
 
       {page.cards.map((card) => (
@@ -361,7 +759,7 @@ const Page = memo(function Page({
         />
       ))}
 
-      {renderRuns(page.runs, fontStack, "run", editable)}
+      {renderRuns(page.runs, fontStack, "run", editable, moving)}
     </Fragment>
   );
 });
@@ -451,6 +849,7 @@ export function CoverCanvas({
   photoUrls,
   typeface,
   editable,
+  movable,
 }: {
   page: BookPage;
   width: number;
@@ -459,10 +858,24 @@ export function CoverCanvas({
   typeface: Typeface;
   /** Given, the lines the composer marked can be typed over where they sit. */
   editable?: EditableRuns;
+  /** Given, the parts the composer marked can be dragged about the page. */
+  movable?: MovableParts;
 }) {
   const holder = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.5);
   const fontStack = CSS_FONT_STACKS[typeface] ?? CSS_FONT_STACKS.sans;
+
+  /*
+   * A drag speaks in screen pixels and the paper is measured in points, so
+   * whatever the canvas has fitted itself to is the exchange rate between
+   * them. Kept here rather than asked of the caller because this is the one
+   * place that knows the scale - and it changes under a drag when the window
+   * is resized mid-move.
+   */
+  const moving: Moving | undefined = useMemo(
+    () => (movable ? { ...movable, points: (px: number) => px / (scale * PX_PER_PT) } : undefined),
+    [movable, scale],
+  );
 
   /*
    * Measured, not assumed - in both directions.
@@ -509,15 +922,27 @@ export function CoverCanvas({
         }}
       >
         <div
-          className="sheet"
-          style={{
-            width: `${width}pt`,
-            height: `${height}pt`,
-            transform: `scale(${scale})`,
-            transformOrigin: "top left",
-          }}
+          className={moving ? "sheet can-move" : "sheet"}
+          style={
+            {
+              width: `${width}pt`,
+              height: `${height}pt`,
+              transform: `scale(${scale})`,
+              transformOrigin: "top left",
+              /* What a handle has to be scaled by to undo that: a grip is a
+                 target for a finger, not part of the drawing, and shrinking
+                 with the paper would leave it six pixels across on a phone. */
+              "--part-counter": scale ? 1 / scale : 1,
+            } as React.CSSProperties
+          }
         >
-          <Page page={page} photoUrls={photoUrls} fontStack={fontStack} editable={editable} />
+          <Page
+            page={page}
+            photoUrls={photoUrls}
+            fontStack={fontStack}
+            editable={editable}
+            moving={moving}
+          />
         </div>
       </div>
     </div>

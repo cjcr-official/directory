@@ -99,6 +99,38 @@ If it looks sparse:
 
 ---
 
+## The cover
+
+The cover is drawn beside its settings on the directory's own form, and it is
+the real thing: the same code draws it there and in the PDF, so what is on the
+screen is what comes out of the printer.
+
+There are two ways to change it, and both work on that drawing.
+
+**Type on it.** Click any line on the cover — the church's name, the title, the
+subtitle, the vision or welcome, the address — and type. It is the same setting
+as the field in the pane beside it, so either will do.
+
+**Move it.** Drag a line to move it, and drag a picture to move it. A picture's
+bottom-right corner makes it bigger or smaller. Nothing reflows around what you
+move: everything else stays exactly where it was, so a title nudged upwards
+does not drag the vision statement up behind it.
+
+With a finger, press and hold for a moment before dragging. A finger that moves
+straight away scrolls the page, the way it always has.
+
+The small handle that appears beside each part moves it too, and is how to move
+the line you are currently typing in. Tab to it and the arrow keys nudge a
+point at a time, ten with Shift held; on a picture, `+` and `-` size it.
+
+Nothing can be dragged off the paper — a part stops against the edge rather
+than printing half off the page — and **Put it all back** under the drawing
+returns every part to where the app put it. Where things have been moved to is
+part of the directory's settings like anything else here: **Save changes**
+keeps it, and leaving the form without saving throws it away.
+
+---
+
 ## Photographs
 
 Photos are cropped to a matching upright rectangle by default, which is what

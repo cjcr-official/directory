@@ -121,6 +121,10 @@ const PAIRS: Pair[] = [
   // panel rather than onto a tint of their own.
   { what: "a check coming due, in the tray", fg: "--warn-deep", bg: "--raised" },
   { what: "accent text on the soft accent", fg: "--accent", bg: "--accent-soft" },
+  // The handles on the cover, which are drawn on the printed page rather than
+  // on the app: white in both themes, so they are the one thing here whose
+  // foreground must not follow the accent after dark.
+  { what: "the cover's handles on the sheet", fg: "--sheet-accent", bg: "--sheet" },
 ];
 
 console.log(

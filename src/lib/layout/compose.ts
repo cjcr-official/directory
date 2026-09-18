@@ -15,9 +15,11 @@ import {
   samePhone,
 } from "../format";
 import {
+  COVER_PARTS,
   PAGE_SIZES,
   TEXT_SCALES,
   type CardStyle,
+  type CoverPlacements,
   type PhotoFit,
   type ProjectSettings,
   type Typeface,
@@ -80,6 +82,14 @@ export interface PhotoSlot {
   fit: PhotoFit;
   /** Drawn in a soft placeholder when there is no photograph yet. */
   initials: string;
+  /**
+   * Which part of the cover this picture is, where it is one.
+   *
+   * Provenance, exactly as TextRun.field is: the renderers have no use for it.
+   * It is what lets the cover hand this slot back to be dragged, and it is
+   * what the placements are applied by.
+   */
+  field?: string;
 }
 
 export interface CardModel {
@@ -98,6 +108,14 @@ export interface RuleModel {
   y: number;
   w: number;
   color: string;
+  /**
+   * The part of the cover this hairline belongs to, where it belongs to one.
+   *
+   * The flourish under the title is the title's, and the short rule over the
+   * address is the address block's: they are drawn as separate objects and
+   * read as one thing, so when one is dragged the other has to go with it.
+   */
+  field?: string;
 }
 
 /** A filled rectangle: the letter tab, and the frame around a photograph. */
@@ -869,7 +887,7 @@ function composeCover(
   geo: Geometry,
   type: TypeScale,
   metrics: Metrics,
-): BookPage {
+): { page: BookPage; placed: CoverPlacements } {
   const page = blankPage(geo);
   page.kind = "cover";
 
@@ -936,7 +954,13 @@ function composeCover(
     const height = contact.length * metrics.lineHeight(9.5);
     const top = floor - height;
     put(contact, top, 9.5, "regular", COLORS.muted, inner, "coverContact");
-    page.rules.push({ x: W / 2 - 26, y: top - 15, w: 52, color: COLORS.rule });
+    page.rules.push({
+      x: W / 2 - 26,
+      y: top - 15,
+      w: 52,
+      color: COLORS.rule,
+      field: "coverContact",
+    });
     floor = top - 32;
   }
 
@@ -949,6 +973,7 @@ function composeCover(
       path: settings.coverLogoPath,
       fit: "fit",
       initials: "",
+      field: "coverLogo",
     });
     y += COVER_LOGO_HEIGHT + 16;
   }
@@ -991,7 +1016,14 @@ function composeCover(
     middle.push({
       height: 1,
       gap: 15,
-      place: (top) => page.rules.push({ x: W / 2 - 27, y: top, w: 54, color: COLORS.accent }),
+      place: (top) =>
+        page.rules.push({
+          x: W / 2 - 27,
+          y: top,
+          w: 54,
+          color: COLORS.accent,
+          field: "coverTitle",
+        }),
     });
   }
 
@@ -1036,6 +1068,7 @@ function composeCover(
         path: settings.coverPhotoPath,
         fit: "fill",
         initials: "",
+        field: "coverPhoto",
       });
       y += height + 26;
     }
@@ -1050,7 +1083,168 @@ function composeCover(
     cursor += item.height;
   });
 
-  return page;
+  return { page, placed: applyPlacements(page, settings, metrics, { W, H, band: BAND }) };
+}
+
+/** The paper a placed part has to stay on, and the rules it may not cross. */
+interface Paper {
+  W: number;
+  H: number;
+  band: number;
+}
+
+/**
+ * The cover after somebody has moved something on it.
+ *
+ * Applied to the finished page, which is the whole design: the stack above has
+ * already measured itself against what is actually on the cover, and nothing
+ * here feeds back into it. A title dragged upwards does not pull the verse up
+ * behind it, a picture made bigger does not squeeze the address off the foot,
+ * and a cover with no placements at all composes exactly as it did before any
+ * of this was written.
+ *
+ * Nothing may leave the paper. A part dragged at the edge stops against it
+ * rather than printing half off the page, and a picture cannot be made bigger
+ * than the sheet it prints on - so the screen can be dragged carelessly and
+ * still only ever describe a cover that can be printed. The preview and the
+ * PDF agree about all of it because this is the one function that decides it.
+ *
+ * What it returns is what it actually used, part by part, after that clamping.
+ * The editor drags against those rather than against what is stored: a drag
+ * that has run off the edge of the paper comes straight back when it turns
+ * round, instead of first paying back the distance it went past it.
+ */
+function applyPlacements(
+  page: BookPage,
+  settings: ProjectSettings,
+  metrics: Metrics,
+  paper: Paper,
+): CoverPlacements {
+  const used: CoverPlacements = {};
+
+  for (const part of COVER_PARTS) {
+    const placement = settings.coverPlacements[part];
+    if (!placement) continue;
+
+    const runs = page.runs.filter((run) => run.field === part);
+    const rules = page.rules.filter((rule) => rule.field === part);
+    const photos = page.photos.filter((slot) => slot.field === part);
+    // A part with nothing on the page - an empty subtitle, a photograph that
+    // was dropped, a picture the stack had no room for - keeps what was stored
+    // for it and reports nothing: the offset belongs to the part, not to this
+    // particular composition of it, and filling the field in again should find
+    // it where it was left.
+    if (!runs.length && !rules.length && !photos.length) continue;
+
+    // At most one: a part is a picture or it is words, and never two pictures.
+    const scale = photos.length ? resize(photos[0], placement.scale, paper) : 1;
+
+    const ink = inkBox(runs, rules, photos, metrics);
+    const dx = clamp(placement.dx, -ink.x, paper.W - (ink.x + ink.w));
+    const dy = clamp(placement.dy, paper.band - ink.y, paper.H - paper.band - (ink.y + ink.h));
+
+    for (const run of runs) {
+      run.x += dx;
+      run.y += dy;
+    }
+    for (const rule of rules) {
+      rule.x += dx;
+      rule.y += dy;
+    }
+    for (const slot of photos) {
+      slot.box.x += dx;
+      slot.box.y += dy;
+    }
+
+    used[part] = { dx, dy, scale };
+  }
+
+  return used;
+}
+
+/** Nothing smaller than this on its shortest edge, in points: a picture has to stay grabbable. */
+const COVER_PICTURE_MIN = 24;
+
+/**
+ * A picture, resized about its own middle.
+ *
+ * About the middle rather than the corner because a picture is made bigger to
+ * see more of it, and growing from the top left walks it down the page as it
+ * goes. The ceiling is the paper: a picture can be taken up to the full width
+ * of the cover, or the full height between the two rules, whichever runs out
+ * first.
+ */
+function resize(slot: PhotoSlot, scale: number, paper: Paper): number {
+  if (!Number.isFinite(scale) || scale <= 0) return 1;
+
+  const biggest = Math.min(paper.W / slot.box.w, (paper.H - paper.band * 2) / slot.box.h);
+  const smallest = COVER_PICTURE_MIN / Math.min(slot.box.w, slot.box.h);
+  const used = clamp(scale, Math.min(smallest, biggest), Math.max(smallest, biggest));
+
+  const middleX = slot.box.x + slot.box.w / 2;
+  const middleY = slot.box.y + slot.box.h / 2;
+  slot.box.w *= used;
+  slot.box.h *= used;
+  slot.box.x = middleX - slot.box.w / 2;
+  slot.box.y = middleY - slot.box.h / 2;
+  return used;
+}
+
+/**
+ * The rectangle a part actually covers - its ink, not its boxes.
+ *
+ * A composed run is a line of type inside a box as wide as the measure it was
+ * centred in, so the title of this book is four words in a box the width of
+ * the page. Keeping the boxes on the paper would let a title travel about
+ * thirty points to the left and stop dead. What has to stay on the paper is
+ * the type, so the type is what is measured.
+ */
+function inkBox(
+  runs: TextRun[],
+  rules: RuleModel[],
+  photos: PhotoSlot[],
+  metrics: Metrics,
+): { x: number; y: number; w: number; h: number } {
+  const lefts: number[] = [];
+  const rights: number[] = [];
+  const tops: number[] = [];
+  const bottoms: number[] = [];
+
+  for (const run of runs) {
+    const width = Math.min(run.w, metrics.widthOf(run.text, run.size, run.weight, run.face));
+    const left =
+      run.align === "center"
+        ? run.x + (run.w - width) / 2
+        : run.align === "right"
+          ? run.x + run.w - width
+          : run.x;
+    lefts.push(left);
+    rights.push(left + width);
+    tops.push(run.y);
+    bottoms.push(run.y + metrics.lineHeight(run.size));
+  }
+  for (const rule of rules) {
+    lefts.push(rule.x);
+    rights.push(rule.x + rule.w);
+    tops.push(rule.y);
+    bottoms.push(rule.y);
+  }
+  for (const slot of photos) {
+    lefts.push(slot.box.x);
+    rights.push(slot.box.x + slot.box.w);
+    tops.push(slot.box.y);
+    bottoms.push(slot.box.y + slot.box.h);
+  }
+
+  const x = Math.min(...lefts);
+  const y = Math.min(...tops);
+  return { x, y, w: Math.max(...rights) - x, h: Math.max(...bottoms) - y };
+}
+
+/** Inside a range, and at the near end of one that has closed up entirely. */
+function clamp(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return max < min ? min : Math.min(max, Math.max(min, value));
 }
 
 function composeIndexPages(
@@ -1274,7 +1468,7 @@ export function composeBook(
   }
 
   // --- numbering ----------------------------------------------------------
-  const cover = settings.includeCover ? composeCover(settings, geo, type, metrics) : null;
+  const cover = settings.includeCover ? composeCover(settings, geo, type, metrics).page : null;
   const coverOffset = cover ? 1 : 0;
 
   // --- index --------------------------------------------------------------
@@ -1360,9 +1554,15 @@ export function composeCoverPage(
   height: number;
   photoPaths: string[];
   typeface: Typeface;
+  /**
+   * What each moved part's placement actually came to, once it had been kept
+   * on the paper. The editor drags against these rather than against what is
+   * stored - see applyPlacements.
+   */
+  placed: CoverPlacements;
 } {
   const geo = computeGeometry(settings);
-  const page = composeCover(settings, geo, typeScale(settings), metrics);
+  const { page, placed } = composeCover(settings, geo, typeScale(settings), metrics);
   const photoPaths = [
     ...new Set(page.photos.map((slot) => slot.path).filter((path): path is string => !!path)),
   ];
@@ -1372,5 +1572,6 @@ export function composeCoverPage(
     height: geo.pageHeight,
     photoPaths,
     typeface: settings.typeface,
+    placed,
   };
 }

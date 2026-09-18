@@ -23,14 +23,19 @@ import {
 } from "@/lib/queries";
 import type { ProjectKind, SelectionMode } from "@/lib/database.types";
 import {
+  COVER_PARTS,
   DEFAULT_SETTINGS,
   PAGE_SIZES,
   TAG_SIZES,
   TAG_STYLES,
   normalizeSettings,
   paperName,
+  placeCoverPart,
   recordsPerSheet,
   type CardStyle,
+  type CoverPart,
+  type CoverPlacement,
+  type CoverPlacements,
   type PageSizeName,
   type ProjectSettings,
   type TextScale,
@@ -39,7 +44,7 @@ import {
 import { resolveEntries, type Selection } from "@/lib/projectEntries";
 import { labelledHouseholdName, message } from "@/lib/format";
 import { getPhotoUrls, removePhoto, uploadPhoto } from "@/lib/photos";
-import { CoverCanvas } from "@/components/BookPreview";
+import { CoverCanvas, type MovableParts } from "@/components/BookPreview";
 import { composeCoverPage } from "@/lib/layout/compose";
 import { tagsPerSheet } from "@/lib/layout/tags";
 import { TYPEFACE_LABELS, loadMetrics, type Metrics } from "@/lib/layout/metrics";
@@ -71,6 +76,24 @@ const COVER_PLACEHOLDER: Record<string, string> = {
 
 /** The two of them that may hold more than one line. */
 const COVER_MULTILINE = new Set(["coverStatement", "coverContact", "coverTitle", "coverSubtitle"]);
+
+/**
+ * What each part of the cover is called when a handle has to name it.
+ *
+ * Read aloud by a screen reader as "Move the church's name", so they are the
+ * words for the thing on the paper rather than the words on the field that
+ * fills it in - somebody moving the address about is not thinking about a
+ * textarea labelled Contact details.
+ */
+const COVER_PART_LABELS: Record<CoverPart, string> = {
+  coverLogo: "the logo",
+  churchName: "the church's name",
+  coverPhoto: "the photograph",
+  coverTitle: "the title",
+  coverSubtitle: "the subtitle",
+  coverStatement: "the mission or welcome",
+  coverContact: "the contact details",
+};
 
 export function ProjectEditPage() {
   const { id } = useParams();
@@ -277,6 +300,65 @@ export function ProjectEditPage() {
       metrics,
     );
   }, [metrics, safeSettings.includeCover, drawnSettings, editing]);
+
+  /*
+   * Where each part of the cover actually ended up.
+   *
+   * The composer keeps everything on the paper, so what it used is not always
+   * what is stored - and a drag has to be measured against what is on screen
+   * or it stops feeling like dragging. Held in a ref rather than read from
+   * `coverPage` directly so that the handlers below never need rebuilding: a
+   * new one of those on every frame of a drag is a new prop on the drawing
+   * sixty times a second.
+   */
+  const placedRef = useRef<CoverPlacements>({});
+  placedRef.current = coverPage?.placed ?? {};
+
+  /**
+   * One part of the cover, moved or resized from where it is drawn now.
+   *
+   * The rule itself lives with the settings, because what it does with a part
+   * that has been dragged past the edge of the paper is not an opinion this
+   * screen is entitled to have. Held in a callback that never changes, so that
+   * a drag is not handing the drawing a new set of props sixty times a second.
+   */
+  const place = useCallback((part: string, change: (from: CoverPlacement) => CoverPlacement) => {
+    setSettings((current) => ({
+      ...current,
+      coverPlacements: placeCoverPart(
+        current.coverPlacements,
+        placedRef.current,
+        part as CoverPart,
+        change,
+      ),
+    }));
+  }, []);
+
+  /*
+   * The cover, handing its parts back to be moved.
+   *
+   * Only where this browser may actually change the directory: a reader gets
+   * the drawing and none of the handles, exactly as they get the type and no
+   * way to type over it.
+   */
+  const movableCover = useMemo<MovableParts | undefined>(
+    () =>
+      canEdit
+        ? {
+            label: (part) => COVER_PART_LABELS[part as CoverPart] ?? "this",
+            onMove: (part, dx, dy) =>
+              place(part, (from) => ({ ...from, dx: from.dx + dx, dy: from.dy + dy })),
+            onResize: (part, by) => place(part, (from) => ({ ...from, scale: from.scale * by })),
+          }
+        : undefined,
+    [canEdit, place],
+  );
+
+  /** The parts somebody has moved, in the order they print down the page. */
+  const moved = useMemo(
+    () => COVER_PARTS.filter((part) => safeSettings.coverPlacements[part]),
+    [safeSettings.coverPlacements],
+  );
 
   /*
    * The cover, handing its own type back.
@@ -1135,6 +1217,7 @@ export function ProjectEditPage() {
                       photoUrls={coverUrls}
                       typeface={coverPage.typeface}
                       editable={editableCover}
+                      movable={movableCover}
                     />
                     {/* Two facts rather than a sentence: which paper, and the
                         face it is set in. That it redraws as you type is
@@ -1142,9 +1225,28 @@ export function ProjectEditPage() {
                     <figcaption className="hint">
                       {paperName(safeSettings.pageSize)} landscape ·{" "}
                       {TYPEFACE_LABELS[safeSettings.typeface].toLowerCase()}
-                      <span className="tag-figure-tip">
-                        Every line of the cover's own words can be changed by clicking it here.
-                      </span>
+                      {canEdit ? (
+                        <span className="tag-figure-tip">
+                          Click a line to change its words, or drag it to move it — on a phone, hold
+                          it a moment first. Pictures move the same way, and a picture's corner
+                          makes it bigger. The handle beside a part moves it too, and answers the
+                          arrow keys.
+                        </span>
+                      ) : null}
+                      {canEdit && moved.length ? (
+                        <span className="tag-figure-tip cover-moved">
+                          <span>
+                            Moved: {moved.map((part) => COVER_PART_LABELS[part]).join(", ")}.
+                          </span>
+                          <button
+                            type="button"
+                            className="btn ghost small"
+                            onClick={() => set({ coverPlacements: {} })}
+                          >
+                            Put it all back
+                          </button>
+                        </span>
+                      ) : null}
                     </figcaption>
                   </figure>
                 ) : safeSettings.includeCover ? (
