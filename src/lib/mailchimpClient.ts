@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { message } from "./format";
 import { MAILCHIMP_BATCH_LIMIT, chunk, tagChanges, type Recipient } from "./mailchimp";
 
 /**
@@ -88,6 +89,15 @@ export interface SyncOutcome {
    * status when it did not - the work carries on at their end either way.
    */
   stillRunning: BatchProgress | null;
+  /**
+   * Set when who-already-has-this-tag could not be read, so nobody was
+   * untagged this time.
+   *
+   * Adding is the job; removing is the tidy-up. Losing the tidy-up is worth a
+   * line of small print, and is not worth refusing to add anybody over - which
+   * is what failing the whole sync here amounted to.
+   */
+  removalsSkipped: string | null;
 }
 
 export type SyncStep = (note: string) => void;
@@ -114,7 +124,15 @@ export async function syncGroup(
   step: SyncStep,
 ): Promise<SyncOutcome> {
   step("Looking up who already has this tag…");
-  const { emails } = await ask<{ emails: string[] }>("tagged", { listId: audienceId, tag });
+  let emails: string[] = [];
+  let removalsSkipped: string | null = null;
+  try {
+    ({ emails } = await ask<{ emails: string[] }>("tagged", { listId: audienceId, tag }));
+  } catch (cause) {
+    // Not fatal. Without this list nobody can be untagged, but everybody in
+    // the group can still be added - and a sync that adds is most of the point.
+    removalsSkipped = message(cause);
+  }
   const changes = tagChanges(recipients, emails);
 
   const runs = chunk(recipients, MAILCHIMP_BATCH_LIMIT);
@@ -173,5 +191,6 @@ export async function syncGroup(
     updated,
     rejected,
     stillRunning: progress.status === "finished" ? null : progress,
+    removalsSkipped,
   };
 }

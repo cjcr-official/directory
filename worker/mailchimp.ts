@@ -312,12 +312,26 @@ export async function upsertContacts(
 /**
  * Who currently carries one tag.
  *
- * A tag is a static segment underneath, which is the only reason this is
- * answerable at all - there is no "list members with tag X" endpoint, but
- * there is "list the members of segment X", and the segment is named after the
- * tag. A tag nobody has yet simply has no segment, which is not an error: it
- * is a group that has never been synced, and the answer is nobody.
+ * Read off the contacts themselves rather than out of a segment. A tag is a
+ * static segment underneath - Mailchimp's own guide calls that "an
+ * implementation detail within the API that can be confusing" - and going
+ * through /segments/{id}/members meant a lookup by name followed by a second
+ * call into an endpoint that exists for something else. The first sync of a
+ * group never exercised it, because the segment does not exist until the tag
+ * is first applied; the second sync did, and came back 500.
+ *
+ * Every member object already carries its own tags, so the plain members
+ * listing answers this in one call, on the most heavily used endpoint in the
+ * API, with no dependence on what a tag is underneath.
+ *
+ * Paged, because a congregation can outgrow one page and a half-read answer
+ * would quietly untag whoever fell off the end. Bounded, because an unbounded
+ * loop inside a Worker is a way to discover its subrequest limit in
+ * production; a church that passes twenty thousand contacts can have a better
+ * answer than this written for it.
  */
+const MAX_PAGES = 20;
+
 export async function taggedAddresses(
   key: string,
   listId: string,
@@ -325,28 +339,37 @@ export async function taggedAddresses(
   signal?: AbortSignal,
 ): Promise<string[]> {
   const list = encodeURIComponent(listId);
-  const segments = await call<{ segments?: { id: number; name: string }[] }>(
-    key,
-    "GET",
-    `/lists/${list}/segments?type=static&count=${PAGE}&fields=segments.id,segments.name`,
-    undefined,
-    signal,
-  );
-
   const wanted = tag.trim().toLowerCase();
-  const segment = (segments.segments ?? []).find((row) => row.name.trim().toLowerCase() === wanted);
-  if (!segment) return [];
+  const carrying: string[] = [];
 
-  const members = await call<{ members?: { email_address?: string }[] }>(
-    key,
-    "GET",
-    `/lists/${list}/segments/${segment.id}/members?count=${PAGE}&fields=members.email_address`,
-    undefined,
-    signal,
-  );
-  return (members.members ?? [])
-    .map((row) => (row.email_address ?? "").trim().toLowerCase())
-    .filter(Boolean);
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const data = await call<{
+      members?: { email_address?: string; tags?: { name?: string }[] }[];
+      total_items?: number;
+    }>(
+      key,
+      "GET",
+      `/lists/${list}/members?count=${PAGE}&offset=${page * PAGE}` +
+        `&fields=members.email_address,members.tags,total_items`,
+      undefined,
+      signal,
+    );
+
+    const members = data.members ?? [];
+    for (const member of members) {
+      const has = (member.tags ?? []).some(
+        (each) => (each.name ?? "").trim().toLowerCase() === wanted,
+      );
+      if (!has) continue;
+      const email = (member.email_address ?? "").trim().toLowerCase();
+      if (email) carrying.push(email);
+    }
+
+    // A short page is the last page, whatever the total claims.
+    if (members.length < PAGE) break;
+  }
+
+  return carrying;
 }
 
 export interface BatchStatus {

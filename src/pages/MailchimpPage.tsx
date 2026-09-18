@@ -118,6 +118,13 @@ export function MailchimpPage() {
 
     setRunning({ tagId, note: "Starting…" });
     setFailures((all) => ({ ...all, [tagId]: "" }));
+    // Last time's result is not this time's. Left in place, a success from an
+    // earlier press sat underneath the red box from a later one, which reads as
+    // one sync that both worked and failed.
+    setOutcomes((all) => {
+      const { [tagId]: _previous, ...rest } = all;
+      return rest;
+    });
     try {
       const outcome = await syncGroup(audienceId, name, roster.recipients, (note) =>
         setRunning({ tagId, note }),
@@ -273,6 +280,14 @@ export function MailchimpPage() {
                                     .map((row) => `${row.email} (${row.reason})`)
                                     .join("; ")}
                                   {outcome.rejected.length > 3 ? "…" : ""}
+                                </>
+                              ) : null}
+                              {outcome.removalsSkipped ? (
+                                <>
+                                  {" "}
+                                  Nobody was untagged: who already has this tag could not be read (
+                                  {outcome.removalsSkipped}). Anyone who has left the group keeps it
+                                  until the next sync that can.
                                 </>
                               ) : null}
                               {outcome.stillRunning ? (
