@@ -6,16 +6,37 @@ import { EmptyState, Field, LoadingScreen, Notice } from "@/components/ui";
 import { rosterFor } from "@/lib/mailchimp";
 import { audiences as fetchAudiences, settings, syncGroup } from "@/lib/mailchimpClient";
 import type { Audience, SyncOutcome } from "@/lib/mailchimpClient";
-import { message } from "@/lib/format";
+import { describeWhen, message } from "@/lib/format";
 
 /** So the audience is chosen once rather than every time the screen opens. */
 const AUDIENCE_KEY = "church-directory:mailchimp-audience";
+/**
+ * When each group was last pushed across, by group id.
+ *
+ * Kept in the browser rather than asked of Mailchimp, because Mailchimp knows
+ * when a contact was last changed and not when this screen last agreed with
+ * it. It is a convenience - "did I do the choir before the newsletter went
+ * out?" - not a record, and it says so by being per-browser.
+ */
+const SYNCED_KEY = "church-directory:mailchimp-synced";
 
 function remembered(): string {
   try {
     return localStorage.getItem(AUDIENCE_KEY) ?? "";
   } catch {
     return "";
+  }
+}
+
+function rememberedSyncs(): Record<string, string> {
+  try {
+    const held: unknown = JSON.parse(localStorage.getItem(SYNCED_KEY) ?? "{}");
+    return held && typeof held === "object" && !Array.isArray(held)
+      ? (held as Record<string, string>)
+      : {};
+  } catch {
+    // Private browsing, or something else wrote nonsense under this key.
+    return {};
   }
 }
 
@@ -63,6 +84,7 @@ export function MailchimpPage() {
   const [running, setRunning] = useState<Running | null>(null);
   const [outcomes, setOutcomes] = useState<Record<string, SyncOutcome>>({});
   const [failures, setFailures] = useState<Record<string, string>>({});
+  const [syncedAt, setSyncedAt] = useState<Record<string, string>>(rememberedSyncs);
 
   /** Who each group would actually reach, worked out once for the whole page. */
   const rosters = useMemo(
@@ -102,6 +124,26 @@ export function MailchimpPage() {
     };
   }, []);
 
+  /**
+   * What the groups add up to.
+   *
+   * One address counted once however many groups it is in, because that is
+   * what it costs in Mailchimp - a contact, not a membership - and "42
+   * addresses" that turn out to be nineteen people is the kind of figure that
+   * gets a plan bought.
+   */
+  const coverage = useMemo(() => {
+    const addresses = new Set<string>();
+    const stranded = new Set<string>();
+    let inGroups = 0;
+    for (const roster of rosters.values()) {
+      inGroups += roster.recipients.length + roster.unreachable.length;
+      for (const one of roster.recipients) addresses.add(one.email);
+      for (const one of roster.unreachable) stranded.add(`${one.type}:${one.id}`);
+    }
+    return { inGroups, addresses: addresses.size, stranded: stranded.size };
+  }, [rosters]);
+
   useEffect(() => {
     try {
       if (audienceId) localStorage.setItem(AUDIENCE_KEY, audienceId);
@@ -130,6 +172,15 @@ export function MailchimpPage() {
         setRunning({ tagId, note }),
       );
       setOutcomes((all) => ({ ...all, [tagId]: outcome }));
+      setSyncedAt((all) => {
+        const next = { ...all, [tagId]: new Date().toISOString() };
+        try {
+          localStorage.setItem(SYNCED_KEY, JSON.stringify(next));
+        } catch {
+          // Remembering is a convenience, not the feature.
+        }
+        return next;
+      });
     } catch (cause) {
       setFailures((all) => ({ ...all, [tagId]: message(cause) }));
     } finally {
@@ -137,7 +188,23 @@ export function MailchimpPage() {
     }
   }
 
+  /**
+   * Every group with somebody to email, one after another.
+   *
+   * In turn rather than at once: each group is several calls to Mailchimp, and
+   * five groups firing together is how a church on a free plan meets a rate
+   * limit for the first time. Groups with nobody in them are skipped rather
+   * than failed - there is nothing to send them.
+   */
+  async function syncEverything() {
+    for (const tag of tags) {
+      if (!rosters.get(tag.id)?.recipients.length) continue;
+      await sync(tag.id, tag.name);
+    }
+  }
+
   const chosen = list.find((one) => one.id === audienceId);
+  const syncable = tags.filter((tag) => (rosters.get(tag.id)?.recipients.length ?? 0) > 0);
 
   return (
     <div className="page">
@@ -150,6 +217,31 @@ export function MailchimpPage() {
           </div>
         </div>
       </div>
+
+      {/* What the groups add up to, before any of the detail. The same shape
+          Backup uses, and for the same reason: the figures that decide whether
+          this screen is worth opening are facts about the directory, not about
+          any one group. The middle one is a link because it is the only one
+          that is ever wrong on purpose - somebody has no address yet - and
+          People is where that gets fixed. */}
+      {ready && tags.length ? (
+        <div className="card stat-strip">
+          <div className="stat">
+            <span className="value">{coverage.addresses}</span>
+            <span className="label">{coverage.addresses === 1 ? "Address" : "Addresses"}</span>
+          </div>
+          <Link className="stat" to="/people">
+            <span className="value">{coverage.stranded}</span>
+            <span className="label">Without an address</span>
+          </Link>
+          <div className="stat">
+            <span className="value">{syncable.length}</span>
+            <span className="label">
+              {syncable.length === 1 ? "Group to send" : "Groups to send"}
+            </span>
+          </div>
+        </div>
+      ) : null}
 
       {error ? <Notice kind="error">{error}</Notice> : null}
 
@@ -206,6 +298,21 @@ export function MailchimpPage() {
           <div className="card">
             <div className="card-head">
               <h2>Groups</h2>
+              {canEdit && syncable.length > 1 ? (
+                <button
+                  type="button"
+                  className="btn primary small"
+                  disabled={!audienceId || Boolean(running)}
+                  onClick={() => void syncEverything()}
+                  title={
+                    audienceId
+                      ? `Sync all ${syncable.length} groups that have somebody to email`
+                      : "Choose an audience first"
+                  }
+                >
+                  {running ? "Syncing…" : `Sync all ${syncable.length}`}
+                </button>
+              ) : null}
             </div>
             {tags.length ? (
               <ul className="group-list">
@@ -215,6 +322,7 @@ export function MailchimpPage() {
                   const open = openId === tag.id;
                   const panelId = `mailchimp-group-${tag.id}`;
                   const busy = running?.tagId === tag.id;
+                  const when = describeWhen(syncedAt[tag.id]);
                   const outcome = outcomes[tag.id];
                   const failed = failures[tag.id];
 
@@ -260,6 +368,18 @@ export function MailchimpPage() {
                       {busy || outcome || failed || open ? (
                         <div className="group-members" id={panelId}>
                           {busy ? <p className="hint">{running?.note}</p> : null}
+
+                          {/* Not in the row above. That row budgets its width
+                              to the pixel - the name shrinks to an ellipsis
+                              rather than push the count off the end - so three
+                              more words there cost "Worship Team" its name.
+                              Here there is room, and this is the group being
+                              looked at anyway. */}
+                          {when && !busy ? (
+                            <p className="hint" style={{ marginTop: 0 }}>
+                              Last synced {when} from this browser.
+                            </p>
+                          ) : null}
 
                           {failed ? <Notice kind="error">{failed}</Notice> : null}
 
@@ -326,10 +446,25 @@ export function MailchimpPage() {
                               {roster?.unreachable.length ? (
                                 <p className="hint">
                                   No email address on record for{" "}
-                                  {roster.unreachable.slice(0, 6).join(", ")}
-                                  {roster.unreachable.length > 6
-                                    ? `, and ${roster.unreachable.length - 6} more`
-                                    : ""}
+                                  {roster.unreachable.map((one, at) => (
+                                    <span key={`${one.type}:${one.id}`}>
+                                      {at > 0 ? ", " : ""}
+                                      {/* A link rather than a name: this list
+                                          is the only thing on the screen that
+                                          is somebody's to go and fix, and the
+                                          form that fixes it is one tap away. */}
+                                      <Link
+                                        className="list-link"
+                                        to={
+                                          one.type === "person"
+                                            ? `/people/${one.id}`
+                                            : `/families/${one.id}`
+                                        }
+                                      >
+                                        {one.name}
+                                      </Link>
+                                    </span>
+                                  ))}
                                   . They are in the group but will not receive this.
                                 </p>
                               ) : null}
