@@ -454,7 +454,7 @@ export function MailchimpPage() {
                                   one accent on a screen is emphasis, three is
                                   wallpaper, and Sync all already has it. */}
                               {!busy && (canEdit || when || said) ? (
-                                <div className="panel-foot">
+                                <div className="group-foot">
                                   {canEdit && (roster?.recipients.length ?? 0) > 0 ? (
                                     <Link className="btn small" to={`/mailchimp/${tag.id}`}>
                                       Write email

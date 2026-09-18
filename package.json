@@ -22,6 +22,7 @@
     "cover:check": "node scripts/run.mjs scripts/cover-check.ts",
     "fields:check": "node scripts/run.mjs scripts/fields-check.ts",
     "strip:check": "node scripts/run.mjs scripts/strip-check.ts",
+    "sheet:check": "node scripts/run.mjs scripts/sheet-check.ts",
     "qr:check": "node scripts/run.mjs scripts/qr-check.ts",
     "changed:check": "node scripts/run.mjs scripts/changed-check.ts",
     "columns:check": "node scripts/run.mjs scripts/columns-check.ts",
