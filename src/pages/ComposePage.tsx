@@ -63,6 +63,16 @@ export function ComposePage() {
   const [fromName, setFromName] = useState(remembered.fromName);
   const [replyTo, setReplyTo] = useState(remembered.replyTo || (profile?.email ?? ""));
   const [body, setBody] = useState("");
+  /**
+   * Where the copy goes.
+   *
+   * Defaults to whoever is signed in, because that is nearly always the
+   * answer - but it is a field rather than a fact, because the question this
+   * needs to settle is usually "does this reach Gmail?", and the person
+   * pressing the button is on Hotmail. A test that can only reach the sender
+   * cannot answer the only question worth asking before a real send.
+   */
+  const [testTo, setTestTo] = useState(profile?.email ?? "");
 
   /** The draft in Mailchimp for exactly what is on screen, if there is one. */
   const [draftId, setDraftId] = useState<string | null>(null);
@@ -114,6 +124,7 @@ export function ComposePage() {
     isEmailish(replyTo) &&
     body.trim().length > 0 &&
     count > 0;
+  const canTest = ready && isEmailish(testTo);
 
   /** Makes the draft if what is on screen has not been drafted yet. */
   async function draftNow(): Promise<string> {
@@ -137,11 +148,11 @@ export function ComposePage() {
     setNote(null);
     try {
       const id = await draftNow();
-      await sendTestTo(audienceId, id, profile?.email ?? replyTo.trim().toLowerCase());
+      const to = testTo.trim().toLowerCase();
+      await sendTestTo(audienceId, id, to);
       setNote(
-        `A copy is on its way to ${profile?.email ?? replyTo}. Read it before you send it to ${
-          count === 1 ? "anybody else" : "everybody else"
-        }.`,
+        `A copy is on its way to ${to}. Look in the junk folder as well as the inbox — where it ` +
+          `lands is as much worth knowing as whether it arrives.`,
       );
     } catch (cause) {
       setError(message(cause));
@@ -272,10 +283,12 @@ export function ComposePage() {
 
           {isPublicMailbox(replyTo) ? (
             <Notice kind="warn">
-              {replyTo.slice(replyTo.lastIndexOf("@") + 1)} is a public mailbox, and Mailchimp
-              cannot authenticate one. It will still send, but Gmail and Yahoo are more likely to
-              treat it as suspicious. An address on the church’s own domain is worth the change
-              before a big send.
+              <strong>{replyTo.slice(replyTo.lastIndexOf("@") + 1)} will cost you delivery.</strong>{" "}
+              Mailchimp sends from its own servers, so mail claiming to be from a mailbox it cannot
+              authenticate fails the check Gmail runs on every message. Gmail may refuse it outright
+              rather than put it in junk, which is why a send can look successful and reach nobody.
+              The fix is an address on a domain the church owns, authenticated in Mailchimp — not
+              anything in this app.
             </Notice>
           ) : null}
         </div>
@@ -288,17 +301,30 @@ export function ComposePage() {
           </div>
           <div className="card-body">
             <p className="hint" style={{ marginTop: 0 }}>
-              Send yourself a copy first. It is the only way to see what the congregation will see,
-              and there is no unsending the real one.
+              Send a copy first. It goes to the one address below and to nobody in the group — the
+              group only gets it when you press the red button, and there is no unsending that one.
             </p>
+            <Field
+              label="Send a copy to"
+              htmlFor="test_to"
+              hint="Any address. Try one at Gmail as well as your own — they judge it differently."
+            >
+              <input
+                id="test_to"
+                type="email"
+                value={testTo}
+                onChange={(event) => setTestTo(event.target.value)}
+              />
+            </Field>
+
             <div className="row">
               <button
                 type="button"
                 className="btn"
-                disabled={!ready || Boolean(busy)}
+                disabled={!canTest || Boolean(busy)}
                 onClick={() => void testIt()}
               >
-                {busy === "Sending you a copy…" ? "Sending…" : "Send me a copy"}
+                {busy === "Sending you a copy…" ? "Sending…" : "Send a copy"}
               </button>
 
               <ConfirmButton
