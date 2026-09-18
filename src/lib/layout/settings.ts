@@ -57,6 +57,54 @@ export const TAG_PT_MAX = 96;
 export const TAG_PT_STEPS = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72];
 
 /**
+ * The parts of a cover that can be picked up and moved, in the order they
+ * print down the page.
+ *
+ * Five of them are named for the setting they are drawn from, because that is
+ * the name the composer already marks those runs with and a part is best named
+ * after the thing somebody reads on the cover. The two pictures have no
+ * setting of their own to be named after - theirs hold a storage path, not
+ * words - so they are named for what they are.
+ */
+export const COVER_PARTS = [
+  "coverLogo",
+  "churchName",
+  "coverPhoto",
+  "coverTitle",
+  "coverSubtitle",
+  "coverStatement",
+  "coverContact",
+] as const;
+
+export type CoverPart = (typeof COVER_PARTS)[number];
+
+/** Where one part of the cover sits, against where the composer put it. */
+export type CoverPlacement = {
+  /** Points right and down from the composed position. */
+  dx: number;
+  dy: number;
+  /** A multiple of the size the composer gave it. Pictures only. */
+  scale: number;
+};
+
+/** Only the parts somebody has actually moved: a part missing here is where it was composed. */
+export type CoverPlacements = Partial<Record<CoverPart, CoverPlacement>>;
+
+/** A part exactly where the composer put it, which is what an absent one means. */
+export const AS_COMPOSED: CoverPlacement = { dx: 0, dy: 0, scale: 1 };
+
+/**
+ * How far a picture may be taken from the size the composer gave it.
+ *
+ * Wide, because the composer's size is a starting point and not an opinion -
+ * the photograph is drawn at whatever the stack leaves spare, which on a full
+ * cover is small. The composer clamps again to the paper itself, so neither of
+ * these can put a picture off the page.
+ */
+export const COVER_SCALE_MIN = 0.25;
+export const COVER_SCALE_MAX = 4;
+
+/**
  * Everything about how one project prints. Stored as JSON in projects.settings,
  * so adding a field here only needs a default below - no migration.
  */
@@ -157,6 +205,19 @@ export type ProjectSettings = {
    */
   coverPhotoPath: string;
   coverLogoPath: string;
+  /**
+   * Where the parts of the cover have been dragged to, against where the
+   * composer put them.
+   *
+   * Offsets and not positions, which is the whole of why this is safe. The
+   * cover composes itself exactly as it always did - a measured stack that
+   * fits itself to what is actually on it - and these are applied to the
+   * finished page. So a cover nobody has touched is the cover this app has
+   * always drawn; a title that grows to two lines still pushes the verse
+   * down; and putting a part back is forgetting a number rather than
+   * restoring a layout.
+   */
+  coverPlacements: CoverPlacements;
   includeCover: boolean;
   includeIndex: boolean;
   runningHeader: boolean;
@@ -219,6 +280,7 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   coverContact: "",
   coverPhotoPath: "",
   coverLogoPath: "",
+  coverPlacements: {},
   includeCover: true,
   includeIndex: true,
   runningHeader: true,
@@ -246,6 +308,11 @@ export function normalizeSettings(raw: unknown): ProjectSettings {
   if (input.cardStyle === undefined && "cardBorders" in (input as object)) {
     merged.cardStyle = (input as { cardBorders?: unknown }).cardBorders ? "box" : "none";
   }
+
+  // The one field that is not a string, a number or a flag, and so the one the
+  // rule above cannot check: `typeof` says "object" of anything at all,
+  // including an array and including a map of parts that do not exist.
+  merged.coverPlacements = normalizePlacements(input.coverPlacements);
 
   // Guard rails: the layout maths assumes at least one card per half.
   merged.rows = clamp(Math.round(merged.rows), 1, 8);
@@ -329,6 +396,91 @@ const LEGACY_HEADING_SHARES: Record<string, number> = {
   medium: 0.05,
   large: 0.063,
 };
+
+/**
+ * One part of the cover, moved or resized from where it is drawn now.
+ *
+ * Every drag, nudge and resize goes through here, and all of them are
+ * relative: the pointer says how far it has come since it last said so, and
+ * that is added to where the part currently is. `drawn` is what the composer
+ * reports having actually used, which is not always what is stored - it keeps
+ * everything on the paper - and preferring it is what makes a drag at the edge
+ * behave. The part stops at the edge, so the edge is what the next movement is
+ * added to, and turning round brings it straight back instead of first winding
+ * off the distance the pointer went past it.
+ *
+ * A part that comes back to exactly where it was composed is forgotten rather
+ * than written down as three zeroes, which is the rule normalizePlacements
+ * keeps as well, and is what lets "has anything been moved on this cover" be a
+ * question about the saved settings.
+ */
+export function placeCoverPart(
+  stored: CoverPlacements,
+  drawn: CoverPlacements,
+  part: CoverPart,
+  change: (from: CoverPlacement) => CoverPlacement,
+): CoverPlacements {
+  const next = change(drawn[part] ?? stored[part] ?? AS_COMPOSED);
+  const placed: CoverPlacements = { ...stored };
+  // Two decimal places is a hundredth of a point - well under a pixel on any
+  // screen this is dragged on, and it keeps the stored JSON from filling up
+  // with the tail ends of floats.
+  const tidy: CoverPlacement = {
+    dx: round(clamp(next.dx, -COVER_TRAVEL, COVER_TRAVEL), 2),
+    dy: round(clamp(next.dy, -COVER_TRAVEL, COVER_TRAVEL), 2),
+    scale: round(clamp(next.scale, COVER_SCALE_MIN, COVER_SCALE_MAX), 4),
+  };
+
+  if (tidy.dx === 0 && tidy.dy === 0 && tidy.scale === 1) delete placed[part];
+  else placed[part] = tidy;
+  return placed;
+}
+
+function round(value: number, places: number): number {
+  const step = 10 ** places;
+  return Math.round(value * step) / step;
+}
+
+/**
+ * The placements, read back as something the composer can be handed.
+ *
+ * Rebuilt a part at a time rather than taken as it stands: this is the one
+ * setting whose stored value is an object, so it is the one that can arrive as
+ * an array, as a map of parts that no longer exist, or with a NaN in it - and
+ * a NaN reaching the composer would take a line of type off the page and print
+ * it nowhere.
+ *
+ * A part sitting exactly where it was composed is dropped rather than stored
+ * as three zeroes, so "never moved" and "moved and put back" are the same
+ * state, and the cover of a directory nobody has dragged anything on carries
+ * nothing at all.
+ */
+function normalizePlacements(raw: unknown): CoverPlacements {
+  if (!raw || typeof raw !== "object") return {};
+  const stored = raw as Record<string, unknown>;
+  const out: CoverPlacements = {};
+
+  for (const part of COVER_PARTS) {
+    const one = stored[part];
+    if (!one || typeof one !== "object") continue;
+    const { dx, dy, scale } = one as Record<string, unknown>;
+    const placement: CoverPlacement = {
+      // Points, and a cover is at most 1008 of them wide. The composer clamps
+      // to the paper itself, so this is only a floor and a ceiling on what can
+      // be written down at all.
+      dx: clamp(given(dx) ? dx : 0, -COVER_TRAVEL, COVER_TRAVEL),
+      dy: clamp(given(dy) ? dy : 0, -COVER_TRAVEL, COVER_TRAVEL),
+      scale: clamp(given(scale) ? scale : 1, COVER_SCALE_MIN, COVER_SCALE_MAX),
+    };
+    if (placement.dx === 0 && placement.dy === 0 && placement.scale === 1) continue;
+    out[part] = placement;
+  }
+
+  return out;
+}
+
+/** Further than the longest paper this app prints on, in points. */
+const COVER_TRAVEL = 1200;
 
 /**
  * A colour the renderers can actually draw with.

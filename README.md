@@ -574,6 +574,17 @@ it with pdf-lib, and `components/BookPreview.tsx` paints it as HTML. Both
 measure text with the same Helvetica metrics, which is why the preview can be
 trusted: if a name wraps on screen, it wraps in print.
 
+The cover is where that model is edited rather than only drawn. Its lines are
+composed with the setting each came from written on them, so the preview can
+hand a line back as a field where it sits, and each part carries an offset from
+where the composer put it - so it can be dragged about the page. The offsets
+are applied to the finished page and never fed back into the layout: the stack
+still measures itself against what is actually on the cover, a part that has
+been moved does not move its neighbours, and a cover nobody has dragged
+anything on composes exactly as it did before any of it existed. The clamping
+that keeps a dragged part on the paper is in the composer too, so the screen
+and the PDF cannot disagree about it.
+
 ### Commands
 
 | Command                         | What it does                                   |

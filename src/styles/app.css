@@ -66,6 +66,12 @@
      themes, so it is the one that needs a token of its own. */
   --sheet: #ffffff;
 
+  /* And the green that is printed on it. The handles on the cover are drawn on
+     that same white in both themes, so they cannot follow --accent, which is
+     lifted after dark to carry on a near-black ground and is far too pale for
+     paper. This is the #2f6d63 the composer prints the cover's own rules in. */
+  --sheet-accent: #2f6d63;
+
   /* What the browser should draw the things the sheet cannot reach with - the
      scrollbars, the date picker, the wash over an autofilled field. lib/theme
      sets this on the element too, from the theme it resolves; this is the
@@ -2859,6 +2865,159 @@ th.num {
 }
 .cover-figure figcaption {
   margin-top: 8px;
+}
+
+/* --- the cover as a canvas ------------------------------------------------
+ *
+ * The parts of a cover can be picked up and put where the church wants them,
+ * and everything in this block is about the fact that they are already
+ * something else: the type is a field, the picture is a picture, and the paper
+ * they sit on is most of a phone screen that scrolls. So none of them may take
+ * a gesture the other use had first - which is decided in BookPreview, where
+ * the pointer is - and what is left here is saying which gesture is on offer.
+ * -------------------------------------------------------------------------- */
+
+/* A line nobody is typing in is a thing to pick up, and the pointer says so.
+   Also the two refusals a long press needs on iOS, which offers to select the
+   words in a field and to save a picture: neither is what a hand resting on
+   the cover is asking for, and both are offered where the drag begins. */
+.sheet.can-move .run-edit:not(:focus) {
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.sheet.can-move .run-edit:not(:focus):active {
+  cursor: grabbing;
+}
+
+.movable-picture {
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.movable-picture:active {
+  cursor: grabbing;
+}
+
+/*
+ * The handle on a part, and the corner that sizes a picture.
+ *
+ * Both are placed in the paper's own points and then taken back out of the
+ * paper's scale: a cover on a phone is drawn at about two fifths of true size,
+ * and a handle that went down with it would be ten pixels across. So every
+ * length here is screen pixels and --part-counter undoes the sheet's
+ * transform - the drawing shrinks to fit, the things you take hold of do not.
+ */
+.part-grip {
+  position: absolute;
+  /* Above the drawing, and that is not decoration.
+     A line of type is composed inside a box as wide as the measure it is
+     centred in, so the control standing in for a centred title is a
+     transparent band the width of the page - and the type is drawn after the
+     pictures, so that band lies over them. Left to the order they are written
+     in, a picture's handles end up underneath the title's box and cannot be
+     pressed at all once anything has been moved near them. */
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--sheet-accent) 30%, transparent);
+  border-radius: 999px;
+  background: var(--sheet);
+  color: var(--sheet-accent);
+  opacity: 0;
+  cursor: grab;
+  /* The pointer drags this and does nothing else with it: no text to select,
+     no page to scroll, no picture to save. */
+  touch-action: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  transform: translate(-50%, -50%) scale(var(--part-counter, 1));
+  transition: opacity 120ms ease;
+}
+.part-grip svg {
+  width: 9px;
+  height: 15px;
+  fill: currentcolor;
+}
+/*
+ * Not there until they are wanted.
+ *
+ * A cover with seven handles down the side of it at rest is not a drawing of
+ * the printed page any more, and this drawing's whole job is to be one. So
+ * they come up faintly as soon as the pointer is anywhere on the paper - which
+ * is how somebody finds out the parts move at all - and solidly on the one
+ * being pointed at.
+ *
+ * The handle of a line with the caret in it is solid too, and that rule is the
+ * one a phone depends on: there is no pointer to hover with there, the line
+ * being typed in cannot be dragged by its own type, and this is what puts its
+ * handle on the screen. Invisible is not unreachable either way - an opacity
+ * of nothing is still on the tab ring, and lights up when it is tabbed to.
+ */
+.cover-canvas-paper:hover .part-grip {
+  opacity: 0.5;
+}
+.run-edit:hover + .part-grip,
+.run-edit:focus + .part-grip,
+.movable-picture:hover + .part-grip,
+.part-grip:hover,
+.part-grip:focus-visible {
+  opacity: 1;
+}
+.part-grip:active {
+  cursor: grabbing;
+}
+
+.part-corner {
+  position: absolute;
+  z-index: 2;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border: 1.5px solid var(--sheet);
+  border-radius: 3px;
+  background: var(--sheet-accent);
+  /* The one handle that is always on the drawing. A picture is sized by
+     dragging this corner and by nothing else, and on a phone there is no
+     hover to bring it out with - so it is faint rather than absent, and there
+     are at most two of them on a cover. */
+  opacity: 0.5;
+  cursor: nwse-resize;
+  touch-action: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  transform: translate(-50%, -50%) scale(var(--part-counter, 1));
+  transition: opacity 120ms ease;
+}
+.cover-canvas-paper:hover .part-corner,
+.part-corner:focus-visible {
+  opacity: 1;
+}
+
+/* What has been moved, and the way to take it all back.
+   A row rather than a sentence with a button inside it: undoing a drag is the
+   one thing on this screen that cannot be done on the drawing itself, so it
+   should not have to be found in the middle of a paragraph. It wraps, because
+   on a phone the list of parts is most of the line on its own. */
+.cover-moved {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin-top: 7px;
+}
+
+/* While something is being dragged, nothing anywhere is being selected: the
+   pointer is out over the page with a button held down, and without this a
+   drag off the paper sweeps a blue selection across the form beside it. */
+body.moving-a-part {
+  cursor: grabbing;
+  user-select: none;
 }
 
 /*
