@@ -15,7 +15,14 @@
  */
 
 import { buildEntries, type DirectoryData } from "@/lib/entries";
-import { chunk, isEmailish, rosterFor, tagChanges } from "@/lib/mailchimp";
+import {
+  chunk,
+  composeEmail,
+  isEmailish,
+  isPublicMailbox,
+  rosterFor,
+  tagChanges,
+} from "@/lib/mailchimp";
 import { md5, subscriberHash } from "../worker/md5";
 import { missingSettings, settingsOf } from "../worker/settings";
 import { describeKey, keyFingerprint, listAudiences, taggedAddresses } from "../worker/mailchimp";
@@ -754,4 +761,47 @@ console.log("\nreading who has a tag off the contacts themselves");
   }
 
   globalThis.fetch = real;
+}
+
+console.log("\nwhat somebody types, as an email");
+{
+  const typed =
+    "Dear friends,\n\nPractice has moved to Thursday at 7pm.\nBring the green folder.\n\nThank you,\nThe Office";
+  const { html, text } = composeEmail(typed, "Choir");
+
+  // Mailchimp refuses to send a campaign with no unsubscribe link, and the law
+  // in most places refuses one with no postal address. Both are merge tags it
+  // fills in per recipient; both have to actually be in what we hand it.
+  check("the unsubscribe link is in the HTML", html.includes("*|UNSUB|*"));
+  check("and in the plain text, for a reader who refuses HTML", text.includes("*|UNSUB|*"));
+  check("the postal address is in the HTML", html.includes("*|LIST:ADDRESS|*"));
+  check("and in the plain text", text.includes("*|LIST:ADDRESS|*"));
+
+  check("a blank line starts a paragraph", (html.match(/<p>/g) ?? []).length >= 3);
+  check("a single newline is a line break", html.includes("Thursday at 7pm.<br />Bring"));
+  check("the group is named, so the reader knows why they got it", html.includes("Choir"));
+  check("and the words survive into the plain text", text.includes("Bring the green folder."));
+
+  // Somebody's surname is not markup.
+  const risky = composeEmail("Dear <b>everyone</b> & the O'Brien family", "Choir");
+  check("angle brackets in what was typed are escaped", risky.html.includes("&lt;b&gt;everyone"));
+  check("and ampersands", risky.html.includes("&amp; the"));
+  check("but the plain text keeps them as typed", risky.text.includes("<b>everyone</b> & the"));
+
+  // Nothing to say still produces something Mailchimp will accept: the
+  // footer it refuses to send without is not part of what was typed.
+  const empty = composeEmail("", "Choir");
+  same("nothing typed is no paragraphs of its own", (empty.html.match(/<p>/g) ?? []).length, 0);
+  check("but the unsubscribe link is still there", empty.html.includes("*|UNSUB|*"));
+}
+
+console.log("\nan address Mailchimp cannot authenticate");
+{
+  for (const free of ["office@gmail.com", "CHURCH@Hotmail.com", "a@yahoo.com", "b@icloud.com"]) {
+    check(`flagged: ${free}`, isPublicMailbox(free));
+  }
+  for (const owned of ["office@thealliance.org", "hello@stmarys.church"]) {
+    check(`not flagged: ${owned}`, !isPublicMailbox(owned));
+  }
+  check("nothing typed is not flagged", !isPublicMailbox(""));
 }

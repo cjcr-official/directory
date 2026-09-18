@@ -194,3 +194,45 @@ export async function syncGroup(
     removalsSkipped,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Writing and sending
+// ---------------------------------------------------------------------------
+
+export interface Draft {
+  /** Mailchimp's id for the campaign, which test and send both name. */
+  id: string;
+  /** The number in Mailchimp's own URL for it, so the office can go and look. */
+  webId: number;
+}
+
+export interface DraftFields {
+  tag: string;
+  subject: string;
+  fromName: string;
+  replyTo: string;
+  html: string;
+  text: string;
+}
+
+/**
+ * Writes the campaign into Mailchimp without sending it.
+ *
+ * Kept separate from sending on purpose. A draft can be made, looked at, sent
+ * to yourself, thought better of and abandoned, and none of that reaches the
+ * congregation - the draft simply sits in the church's Mailchimp account like
+ * any other.
+ */
+export function draft(audienceId: string, fields: DraftFields): Promise<Draft> {
+  return ask<Draft>("draft", { listId: audienceId, ...fields });
+}
+
+/** One copy to whoever is about to decide, before anybody else gets it. */
+export function sendTestTo(audienceId: string, campaignId: string, to: string): Promise<void> {
+  return ask<void>("draft-test", { listId: audienceId, campaignId, to: [to] });
+}
+
+/** Sends it to the group. There is no unsending it. */
+export function send(audienceId: string, campaignId: string): Promise<void> {
+  return ask<void>("draft-send", { listId: audienceId, campaignId });
+}
