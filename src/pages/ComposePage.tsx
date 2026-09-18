@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDirectory } from "@/data/DirectoryContext";
 import { useAuth } from "@/auth/AuthProvider";
 import { ConfirmButton, Field, LoadingScreen, Notice } from "@/components/ui";
-import { composeEmail, isEmailish, isPublicMailbox, rosterFor } from "@/lib/mailchimp";
+import { composeEmail, groupList, isEmailish, isPublicMailbox, rosterFor } from "@/lib/mailchimp";
 import { draft as makeDraft, send, sendTestTo } from "@/lib/mailchimpClient";
 import { message } from "@/lib/format";
 
@@ -56,7 +56,48 @@ export function ComposePage() {
   const navigate = useNavigate();
 
   const tag = tags.find((one) => one.id === tagId);
-  const roster = useMemo(() => (tag ? rosterFor(entries, tag.id) : null), [entries, tag]);
+
+  /*
+   * The groups this email goes to. The one that was clicked to get here, plus
+   * any others ticked on the way past.
+   *
+   * One email rather than two, because two emails reach everybody in both
+   * groups twice - and the office cannot see that overlap from here to work
+   * around it. rosterFor takes the union and counts a person in both of them
+   * once, so the number under the heading is the number of people who will
+   * actually receive something.
+   */
+  const [also, setAlso] = useState<string[]>([]);
+  const chosen = useMemo(
+    () => (tag ? [tag, ...tags.filter((one) => one.id !== tag.id && also.includes(one.id))] : []),
+    [tag, tags, also],
+  );
+  const roster = useMemo(
+    () =>
+      chosen.length
+        ? rosterFor(
+            entries,
+            chosen.map((one) => one.id),
+          )
+        : null,
+    [entries, chosen],
+  );
+  const goingTo = groupList(chosen.map((one) => one.name));
+
+  /*
+   * The groups that could be added. Only ones with somebody to write to: a
+   * group carrying no addresses adds nothing to a send, and offering it would
+   * be a switch that does nothing when pressed.
+   */
+  const others = useMemo(
+    () =>
+      tag
+        ? tags.filter(
+            (one) => one.id !== tag.id && rosterFor(entries, one.id).recipients.length > 0,
+          )
+        : [],
+    [tag, tags, entries],
+  );
 
   const remembered = heldSender();
   const [subject, setSubject] = useState("");
@@ -89,7 +130,10 @@ export function ComposePage() {
   useEffect(() => {
     setDraftId(null);
     setNote(null);
-  }, [subject, fromName, replyTo, body]);
+    // `also` belongs here as much as the words do: changing which groups are
+    // ticked changes who the campaign is aimed at, so a draft made before the
+    // change would send to the old set.
+  }, [subject, fromName, replyTo, body, also]);
 
   useEffect(() => {
     try {
@@ -129,9 +173,15 @@ export function ComposePage() {
   /** Makes the draft if what is on screen has not been drafted yet. */
   async function draftNow(): Promise<string> {
     if (draftId) return draftId;
-    const { html, text } = composeEmail(body, tag!.name);
+    const names = chosen.map((one) => one.name);
+    const { html, text } = composeEmail(body, names);
     const made = await makeDraft(audienceId, {
-      tag: tag!.name,
+      tags: names,
+      // Only meaningful for more than one group, and the Worker only reads it
+      // then: one group is aimed at by its own tag, which Mailchimp holds
+      // already. For several there is no such tag, so the segment is built out
+      // of exactly these addresses.
+      emails: names.length > 1 ? (roster?.recipients.map((one) => one.email) ?? []) : undefined,
       subject: subject.trim(),
       fromName: fromName.trim(),
       replyTo: replyTo.trim().toLowerCase(),
@@ -181,7 +231,7 @@ export function ComposePage() {
           <div className="grow">
             <h1>Sent</h1>
             <div className="sub">
-              “{subject}” — {count} {count === 1 ? "person" : "people"} in {tag.name}
+              “{subject}” — {count} {count === 1 ? "person" : "people"} in {goingTo}
             </div>
           </div>
         </div>
@@ -199,13 +249,51 @@ export function ComposePage() {
     <div className="page">
       <div className="page-head">
         <div className="grow">
-          <h1>Write to {tag.name}</h1>
+          <h1>Write to {goingTo}</h1>
           <div className="sub">
             {count === 0 ? "No addresses yet" : `${count} ${count === 1 ? "person" : "people"}`} ·{" "}
             <Link to="/mailchimp">Groups</Link>
           </div>
         </div>
       </div>
+
+      {/*
+        Ticking a second group here rather than writing the email twice. Only
+        groups that have somebody to write to are offered - a group with no
+        addresses on it adds nothing to the send and would only be a dead
+        switch. The group this page was opened for is not in the row: it is
+        already in the heading, and taking it away would leave the page
+        belonging to nothing.
+      */}
+      {canEdit && others.length ? (
+        <div className="card">
+          <div className="card-body tight">
+            <p className="hint pick-head">Also send to</p>
+            <div className="row">
+              {others.map((one) => {
+                const on = also.includes(one.id);
+                return (
+                  <button
+                    key={one.id}
+                    type="button"
+                    className={`btn small${on ? " on" : ""}`}
+                    aria-pressed={on}
+                    onClick={() =>
+                      setAlso((now) =>
+                        now.includes(one.id)
+                          ? now.filter((each) => each !== one.id)
+                          : [...now, one.id],
+                      )
+                    }
+                  >
+                    {one.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {error ? <Notice kind="error">{error}</Notice> : null}
       {note ? <Notice kind="ok">{note}</Notice> : null}
@@ -296,7 +384,7 @@ export function ComposePage() {
             <div className="send-step">
               <h3>Check it first</h3>
               <p className="hint">
-                Goes to this address only. Nobody in {tag.name} is sent anything.
+                Goes to this address only. Nobody in {goingTo} is sent anything.
               </p>
               <div className="row">
                 <input
@@ -318,14 +406,14 @@ export function ComposePage() {
             </div>
 
             <div className="send-step">
-              <h3>Send to {tag.name}</h3>
+              <h3>Send to {goingTo}</h3>
               <p className="hint">
-                Goes to {count === 1 ? "the 1 person" : `all ${count} people`} in {tag.name}. It
+                Goes to {count === 1 ? "the 1 person" : `all ${count} people`} in {goingTo}. It
                 cannot be unsent.
               </p>
               <ConfirmButton
                 label={count === 1 ? "Send to 1 person" : `Send to ${count} people`}
-                confirmLabel={`Really send to ${tag.name}`}
+                confirmLabel={`Really send to ${goingTo}`}
                 disabled={!ready || Boolean(busy)}
                 onConfirm={sendIt}
               />

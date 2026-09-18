@@ -98,10 +98,19 @@ function usable(value: string | null | undefined): string | null {
  * Mailchimp - and sending the choir letter twice to the same inbox is the
  * complaint that arrives first.
  */
-export function rosterFor(entries: DirectoryEntry[], tagId: string): Roster {
+export function rosterFor(entries: DirectoryEntry[], tagId: string | string[]): Roster {
+  // One group or several, because an email to the choir and the deacons is one
+  // email. Sending it twice reaches whoever is in both groups twice, and the
+  // office cannot see the overlap to work around it.
+  //
+  // Nothing here has to merge anything: resolveEntries filters the directory
+  // once, keeping an entry that carries any of the wanted tags, so a person in
+  // both groups comes back a single time. The union and its de-duplication are
+  // the same operation.
+  const tagIds = Array.isArray(tagId) ? tagId : [tagId];
   const inGroup = resolveEntries(entries, {
     mode: "tags",
-    tagIds: [tagId],
+    tagIds,
     entries: [],
     wholeFamily: false,
   });
@@ -264,14 +273,35 @@ const POSTAL_ADDRESS = "*|LIST:ADDRESS|*";
  * client refuses HTML gets the same words in the same order, rather than the
  * "this email cannot be displayed" that a missing plain part produces.
  */
-export function composeEmail(body: string, group: string): Composed {
+/**
+ * A list of group names as a person would say it.
+ *
+ * "and" for the office, which is choosing them - "Write to Choir and Deacons".
+ * "or" for the footer, which is explaining to one reader why the email reached
+ * them, and they are in one of the groups rather than all of them.
+ */
+export function groupList(names: readonly string[], joiner: "and" | "or" = "and"): string {
+  const clean = [...new Set(names.map((one) => one.trim()).filter(Boolean))];
+  if (clean.length <= 1) return clean[0] ?? "";
+  return `${clean.slice(0, -1).join(", ")} ${joiner} ${clean[clean.length - 1]}`;
+}
+
+export function composeEmail(body: string, group: string | readonly string[]): Composed {
   const paragraphs = body
     .replace(/\r\n/g, "\n")
     .split(/\n{2,}/)
     .map((block) => block.trim())
     .filter(Boolean);
 
-  const why = `You are receiving this because you are in the ${group} group in our church directory.`;
+  // Named in the footer because a reader who does not know why this arrived is
+  // a reader who marks it as spam, and one complaint costs the whole audience.
+  const names = Array.isArray(group)
+    ? [...new Set(group.map((one) => one.trim()).filter(Boolean))]
+    : [String(group).trim()];
+  const why =
+    names.length > 1
+      ? `You are receiving this because you are in the ${groupList(names, "or")} groups in our church directory.`
+      : `You are receiving this because you are in the ${names[0] ?? ""} group in our church directory.`;
 
   const html = [
     '<div style="font-family:Helvetica,Arial,sans-serif;font-size:16px;line-height:1.5;color:#222;">',

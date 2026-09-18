@@ -207,7 +207,15 @@ export interface Draft {
 }
 
 export interface DraftFields {
-  tag: string;
+  /** The groups this goes to, by name. One is the ordinary case. */
+  tags: string[];
+  /**
+   * Everyone the groups reach, de-duplicated, and only needed for more than one
+   * group: a single group is aimed at by its own tag, which Mailchimp already
+   * holds. For several there is no such tag, so the Worker builds a segment out
+   * of exactly this list.
+   */
+  emails?: string[];
   subject: string;
   fromName: string;
   replyTo: string;
