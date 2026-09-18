@@ -461,3 +461,140 @@ export async function batchStatus(
     ),
   );
 }
+
+// ---------------------------------------------------------------------------
+// Campaigns
+// ---------------------------------------------------------------------------
+
+/**
+ * The id Mailchimp knows a tag by, which is what a campaign is aimed with.
+ *
+ * A campaign is sent to a segment, and a tag is a segment underneath, so
+ * sending to "the choir" means finding the number behind that name first.
+ * tag-search does it in one call and matches on a prefix, so the answer is
+ * narrowed to an exact name here rather than trusted.
+ *
+ * Nothing found is not an error to shout about: it means this group has never
+ * been synced, and the screen can say that in words a church office can act on.
+ */
+export async function tagSegmentId(
+  key: string,
+  listId: string,
+  tag: string,
+  signal?: AbortSignal,
+): Promise<number | null> {
+  const data = await call<{ tags?: { id: number; name: string }[] }>(
+    key,
+    "GET",
+    `/lists/${encodeURIComponent(listId)}/tag-search?name=${encodeURIComponent(tag)}`,
+    undefined,
+    signal,
+  );
+  const wanted = tag.trim().toLowerCase();
+  const found = (data.tags ?? []).find((row) => row.name.trim().toLowerCase() === wanted);
+  return found ? found.id : null;
+}
+
+export interface DraftRequest {
+  listId: string;
+  segmentId: number;
+  subject: string;
+  fromName: string;
+  replyTo: string;
+  /** What the office will see this called in Mailchimp's own campaign list. */
+  title: string;
+  html: string;
+  text: string;
+}
+
+/**
+ * A campaign, written and aimed but not sent.
+ *
+ * Two calls, because Mailchimp keeps a campaign's settings and its content
+ * apart: one makes the envelope - who it goes to, who it is from, what the
+ * subject line says - and the other puts the letter inside it. Neither sends
+ * anything, which is the point: what comes back is a draft sitting in the
+ * church's own Mailchimp account, and sending it is a separate decision taken
+ * separately.
+ *
+ * auto_footer is off because the unsubscribe link and the postal address are
+ * written into the content itself. Exactly one of each, and this app knows
+ * which.
+ */
+export async function draftCampaign(
+  key: string,
+  draft: DraftRequest,
+  signal?: AbortSignal,
+): Promise<{ id: string; webId: number }> {
+  const campaign = await call<{ id?: string; web_id?: number }>(
+    key,
+    "POST",
+    "/campaigns?fields=id,web_id",
+    {
+      type: "regular",
+      recipients: {
+        list_id: draft.listId,
+        segment_opts: { saved_segment_id: draft.segmentId },
+      },
+      settings: {
+        subject_line: draft.subject,
+        title: draft.title,
+        from_name: draft.fromName,
+        reply_to: draft.replyTo,
+        auto_footer: false,
+        inline_css: true,
+      },
+    },
+    signal,
+  );
+
+  const id = campaign.id ?? "";
+  if (!id) throw new MailchimpFailure(502, "Mailchimp made the campaign but did not name it.");
+
+  await call(
+    key,
+    "PUT",
+    `/campaigns/${encodeURIComponent(id)}/content`,
+    { html: draft.html, plain_text: draft.text },
+    signal,
+  );
+
+  return { id, webId: campaign.web_id ?? 0 };
+}
+
+/** One copy, to whoever is about to press send. */
+export async function sendTest(
+  key: string,
+  campaignId: string,
+  to: string[],
+  signal?: AbortSignal,
+): Promise<void> {
+  await call(
+    key,
+    "POST",
+    `/campaigns/${encodeURIComponent(campaignId)}/actions/test`,
+    { test_emails: to, send_type: "html" },
+    signal,
+  );
+}
+
+/**
+ * Sends it. There is no unsending it.
+ *
+ * Kept as its own function, its own route and its own button for that reason:
+ * nothing else in this file reaches people who did not ask this app for
+ * anything, and nothing else in it cannot be undone by doing the opposite.
+ */
+export async function sendCampaign(
+  key: string,
+  campaignId: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  await call(
+    key,
+    "POST",
+    `/campaigns/${encodeURIComponent(campaignId)}/actions/send`,
+    undefined,
+    signal,
+  );
+}

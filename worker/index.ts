@@ -1,6 +1,10 @@
 import { missingSettings, settingsOf } from "./settings";
 import {
   MailchimpFailure,
+  draftCampaign,
+  sendCampaign,
+  sendTest,
+  tagSegmentId,
   batchStatus,
   listAudiences,
   submitTagBatch,
@@ -216,6 +220,68 @@ async function api(request: Request, env: Env, route: string): Promise<Response>
       contacts.push({ email, firstName: text(row.firstName), lastName: text(row.lastName) });
     }
     return json(await upsertContacts(key, listId, contacts, request.signal));
+  }
+
+  if (route === "draft") {
+    const tag = text(body.tag);
+    const subject = text(body.subject);
+    const fromName = text(body.fromName);
+    const replyTo = text(body.replyTo).toLowerCase();
+    const html = typeof body.html === "string" ? body.html : "";
+    const plain = typeof body.text === "string" ? body.text : "";
+    if (!tag) return problem(400, "Which group?");
+    if (!subject) return problem(400, "An email needs a subject line.");
+    if (!fromName) return problem(400, "An email needs a name to be from.");
+    if (!replyTo.includes("@")) return problem(400, "An email needs a reply-to address.");
+    if (!html.trim() || !plain.trim()) return problem(400, "An email needs something in it.");
+
+    const segmentId = await tagSegmentId(key, listId, tag, request.signal);
+    if (segmentId === null) {
+      return problem(
+        409,
+        `Mailchimp has no “${tag}” tag yet, so there is nobody for a campaign to go to. ` +
+          `Press Sync on that group first, then write the email.`,
+      );
+    }
+
+    return json(
+      await draftCampaign(
+        key,
+        {
+          listId,
+          segmentId,
+          subject,
+          fromName,
+          replyTo,
+          title: `${tag} — ${subject}`,
+          html,
+          text: plain,
+        },
+        request.signal,
+      ),
+    );
+  }
+
+  if (route === "draft-test") {
+    const campaignId = text(body.campaignId);
+    const to = addresses(body.to, 5);
+    if (!campaignId) return problem(400, "Which draft?");
+    if (!to || !to.length) return problem(400, "Where should the test go?");
+    await sendTest(key, campaignId, to, request.signal);
+    return json({ sent: to.length });
+  }
+
+  /**
+   * The one route here that reaches people who never asked this app for
+   * anything, and the one that cannot be undone. It carries no content and no
+   * recipients of its own: everything it will send was settled by "draft", and
+   * looked at, before anybody pressed anything.
+   */
+  if (route === "draft-send") {
+    const campaignId = text(body.campaignId);
+    if (!campaignId) return problem(400, "Which draft?");
+    await sendCampaign(key, campaignId, request.signal);
+    return json({ sent: true });
   }
 
   if (route === "tags") {

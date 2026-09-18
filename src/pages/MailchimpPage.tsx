@@ -420,6 +420,14 @@ export function MailchimpPage() {
                             </Notice>
                           ) : null}
 
+                          {open && canEdit && (roster?.recipients.length ?? 0) > 0 ? (
+                            <p style={{ margin: "0 0 10px" }}>
+                              <Link className="btn primary small" to={`/mailchimp/${tag.id}`}>
+                                Write an email to {tag.name}
+                              </Link>
+                            </p>
+                          ) : null}
+
                           {open ? (
                             <>
                               {roster?.recipients.length ? (
