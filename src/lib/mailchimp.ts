@@ -36,6 +36,14 @@ export interface Recipient {
   label: string;
 }
 
+/** A record in the group that carries no address, and where to go and fix it. */
+export interface Unreachable {
+  id: string;
+  type: "person" | "household";
+  /** As it would be spoken: "Dee Diaz", "The Diaz Family". */
+  name: string;
+}
+
 export interface Roster {
   /** Everyone the group would reach, in the order the directory files them. */
   recipients: Recipient[];
@@ -49,8 +57,12 @@ export interface Roster {
    * Named the way they would be spoken - "Dee Diaz", not "Diaz, Dee" - because
    * unlike the list above, these are read as a sentence with commas between
    * them, and filed names turn two people into an unreadable four.
+   *
+   * Carrying the record's id as well, so the screen can link each name to the
+   * form where the missing address is typed. A list of names is a report; a
+   * list of links is the next thing to do.
    */
-  unreachable: string[];
+  unreachable: Unreachable[];
 }
 
 /**
@@ -96,7 +108,7 @@ export function rosterFor(entries: DirectoryEntry[], tagId: string): Roster {
 
   const seen = new Set<string>();
   const recipients: Recipient[] = [];
-  const unreachable: string[] = [];
+  const unreachable: Unreachable[] = [];
 
   const take = (recipient: Recipient): void => {
     if (seen.has(recipient.email)) return;
@@ -112,7 +124,7 @@ export function rosterFor(entries: DirectoryEntry[], tagId: string): Roster {
       // shares the family's front door usually shares its mailbox too.
       const email = usable(person.email) ?? usable(person.household?.email);
       if (!email) {
-        unreachable.push(fullName(person));
+        unreachable.push({ id: person.id, type: "person", name: fullName(person) });
         continue;
       }
       take({
@@ -159,7 +171,7 @@ export function rosterFor(entries: DirectoryEntry[], tagId: string): Roster {
         label: fileAsName(member),
       });
     }
-    if (!reached) unreachable.push(name);
+    if (!reached) unreachable.push({ id: household.id, type: "household", name });
   }
 
   return { recipients, unreachable };

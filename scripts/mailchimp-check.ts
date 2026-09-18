@@ -217,9 +217,16 @@ console.log("\na family put in a group as a family");
       .sort(),
     ["cass@example.org", "col@example.org"],
   );
-  same("and one with no address anywhere is named as unreachable", roster.unreachable, [
-    "The Diaz Family",
-  ]);
+  same(
+    "and one with no address anywhere is named as unreachable",
+    roster.unreachable.map((one) => one.name),
+    ["The Diaz Family"],
+  );
+  same(
+    "carrying the id of the record to go and fix",
+    roster.unreachable.map((one) => `${one.type}:${one.id}`),
+    ["household:h4"],
+  );
 }
 
 console.log("\nnames in a sentence, rather than filed names");
@@ -239,10 +246,17 @@ console.log("\nnames in a sentence, rather than filed names");
   };
 
   // "Diaz, Dee, Ellis, Eve" is four people to anybody reading it.
-  same("two unreachable people read as two", rosterFor(buildEntries(data), CHOIR.id).unreachable, [
-    "Dee Diaz",
-    "Eve Ellis",
-  ]);
+  const stranded = rosterFor(buildEntries(data), CHOIR.id).unreachable;
+  same(
+    "two unreachable people read as two",
+    stranded.map((one) => one.name),
+    ["Dee Diaz", "Eve Ellis"],
+  );
+  same(
+    "and each links to their own record",
+    stranded.map((one) => `${one.type}:${one.id}`),
+    ["person:dee", "person:eve"],
+  );
 }
 
 console.log("\none mailbox, however many people share it");
