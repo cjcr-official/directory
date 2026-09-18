@@ -2,6 +2,8 @@ import { missingSettings, settingsOf } from "./settings";
 import {
   combinedSegment,
   combinedSegmentName,
+  dropSegment,
+  pruneOldSegments,
   MailchimpFailure,
   draftCampaign,
   sendCampaign,
@@ -163,6 +165,8 @@ const CONTACTS_PER_CALL = 500;
  * build an enormous segment, the same reason the tag batch is bounded.
  */
 const GROUPS_PER_EMAIL = 12;
+/** And how many may be read back from the audience in one pass. */
+const GROUPS_PER_READ = 60;
 const MAX_UNION = 20_000;
 /** A ceiling on one tag batch, so a bad request cannot queue an unbounded job. */
 const TAG_OPERATIONS = 5000;
@@ -210,9 +214,21 @@ async function api(request: Request, env: Env, route: string): Promise<Response>
   if (!listId) return problem(400, "Which audience?");
 
   if (route === "tagged") {
+    // One group asks with "tag" and gets "emails"; a sync of everything asks
+    // with "tags" and gets them keyed by group, off a single pass over the
+    // audience. Both, so a tab open across a deploy keeps working.
+    const many = Array.isArray(body.tags) ? body.tags.map((one) => text(one)).filter(Boolean) : [];
+    if (many.length) {
+      if (many.length > GROUPS_PER_READ) {
+        return problem(400, `At most ${GROUPS_PER_READ} groups can be read at once.`);
+      }
+      return json({ byTag: await taggedAddresses(key, listId, many, request.signal) });
+    }
+
     const tag = text(body.tag);
     if (!tag) return problem(400, "Which group?");
-    return json({ emails: await taggedAddresses(key, listId, tag, request.signal) });
+    const found = await taggedAddresses(key, listId, [tag], request.signal);
+    return json({ emails: found[tag] ?? [] });
   }
 
   if (route === "contacts") {
@@ -251,6 +267,15 @@ async function api(request: Request, env: Env, route: string): Promise<Response>
     if (!html.trim() || !plain.trim()) return problem(400, "An email needs something in it.");
 
     let segmentId: number;
+    /*
+     * How many of them Mailchimp actually holds, where it said.
+     *
+     * The screen counts people in the directory; a campaign reaches the ones
+     * already in the audience. Those differ whenever a group has been edited
+     * since it was last synced, and the office should be told the real number
+     * rather than the one it was promised.
+     */
+    let reach: number | null = null;
     if (tags.length === 1) {
       // The ordinary case, unchanged: a group's own tag is already a segment,
       // and aiming at it leaves nothing behind in the account.
@@ -280,7 +305,15 @@ async function api(request: Request, env: Env, route: string): Promise<Response>
         people,
         request.signal,
       );
+
+      // Nobody at all is the multi-group form of "that tag does not exist
+      // yet", and worth refusing for the same reason. Strictly zero: a missing
+      // member_count reads as null here, and treating "Mailchimp did not say"
+      // as "nobody" would block every send with advice that cannot fix it.
       if (made.members === 0) {
+        // Nothing can be pointing at a segment made a moment ago and never
+        // handed out, so this one is safe to take straight back.
+        await dropSegment(key, listId, made.id, request.signal).catch(() => {});
         return problem(
           409,
           `None of those ${people.length} addresses are in the audience yet. ` +
@@ -288,24 +321,28 @@ async function api(request: Request, env: Env, route: string): Promise<Response>
         );
       }
       segmentId = made.id;
+      reach = made.members;
+
+      // Old segments from earlier sends, cleared on the way past. Never allowed
+      // to fail the send it is riding along with.
+      await pruneOldSegments(key, listId, new Date(), request.signal).catch(() => 0);
     }
 
-    return json(
-      await draftCampaign(
-        key,
-        {
-          listId,
-          segmentId,
-          subject,
-          fromName,
-          replyTo,
-          title: `${tags.join(" + ")} — ${subject}`,
-          html,
-          text: plain,
-        },
-        request.signal,
-      ),
+    const drafted = await draftCampaign(
+      key,
+      {
+        listId,
+        segmentId,
+        subject,
+        fromName,
+        replyTo,
+        title: `${tags.join(" + ")} — ${subject}`,
+        html,
+        text: plain,
+      },
+      request.signal,
     );
+    return json({ ...drafted, reach });
   }
 
   if (route === "draft-test") {

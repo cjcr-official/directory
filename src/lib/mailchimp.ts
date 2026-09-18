@@ -99,18 +99,65 @@ function usable(value: string | null | undefined): string | null {
  * complaint that arrives first.
  */
 export function rosterFor(entries: DirectoryEntry[], tagId: string | string[]): Roster {
-  // One group or several, because an email to the choir and the deacons is one
-  // email. Sending it twice reaches whoever is in both groups twice, and the
-  // office cannot see the overlap to work around it.
-  //
-  // Nothing here has to merge anything: resolveEntries filters the directory
-  // once, keeping an entry that carries any of the wanted tags, so a person in
-  // both groups comes back a single time. The union and its de-duplication are
-  // the same operation.
   const tagIds = Array.isArray(tagId) ? tagId : [tagId];
+  if (tagIds.length === 1) return oneGroup(entries, tagIds[0]);
+  return mergeRosters(tagIds.map((id) => oneGroup(entries, id)));
+}
+
+/**
+ * Several groups' rosters as one, each person written to once.
+ *
+ * Separate from rosterFor because the compose screen already holds a roster
+ * per group - it needs one for every group to know which are worth offering -
+ * and resolving the whole directory again per group just to combine them is
+ * the same work twice.
+ *
+ * Merging rosters, rather than asking resolveEntries for all the tags at once,
+ * is also the only thing that gives the right answer. With wholeFamily false
+ * it returns a household whole when the household itself carries a wanted tag
+ * and splits it into members otherwise - so a deacon household containing a
+ * chorister comes back as the family, and the chorister's own address is never
+ * emitted. Choir alone reached him, Deacons alone reached the family, and the
+ * two together reached only the family: somebody the office had deliberately
+ * picked got nothing, and the count said one where it meant two.
+ */
+export function mergeRosters(rosters: readonly Roster[]): Roster {
+  // One roster is already the answer, and handing it straight back keeps the
+  // directory's own order for the ordinary case of a single group.
+  if (rosters.length === 1) return rosters[0];
+
+  const seen = new Set<string>();
+  const met = new Set<string>();
+  const recipients: Recipient[] = [];
+  const unreachable: Unreachable[] = [];
+
+  for (const roster of rosters) {
+    for (const recipient of roster.recipients) {
+      if (seen.has(recipient.email)) continue;
+      seen.add(recipient.email);
+      recipients.push(recipient);
+    }
+    for (const one of roster.unreachable) {
+      const key = `${one.type}:${one.id}`;
+      if (met.has(key)) continue;
+      met.add(key);
+      unreachable.push(one);
+    }
+  }
+
+  // Gathered group by group, so the run arrives in tag order rather than the
+  // directory's. Filed the way the directory files them, which is the order
+  // these names are read in everywhere else in the app.
+  recipients.sort((a, b) => a.label.localeCompare(b.label));
+  unreachable.sort((a, b) => a.name.localeCompare(b.name));
+  return { recipients, unreachable };
+}
+
+/** One group, resolved as the directory would print it. */
+function oneGroup(entries: DirectoryEntry[], tagId: string): Roster {
   const inGroup = resolveEntries(entries, {
     mode: "tags",
-    tagIds,
+    tagIds: [tagId],
     entries: [],
     wholeFamily: false,
   });
@@ -261,19 +308,6 @@ const UNSUBSCRIBE = "*|UNSUB|*";
 const POSTAL_ADDRESS = "*|LIST:ADDRESS|*";
 
 /**
- * What somebody typed, as an email.
- *
- * A church office writes an email the way it writes anything: a few paragraphs,
- * typed into a box, on a phone. Not HTML, and not a template with fourteen
- * slots. So a blank line starts a paragraph and a single newline is a line
- * break, which is the rule every messaging app has already taught everybody,
- * and nothing else is interpreted at all.
- *
- * Both forms are built from the same text on purpose: a recipient whose mail
- * client refuses HTML gets the same words in the same order, rather than the
- * "this email cannot be displayed" that a missing plain part produces.
- */
-/**
  * A list of group names as a person would say it.
  *
  * "and" for the office, which is choosing them - "Write to Choir and Deacons".
@@ -286,6 +320,19 @@ export function groupList(names: readonly string[], joiner: "and" | "or" = "and"
   return `${clean.slice(0, -1).join(", ")} ${joiner} ${clean[clean.length - 1]}`;
 }
 
+/**
+ * What somebody typed, as an email.
+ *
+ * A church office writes an email the way it writes anything: a few paragraphs,
+ * typed into a box, on a phone. Not HTML, and not a template with fourteen
+ * slots. So a blank line starts a paragraph and a single newline is a line
+ * break, which is the rule every messaging app has already taught everybody,
+ * and nothing else is interpreted at all.
+ *
+ * Both forms are built from the same text on purpose: a recipient whose mail
+ * client refuses HTML gets the same words in the same order, rather than the
+ * "this email cannot be displayed" that a missing plain part produces.
+ */
 export function composeEmail(body: string, group: string | readonly string[]): Composed {
   const paragraphs = body
     .replace(/\r\n/g, "\n")
@@ -317,11 +364,6 @@ export function composeEmail(body: string, group: string | readonly string[]): C
   );
 
   return { html, text };
-}
-
-/** Enough of an address to be worth sending Mailchimp; it rules on the rest. */
-export function isSendableFrom(email: string | null | undefined): boolean {
-  return isEmailish(email);
 }
 
 /**
