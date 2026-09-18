@@ -4752,3 +4752,20 @@ th.num {
     padding-bottom: calc(48px + env(safe-area-inset-bottom) + env(safe-area-inset-top));
   }
 }
+
+/* The line under a group's people on the Mailchimp screen: what to do next,
+   and what the last sync did.
+ *
+ * Both used to be boxes. On a light screen that read as two quiet panels; on a
+ * dark one, three of them down the page - one per group, each saying nothing
+ * had changed - were the brightest thing on it, and they pushed the names
+ * underneath the fold. A receipt is a phrase. A refusal is still a box. */
+.panel-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line);
+}

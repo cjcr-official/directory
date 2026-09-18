@@ -316,8 +316,43 @@ export function MailchimpPage() {
                   const panelId = `mailchimp-group-${tag.id}`;
                   const busy = running?.tagId === tag.id;
                   const when = describeWhen(syncedAt[tag.id]);
+
                   const outcome = outcomes[tag.id];
                   const failed = failures[tag.id];
+
+                  /**
+                   * What the last sync did, in a phrase rather than a panel,
+                   * and what went wrong with it, if anything.
+                   *
+                   * Split because the two deserve different volumes. "1 added,
+                   * 1 removed" is a receipt; addresses Mailchimp refused, or a
+                   * tidy-up that could not be planned, is something somebody
+                   * has to do something about.
+                   */
+                  // Not "2 tagged": the row two lines up already says "2
+                  // addresses", and the footer wrapped to two lines to repeat
+                  // it. What a sync tells you that the row cannot is whether
+                  // anything actually moved.
+                  const said = outcome ? `${outcome.added} added · ${outcome.removed} removed` : "";
+                  const trouble =
+                    outcome && !busy
+                      ? [
+                          outcome.rejected.length
+                            ? `Mailchimp would not take ${outcome.rejected.length}: ` +
+                              outcome.rejected
+                                .slice(0, 2)
+                                .map((row) => row.email)
+                                .join(", ") +
+                              (outcome.rejected.length > 2 ? "…" : "")
+                            : "",
+                          outcome.removalsSkipped
+                            ? "Nobody was untagged — the current tags could not be read."
+                            : "",
+                          outcome.stillRunning ? "Mailchimp is still finishing the tags." : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")
+                      : "";
 
                   return (
                     <li key={tag.id} className="group-item">
@@ -358,56 +393,20 @@ export function MailchimpPage() {
                         ) : null}
                       </div>
 
-                      {busy || outcome || failed || open ? (
+                      {busy || failed || open ? (
                         <div className="group-members" id={panelId}>
                           {busy ? <p className="hint">{running?.note}</p> : null}
 
+                          {/* A refusal is worth a box. "Nothing changed" is not:
+                              three of those boxes, one per group, were the
+                              loudest thing on a dark screen and pushed the
+                              names - the only reason to open a group at all -
+                              off the bottom of it. What a sync did is a fact
+                              about the sync, so it goes in the footer with the
+                              other one. */}
                           {failed ? <Notice kind="error">{failed}</Notice> : null}
 
-                          {outcome && !busy ? (
-                            <Notice kind={outcome.rejected.length ? "warn" : "ok"}>
-                              <strong>{outcome.tagged} tagged.</strong> {outcome.added} added ·{" "}
-                              {outcome.removed} removed · {outcome.created} new
-                              {outcome.rejected.length ? (
-                                <>
-                                  {" "}
-                                  · {outcome.rejected.length} refused:{" "}
-                                  {outcome.rejected
-                                    .slice(0, 2)
-                                    .map((row) => row.email)
-                                    .join(", ")}
-                                  {outcome.rejected.length > 2 ? "…" : ""}
-                                </>
-                              ) : null}
-                              {outcome.removalsSkipped ? (
-                                <> · Nobody untagged — the current tags could not be read.</>
-                              ) : null}
-                              {outcome.stillRunning ? (
-                                <> · Mailchimp is still finishing the tags.</>
-                              ) : null}
-                            </Notice>
-                          ) : null}
-
-                          {/* The action first, and the quiet fact beside it
-                              rather than stacked above it. "Synced today" is
-                              not in the row above because that row budgets its
-                              width to the pixel - the name shrinks to an
-                              ellipsis rather than push the count off the end,
-                              and three more words there cost "Worship Team" its
-                              name. */}
-                          {open && !busy ? (
-                            <div
-                              className="row"
-                              style={{ alignItems: "baseline", margin: "0 0 12px" }}
-                            >
-                              {canEdit && (roster?.recipients.length ?? 0) > 0 ? (
-                                <Link className="btn primary small" to={`/mailchimp/${tag.id}`}>
-                                  Write email
-                                </Link>
-                              ) : null}
-                              {when ? <span className="muted small">Synced {when}</span> : null}
-                            </div>
-                          ) : null}
+                          {trouble ? <Notice kind="warn">{trouble}</Notice> : null}
 
                           {open ? (
                             <>
@@ -425,21 +424,15 @@ export function MailchimpPage() {
                                 </ul>
                               ) : (
                                 <p className="hint" style={{ margin: 0 }}>
-                                  Nobody in this group has an email address, so there is nothing to
-                                  send to.
+                                  No addresses in this group yet.
                                 </p>
                               )}
 
                               {roster?.unreachable.length ? (
                                 <p className="hint">
-                                  {" "}
                                   {roster.unreachable.map((one, at) => (
                                     <span key={`${one.type}:${one.id}`}>
                                       {at > 0 ? ", " : ""}
-                                      {/* A link rather than a name: this list
-                                          is the only thing on the screen that
-                                          is somebody's to go and fix, and the
-                                          form that fixes it is one tap away. */}
                                       <Link
                                         className="list-link"
                                         to={
@@ -454,6 +447,23 @@ export function MailchimpPage() {
                                   ))}{" "}
                                   {roster.unreachable.length === 1 ? "has" : "have"} no address.
                                 </p>
+                              ) : null}
+
+                              {/* The action after the list, because the list is
+                                  what decides whether to press it. Not primary:
+                                  one accent on a screen is emphasis, three is
+                                  wallpaper, and Sync all already has it. */}
+                              {!busy && (canEdit || when || said) ? (
+                                <div className="panel-foot">
+                                  {canEdit && (roster?.recipients.length ?? 0) > 0 ? (
+                                    <Link className="btn small" to={`/mailchimp/${tag.id}`}>
+                                      Write email
+                                    </Link>
+                                  ) : null}
+                                  <span className="muted small">
+                                    {[said, when && `synced ${when}`].filter(Boolean).join(" · ")}
+                                  </span>
+                                </div>
                               ) : null}
                             </>
                           ) : null}
