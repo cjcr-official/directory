@@ -110,7 +110,7 @@ export function ComposePage() {
           </div>
         </div>
         <Notice kind="warn">
-          That group is no longer here. <Link to="/mailchimp">Back to Mailchimp</Link>.
+          That group is gone. <Link to="/mailchimp">Back</Link>.
         </Notice>
       </div>
     );
@@ -150,10 +150,7 @@ export function ComposePage() {
       const id = await draftNow();
       const to = testTo.trim().toLowerCase();
       await sendTestTo(audienceId, id, to);
-      setNote(
-        `A copy is on its way to ${to}. Look in the junk folder as well as the inbox — where it ` +
-          `lands is as much worth knowing as whether it arrives.`,
-      );
+      setNote(`Copy sent to ${to}. Check junk as well as the inbox.`);
     } catch (cause) {
       setError(message(cause));
     } finally {
@@ -184,14 +181,11 @@ export function ComposePage() {
           <div className="grow">
             <h1>Sent</h1>
             <div className="sub">
-              “{subject}” has gone to {count} {count === 1 ? "person" : "people"} in {tag.name}.
+              “{subject}” — {count} {count === 1 ? "person" : "people"} in {tag.name}
             </div>
           </div>
         </div>
-        <Notice kind="ok">
-          Mailchimp has it from here — it is in your campaign list with who opened it, and the
-          unsubscribe link is on every copy.
-        </Notice>
+        <Notice kind="ok">It is in your Mailchimp campaign list, with who opened it.</Notice>
         <div className="row" style={{ marginTop: 14 }}>
           <button type="button" className="btn" onClick={() => void navigate("/mailchimp")}>
             Back to groups
@@ -207,10 +201,8 @@ export function ComposePage() {
         <div className="grow">
           <h1>Write to {tag.name}</h1>
           <div className="sub">
-            {count === 0
-              ? "Nobody in this group has an email address yet."
-              : `${count} ${count === 1 ? "person" : "people"} will get this.`}{" "}
-            <Link to="/mailchimp">Back to groups</Link>
+            {count === 0 ? "No addresses yet" : `${count} ${count === 1 ? "person" : "people"}`} ·{" "}
+            <Link to="/mailchimp">Groups</Link>
           </div>
         </div>
       </div>
@@ -220,7 +212,7 @@ export function ComposePage() {
 
       {!audienceId ? (
         <Notice kind="warn">
-          No audience is chosen yet. Open <Link to="/mailchimp">Mailchimp</Link> and pick one first.
+          Pick an audience on the <Link to="/mailchimp">Mailchimp</Link> screen first.
         </Notice>
       ) : null}
 
@@ -237,7 +229,7 @@ export function ComposePage() {
           </Field>
 
           <div className="grid two">
-            <Field label="From" htmlFor="from_name" hint="The name it appears to come from.">
+            <Field label="From" htmlFor="from_name">
               <input
                 id="from_name"
                 type="text"
@@ -247,15 +239,7 @@ export function ComposePage() {
               />
             </Field>
 
-            <Field
-              label="Reply to"
-              htmlFor="reply_to"
-              hint={
-                isPublicMailbox(replyTo)
-                  ? "Mailchimp cannot authenticate a free mailbox — see the note below."
-                  : "Where a reply goes."
-              }
-            >
+            <Field label="Reply to" htmlFor="reply_to">
               <input
                 id="reply_to"
                 type="email"
@@ -265,11 +249,7 @@ export function ComposePage() {
             </Field>
           </div>
 
-          <Field
-            label="Message"
-            htmlFor="body"
-            hint="A blank line starts a new paragraph. The unsubscribe link and your church's address are added by Mailchimp."
-          >
+          <Field label="Message" htmlFor="body" hint="Blank line starts a paragraph.">
             <textarea
               id="body"
               rows={10}
@@ -301,14 +281,9 @@ export function ComposePage() {
           </div>
           <div className="card-body">
             <p className="hint" style={{ marginTop: 0 }}>
-              Send a copy first. It goes to the one address below and to nobody in the group — the
-              group only gets it when you press the red button, and there is no unsending that one.
+              A copy goes to one address. The group gets nothing until you send.
             </p>
-            <Field
-              label="Send a copy to"
-              htmlFor="test_to"
-              hint="Any address. Try one at Gmail as well as your own — they judge it differently."
-            >
+            <Field label="Copy to" htmlFor="test_to" hint="Try a Gmail address too.">
               <input
                 id="test_to"
                 type="email"
