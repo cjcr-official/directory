@@ -25,6 +25,7 @@ import "./contrast-check";
 import "./cover-check";
 import "./fields-check";
 import "./strip-check";
+import "./sheet-check";
 import "./qr-check";
 import "./changed-check";
 import "./columns-check";
