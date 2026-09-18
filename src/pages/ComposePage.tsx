@@ -3,7 +3,14 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDirectory } from "@/data/DirectoryContext";
 import { useAuth } from "@/auth/AuthProvider";
 import { ConfirmButton, Field, LoadingScreen, Notice } from "@/components/ui";
-import { composeEmail, groupList, isEmailish, isPublicMailbox, rosterFor } from "@/lib/mailchimp";
+import {
+  composeEmail,
+  groupList,
+  isEmailish,
+  isPublicMailbox,
+  mergeRosters,
+  rosterFor,
+} from "@/lib/mailchimp";
 import { draft as makeDraft, send, sendTestTo } from "@/lib/mailchimpClient";
 import { message } from "@/lib/format";
 
@@ -58,30 +65,38 @@ export function ComposePage() {
   const tag = tags.find((one) => one.id === tagId);
 
   /*
-   * The groups this email goes to. The one that was clicked to get here, plus
-   * any others ticked on the way past.
+   * Every group's roster, worked out once.
+   *
+   * This screen needs one for each group whether or not it is being written
+   * to: which groups are worth offering is decided by whether they have
+   * anybody in them. Resolving the directory again for the chosen groups on
+   * top of that is the same work twice, and the directory is the largest thing
+   * this app holds - so it is resolved per group here, once, and everything
+   * below is a lookup and a merge.
+   */
+  const byTag = useMemo(
+    () => new Map(tags.map((one) => [one.id, rosterFor(entries, one.id)])),
+    [tags, entries],
+  );
+
+  /*
+   * The groups this email goes to: the one clicked to get here, plus any
+   * ticked on the way past.
    *
    * One email rather than two, because two emails reach everybody in both
    * groups twice - and the office cannot see that overlap from here to work
-   * around it. rosterFor takes the union and counts a person in both of them
-   * once, so the number under the heading is the number of people who will
-   * actually receive something.
+   * around it. The merge counts a person in both of them once, so the number
+   * under the heading is the number of people who will receive something.
    */
   const [also, setAlso] = useState<string[]>([]);
   const chosen = useMemo(
     () => (tag ? [tag, ...tags.filter((one) => one.id !== tag.id && also.includes(one.id))] : []),
     [tag, tags, also],
   );
-  const roster = useMemo(
-    () =>
-      chosen.length
-        ? rosterFor(
-            entries,
-            chosen.map((one) => one.id),
-          )
-        : null,
-    [entries, chosen],
-  );
+  const roster = useMemo(() => {
+    const picked = chosen.map((one) => byTag.get(one.id)).filter((one) => one !== undefined);
+    return picked.length ? mergeRosters(picked) : null;
+  }, [chosen, byTag]);
   const goingTo = groupList(chosen.map((one) => one.name));
 
   /*
@@ -92,11 +107,9 @@ export function ComposePage() {
   const others = useMemo(
     () =>
       tag
-        ? tags.filter(
-            (one) => one.id !== tag.id && rosterFor(entries, one.id).recipients.length > 0,
-          )
+        ? tags.filter((one) => one.id !== tag.id && (byTag.get(one.id)?.recipients.length ?? 0) > 0)
         : [],
-    [tag, tags, entries],
+    [tag, tags, byTag],
   );
 
   const remembered = heldSender();

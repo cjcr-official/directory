@@ -102,6 +102,25 @@ export interface SyncOutcome {
 
 export type SyncStep = (note: string) => void;
 
+/**
+ * Who carries each of these tags already, off one pass over the audience.
+ *
+ * For syncing several groups at once. A tag per call meant reading the whole
+ * audience once per group - the same pages fetched and parsed three times over
+ * for three groups, against an API with a rate limit.
+ */
+export async function taggedForAll(
+  audienceId: string,
+  tags: string[],
+): Promise<Record<string, string[]>> {
+  if (!tags.length) return {};
+  const { byTag } = await ask<{ byTag: Record<string, string[]> }>("tagged", {
+    listId: audienceId,
+    tags,
+  });
+  return byTag ?? {};
+}
+
 /** How long to keep asking whether Mailchimp has finished the tag batch. */
 const WATCH_MS = 90_000;
 const WATCH_EVERY_MS = 2_000;
@@ -122,16 +141,27 @@ export async function syncGroup(
   tag: string,
   recipients: Recipient[],
   step: SyncStep,
+  /**
+   * Who already carries this tag, when the caller has already looked it up.
+   *
+   * "Sync all" reads the whole audience once for every group it is about to
+   * sync, rather than once per group: every contact lists its own tags, so one
+   * pass answers for all of them. Left out, this looks it up itself, which is
+   * what one group pressing Sync on its own does.
+   */
+  known?: readonly string[],
 ): Promise<SyncOutcome> {
-  step("Looking up who already has this tag…");
-  let emails: string[] = [];
+  let emails: string[] = known ? [...known] : [];
   let removalsSkipped: string | null = null;
-  try {
-    ({ emails } = await ask<{ emails: string[] }>("tagged", { listId: audienceId, tag }));
-  } catch (cause) {
-    // Not fatal. Without this list nobody can be untagged, but everybody in
-    // the group can still be added - and a sync that adds is most of the point.
-    removalsSkipped = message(cause);
+  if (!known) {
+    step("Looking up who already has this tag…");
+    try {
+      ({ emails } = await ask<{ emails: string[] }>("tagged", { listId: audienceId, tag }));
+    } catch (cause) {
+      // Not fatal. Without this list nobody can be untagged, but everybody in
+      // the group can still be added - and a sync that adds is most of the point.
+      removalsSkipped = message(cause);
+    }
   }
   const changes = tagChanges(recipients, emails);
 
@@ -204,6 +234,15 @@ export interface Draft {
   id: string;
   /** The number in Mailchimp's own URL for it, so the office can go and look. */
   webId: number;
+  /**
+   * How many people Mailchimp will actually reach, where it said so.
+   *
+   * The screen counts people in the directory; a campaign reaches the ones
+   * already in the audience, and those differ whenever a group has been edited
+   * since it was last synced. null means Mailchimp did not report it - which is
+   * not the same as nobody, and must not be shown as a number.
+   */
+  reach?: number | null;
 }
 
 export interface DraftFields {

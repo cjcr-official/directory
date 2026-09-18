@@ -27,8 +27,10 @@ import {
 import { md5, subscriberHash } from "../worker/md5";
 import { missingSettings, settingsOf } from "../worker/settings";
 import {
+  agedOut,
   combinedSegmentName,
   describeKey,
+  isOwnSegment,
   keyFingerprint,
   listAudiences,
   taggedAddresses,
@@ -731,7 +733,7 @@ console.log("\nreading who has a tag off the contacts themselves");
         member("cal@example.org", "choir"),
       ],
     ]);
-    const carrying = await taggedAddresses(KEY, "list1", "Choir");
+    const carrying = (await taggedAddresses(KEY, "list1", ["Choir"]))["Choir"];
     same("only the contacts carrying the tag come back", carrying, [
       "ana@example.org",
       "cal@example.org",
@@ -749,7 +751,7 @@ console.log("\nreading who has a tag off the contacts themselves");
     serve([[member("ana@example.org", "Youth Group")]]);
     same(
       "a tag nobody carries is nobody, not an error",
-      await taggedAddresses(KEY, "list1", "Choir"),
+      (await taggedAddresses(KEY, "list1", ["Choir"]))["Choir"],
       [],
     );
   }
@@ -760,7 +762,7 @@ console.log("\nreading who has a tag off the contacts themselves");
     const first = Array.from({ length: 1000 }, (_, i) => member(`p${i}@example.org`, "Choir"));
     const second = [member("last@example.org", "Choir")];
     serve([first, second]);
-    const carrying = await taggedAddresses(KEY, "list1", "Choir");
+    const carrying = (await taggedAddresses(KEY, "list1", ["Choir"]))["Choir"];
     same("a full page is followed by another", urls.length, 2);
     same("and nobody past the first page is lost", carrying.length, 1001);
     check("including the very last one", carrying.includes("last@example.org"));
@@ -959,29 +961,178 @@ console.log("\nthe footer tells a reader why it reached them");
 console.log("\nthe segment a multi-group send is aimed at");
 {
   /*
-   * This name is not cosmetic: combinedSegment deletes what it finds under it
-   * before writing it again, so two sends to the same pair of groups must
-   * agree on the name exactly, and it must never collide with something a
-   * person made by hand.
+   * This segment is not scratch space. A campaign drafted a minute ago points
+   * at it by id, and so does the report of one already sent - so every send
+   * gets a segment of its own, and the tidying up goes by age instead.
    */
+  const at = new Date("2026-09-18T04:20:00Z");
+
   same(
-    "the two orders of the same pair name one segment",
-    combinedSegmentName(["Deacons", "Choir"]),
-    combinedSegmentName(["Choir", "Deacons"]),
+    "the two orders of one pair read the same",
+    combinedSegmentName(["Deacons", "Choir"], at),
+    combinedSegmentName(["Choir", "Deacons"], at),
   );
   same(
-    "and that name says which app owns it",
-    combinedSegmentName(["Choir", "Deacons"]),
-    "Choir + Deacons (church directory)",
+    "a repeated group is named once",
+    combinedSegmentName(["Choir", "Choir", "Deacons"], at),
+    combinedSegmentName(["Choir", "Deacons"], at),
   );
   same(
-    "a repeated group does not appear twice in it",
-    combinedSegmentName(["Choir", "Choir", "Deacons"]),
-    "Choir + Deacons (church directory)",
+    "the name says the groups, when, and whose it is",
+    combinedSegmentName(["Choir", "Deacons"], at),
+    "Choir + Deacons — 2026-09-18 04:20 (church directory)",
   );
   check(
-    "a plain group name could never collide with it",
-    combinedSegmentName(["Choir"]) !== "Choir",
-    combinedSegmentName(["Choir"]),
+    "two sends a minute apart do not share a segment",
+    combinedSegmentName(["Choir"], at) !==
+      combinedSegmentName(["Choir"], new Date("2026-09-18T04:21:00Z")),
+    "",
   );
+
+  check(
+    "a segment this app made is recognised as its own",
+    isOwnSegment(combinedSegmentName(["Choir"], at)),
+    "",
+  );
+  for (const theirs of ["Choir", "Lapsed givers", "church directory", "Everyone (2025)"]) {
+    check(`and one somebody made by hand is not: ${theirs}`, !isOwnSegment(theirs), "");
+  }
+
+  // Tidying by age, and never on a guess.
+  const now = new Date("2026-09-18T04:20:00Z");
+  check("a segment from today stays", !agedOut("2026-09-18T00:00:00Z", now), "");
+  check("one from last week stays", !agedOut("2026-09-11T00:00:00Z", now), "");
+  check("one from two months ago goes", agedOut("2026-07-18T00:00:00Z", now), "");
+  check("one with no date is left alone", !agedOut(undefined, now), "");
+  check("one with an unreadable date is left alone", !agedOut("not a date", now), "");
+}
+
+console.log("\na family in one group holding somebody from another");
+{
+  /*
+   * The case that made the first multi-group union wrong, and which every
+   * check written for it missed because they all used person tags.
+   *
+   * resolveEntries, asked for both tags at once, returns a household whole
+   * when the household itself carries a wanted tag and splits it into members
+   * otherwise. So the deacon household came back as a family and Xan - a
+   * chorister living in it, picked deliberately by whoever ticked Choir - was
+   * never emitted at all. Each group alone reached him or the family; the two
+   * together reached only the family.
+   *
+   * The rule this holds: the union can never be smaller than either group.
+   */
+  const DEACONS = {
+    id: "t-dea",
+    name: "Deacons",
+    color: "#c2643a",
+    description: null,
+    created_at: "",
+  };
+  const data = {
+    households: [
+      household({
+        id: "h1",
+        sort_name: "Vance",
+        display_name: "The Vance Family",
+        email: "family@example.org",
+      }),
+    ],
+    people: [
+      person({
+        id: "xan",
+        first_name: "Xan",
+        last_name: "Vance",
+        household_id: "h1",
+        household_role: "child",
+        email: "xan@example.org",
+      }),
+    ],
+    tags: [CHOIR, DEACONS],
+    householdTags: [{ household_id: "h1", tag_id: DEACONS.id }],
+    personTags: [{ person_id: "xan", tag_id: CHOIR.id }],
+  };
+
+  const entries = buildEntries(data);
+  const choir = rosterFor(entries, CHOIR.id).recipients.map((one) => one.email);
+  const deacons = rosterFor(entries, DEACONS.id).recipients.map((one) => one.email);
+  const both = rosterFor(entries, [CHOIR.id, DEACONS.id]).recipients.map((one) => one.email);
+
+  same("the chorister is reached through his own address", choir, ["xan@example.org"]);
+  same("the deacon household through the family's", deacons, ["family@example.org"]);
+  same("and both groups together reach both", both.slice().sort(), [
+    "family@example.org",
+    "xan@example.org",
+  ]);
+
+  for (const email of [...choir, ...deacons]) {
+    check(`the union keeps ${email}`, both.includes(email), JSON.stringify(both));
+  }
+  check(
+    "the union is never smaller than a group inside it",
+    both.length >= choir.length && both.length >= deacons.length,
+    `${both.length} against ${choir.length} and ${deacons.length}`,
+  );
+}
+
+console.log("\nreading several groups off one pass of the audience");
+{
+  /*
+   * "Sync all" syncs every group. A tag per call meant fetching and parsing
+   * the same pages once per group - three times over for three groups,
+   * against an API with a rate limit - when every member object already lists
+   * all of its own tags.
+   */
+  // Deliberately not key-shaped, like every other fixture here: a realistic
+  // one trips GitHub's push protection, and a test key that cannot be pushed
+  // is a test nobody can run.
+  const KEY2 = "example-not-a-real-key-us20";
+  const real = globalThis.fetch;
+  const urls: string[] = [];
+  const member = (email: string, ...names: string[]) => ({
+    email_address: email,
+    tags: names.map((name) => ({ name })),
+  });
+
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    urls.push(url);
+    const body = url.includes("offset=0")
+      ? {
+          members: [
+            member("ana@example.org", "Choir", "Deacons"),
+            member("ben@example.org", "Choir"),
+            member("dee@example.org", "deacons"),
+            member("eve@example.org", "Youth Group"),
+            member("", "Choir"),
+          ],
+        }
+      : { members: [] };
+    return new Response(JSON.stringify(body), { status: 200 });
+  }) as typeof fetch;
+
+  const byTag = await taggedAddresses(KEY2, "list1", ["Choir", "Deacons"]);
+
+  same("one pass answers for every group asked about", urls.length, 1);
+  same("the choir", byTag["Choir"], ["ana@example.org", "ben@example.org"]);
+  same("the deacons, however Mailchimp capitalised the tag", byTag["Deacons"], [
+    "ana@example.org",
+    "dee@example.org",
+  ]);
+  check(
+    "somebody in both groups appears under each",
+    byTag["Choir"].includes("ana@example.org") && byTag["Deacons"].includes("ana@example.org"),
+    "",
+  );
+  check("a tag nobody asked about is not carried back", !("Youth Group" in byTag), "");
+  check(
+    "a contact with no address is skipped rather than counted blank",
+    !byTag["Choir"].includes(""),
+    JSON.stringify(byTag["Choir"]),
+  );
+
+  same("asking about nothing reads nothing", await taggedAddresses(KEY2, "list1", []), {});
+  same("and it did not call out again to find that out", urls.length, 1);
+
+  globalThis.fetch = real;
 }

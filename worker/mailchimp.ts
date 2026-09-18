@@ -310,7 +310,13 @@ export async function upsertContacts(
 }
 
 /**
- * Who currently carries one tag.
+ * Who currently carries each of these tags, in one pass over the audience.
+ *
+ * Several tags rather than one because "Sync all" syncs every group, and a tag
+ * per call meant reading the whole audience once per group - the same pages,
+ * fetched and parsed three times over for three groups, against an API with a
+ * rate limit. Every member object already lists all of its own tags, so one
+ * pass can answer for all of them at once.
  *
  * Read off the contacts themselves rather than out of a segment. A tag is a
  * static segment underneath - Mailchimp's own guide calls that "an
@@ -335,12 +341,21 @@ const MAX_PAGES = 20;
 export async function taggedAddresses(
   key: string,
   listId: string,
-  tag: string,
+  tags: string[],
   signal?: AbortSignal,
-): Promise<string[]> {
+): Promise<Record<string, string[]>> {
   const list = encodeURIComponent(listId);
-  const wanted = tag.trim().toLowerCase();
-  const carrying: string[] = [];
+
+  // Keyed by the lower-cased name so a tag typed "choir" in Mailchimp and
+  // "Choir" here still meet, and mapped back to the caller's own spelling so
+  // the answer is keyed the way it was asked.
+  const wanted = new Map<string, string>();
+  const carrying: Record<string, string[]> = {};
+  for (const tag of tags) {
+    wanted.set(tag.trim().toLowerCase(), tag);
+    carrying[tag] = [];
+  }
+  if (!wanted.size) return carrying;
 
   for (let page = 0; page < MAX_PAGES; page += 1) {
     const data = await call<{
@@ -357,12 +372,12 @@ export async function taggedAddresses(
 
     const members = data.members ?? [];
     for (const member of members) {
-      const has = (member.tags ?? []).some(
-        (each) => (each.name ?? "").trim().toLowerCase() === wanted,
-      );
-      if (!has) continue;
       const email = (member.email_address ?? "").trim().toLowerCase();
-      if (email) carrying.push(email);
+      if (!email) continue;
+      for (const each of member.tags ?? []) {
+        const name = wanted.get((each.name ?? "").trim().toLowerCase());
+        if (name !== undefined) carrying[name].push(email);
+      }
     }
 
     // A short page is the last page, whatever the total claims.
@@ -372,23 +387,52 @@ export async function taggedAddresses(
   return carrying;
 }
 
+/** The suffix every segment this app builds carries, and nothing else should. */
+const SEGMENT_MARK = "(church directory)";
+
+/** Segments this app made are cleared out after this long. */
+const SEGMENT_KEEP_DAYS = 30;
+
 /**
  * What this app calls the segment it builds for a send to several groups.
  *
- * Sorted, so that picking the deacons and then the choir names the same
- * segment as picking the choir and then the deacons - which is what lets the
- * next send replace the last one instead of leaving a year of near-identical
- * segments in the account.
+ * Sorted, so the groups read the same however they were ticked, and stamped,
+ * so every send names a segment of its own.
  *
- * Marked as this app's, because combinedSegment deletes what it finds under
- * this name before writing it again, and it must never do that to a segment
- * somebody at the church built by hand.
+ * An earlier version reused one name per pair of groups and deleted what it
+ * found under it. That is the wrong trade. A segment is not scratch space: a
+ * campaign drafted a minute ago points at it by id, and so does the report of
+ * one already sent. Deleting it under a second editor - or a second tab -
+ * leaves their campaign aimed at nothing and fails at send, which is exactly
+ * the failure this code claims to rule out by doing its work while drafting.
+ *
+ * So nothing in flight is ever touched, and the clutter that buys is dealt
+ * with by age instead, in pruneOldSegments.
  */
-export function combinedSegmentName(tags: string[]): string {
+export function combinedSegmentName(tags: string[], when: Date = new Date()): string {
   const names = [...new Set(tags.map((one) => one.trim()).filter(Boolean))].sort((a, b) =>
     a.localeCompare(b),
   );
-  return `${names.join(" + ")} (church directory)`;
+  const stamp = when.toISOString().slice(0, 16).replace("T", " ");
+  return `${names.join(" + ")} — ${stamp} ${SEGMENT_MARK}`;
+}
+
+/** Whether a segment is one of this app's, and so safe to tidy away. */
+export function isOwnSegment(name: string): boolean {
+  return name.trim().endsWith(SEGMENT_MARK);
+}
+
+/**
+ * Whether a segment of this app's has aged out.
+ *
+ * Fail-safe on purpose: a date that is missing or unreadable answers false, so
+ * anything this cannot date is left alone rather than deleted on a guess.
+ */
+export function agedOut(created: string | undefined, now: Date, keepDays = SEGMENT_KEEP_DAYS) {
+  if (!created) return false;
+  const at = Date.parse(created);
+  if (Number.isNaN(at)) return false;
+  return now.getTime() - at > keepDays * 24 * 60 * 60 * 1000;
 }
 
 /**
@@ -396,22 +440,22 @@ export function combinedSegmentName(tags: string[]): string {
  * groups.
  *
  * Mailchimp aims a campaign at one segment, and there is no tag that means
- * "the choir and the deacons". The alternative to this is two campaigns, which
- * sends twice to everybody in both - and the office cannot see that overlap to
- * work around it.
+ * "the choir and the deacons". The alternative is two campaigns, which sends
+ * twice to everybody in both - and the office cannot see that overlap to work
+ * around it.
  *
- * A static segment - the same thing a tag is underneath - rather than a
- * segment built from conditions on the two tags. The conditions form would not
- * need the addresses passed in, but its exact shape is not something this could
- * be sure of without an account to try it against, and a wrong guess there
- * fails at send time. This shape is the one the app already relies on, the
- * membership is a list this app worked out itself, and if it is refused it is
- * refused while drafting, before anything has gone out.
+ * A static segment - the same thing a tag is underneath - rather than one
+ * built from conditions on the two tags. The conditions form would not need
+ * the addresses passed in, but its exact shape is not something this could be
+ * sure of without an account to try it against, and a wrong guess there fails
+ * at send time. This shape is the one the app already relies on, the
+ * membership is a list this app worked out itself, and a refusal arrives while
+ * drafting, before anything has gone out.
  *
- * Addresses not in the audience are ignored by Mailchimp rather than added, so
- * a group that has never been synced makes a smaller segment rather than an
- * error - which is why the caller compares what came back against what it
- * asked for.
+ * Mailchimp keeps only the addresses already in the audience, so the count it
+ * reports back is the real reach and can be smaller than what was asked for.
+ * It is returned rather than judged here: null means Mailchimp did not say,
+ * which is not the same as nobody and must not be read as nobody.
  */
 export async function combinedSegment(
   key: string,
@@ -419,24 +463,8 @@ export async function combinedSegment(
   name: string,
   emails: string[],
   signal?: AbortSignal,
-): Promise<{ id: number; members: number }> {
+): Promise<{ id: number; members: number | null }> {
   const list = encodeURIComponent(listId);
-
-  // Replace rather than accumulate. Only ever a segment carrying this app's
-  // own generated name, matched exactly.
-  const existing = await call<{ segments?: { id?: number; name?: string }[] }>(
-    key,
-    "GET",
-    `/lists/${list}/segments?count=1000&type=static&fields=segments.id,segments.name`,
-    undefined,
-    signal,
-  );
-  const wanted = name.trim().toLowerCase();
-  for (const segment of existing.segments ?? []) {
-    if (!segment.id) continue;
-    if ((segment.name ?? "").trim().toLowerCase() !== wanted) continue;
-    await call(key, "DELETE", `/lists/${list}/segments/${segment.id}`, undefined, signal);
-  }
 
   const made = await call<{ id?: number; member_count?: number }>(
     key,
@@ -449,7 +477,63 @@ export async function combinedSegment(
   if (!made.id) {
     throw new MailchimpFailure(502, "Mailchimp made the group segment but did not name it.");
   }
-  return { id: made.id, members: made.member_count ?? 0 };
+  return {
+    id: made.id,
+    members: typeof made.member_count === "number" ? made.member_count : null,
+  };
+}
+
+/** Throws away a segment this app made and then could not use. */
+export async function dropSegment(
+  key: string,
+  listId: string,
+  segmentId: number,
+  signal?: AbortSignal,
+): Promise<void> {
+  await call(
+    key,
+    "DELETE",
+    `/lists/${encodeURIComponent(listId)}/segments/${segmentId}`,
+    undefined,
+    signal,
+  );
+}
+
+/**
+ * Clears out segments this app built for earlier sends, once they are old
+ * enough that nothing is drafting against them and no recent report needs
+ * them.
+ *
+ * Best effort: a failure here must never stop an email going out, so the
+ * caller runs it without waiting on the result and ignores what it throws.
+ */
+export async function pruneOldSegments(
+  key: string,
+  listId: string,
+  now: Date,
+  signal?: AbortSignal,
+): Promise<number> {
+  const list = encodeURIComponent(listId);
+  const data = await call<{
+    segments?: { id?: number; name?: string; created_at?: string }[];
+  }>(
+    key,
+    "GET",
+    `/lists/${list}/segments?count=1000&type=static` +
+      `&fields=segments.id,segments.name,segments.created_at`,
+    undefined,
+    signal,
+  );
+
+  let dropped = 0;
+  for (const segment of data.segments ?? []) {
+    if (!segment.id) continue;
+    if (!isOwnSegment(segment.name ?? "")) continue;
+    if (!agedOut(segment.created_at, now)) continue;
+    await dropSegment(key, listId, segment.id, signal);
+    dropped += 1;
+  }
+  return dropped;
 }
 
 export interface BatchStatus {

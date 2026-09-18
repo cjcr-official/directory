@@ -1519,7 +1519,10 @@ td {
   margin-left: -5px;
   padding: 4px 5px;
   border: 1px solid transparent;
-  border-bottom-color: var(--line-strong);
+  /* Transparent at rest: an underline on every row read as a list of broken
+     links. It comes back on hover, on focus and while the panel is open. */
+  border-bottom-color: transparent;
+  transition: border-color 0.12s;
   border-radius: 0;
   background: transparent;
   font: inherit;
@@ -1571,9 +1574,10 @@ td {
 /* Pushed to the right, which is what closes the band of empty space that a
    table column left between the name and its count. */
 .group-count {
-  margin-left: auto;
-  /* Its own breathing room on top of the row gap, so a name long enough to be
-     clipped still ends clear of the count rather than flush against it. */
+  /* Beside the name, not pushed to the far edge. margin-left:auto threw "2
+     addresses" seven hundred pixels from the group it counts on a 1280px
+     screen, with nothing in between; the actions do the pushing now, which
+     still lines every Sync button up down the right-hand edge. */
   padding-left: 6px;
   flex: none;
   color: var(--ink-3);
@@ -1583,6 +1587,9 @@ td {
 
 .group-actions {
   flex: none;
+  /* What holds the row open to full width, so the buttons line up down the
+     right edge while the count stays with the name. */
+  margin-left: auto;
 }
 /* Quiet until it is wanted. Four bordered Delete buttons down a short list
    put the weight of the card on its most destructive action. */
@@ -4870,4 +4877,82 @@ th.num {
 .pick-head {
   display: block;
   margin: 0 0 8px;
+}
+
+/*
+ * Where a screenful of groups is being sent, as a line under the heading.
+ *
+ * This was a card: a heading saying "Audience" and a full-width select under
+ * it, for a control the office sets once and then leaves for a year. It gave
+ * the least important decision on the screen the same weight as the list of
+ * people, and spent a hundred and twenty pixels above the only thing anybody
+ * opens this page for.
+ */
+.audience-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--raised);
+}
+
+.audience-bar label {
+  flex: none;
+  color: var(--ink-3);
+  font-size: 0.82rem;
+}
+
+.audience-bar select {
+  /* Takes the room the label leaves rather than the full width a field would:
+     it is a line, not a form. */
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 34rem;
+}
+
+.audience-bar .notice,
+.audience-bar .hint {
+  margin: 0;
+}
+
+/*
+ * When a group last went to Mailchimp, in its own row.
+ *
+ * Only from 720px up. On a phone this text costs the name the pixels it needs
+ * - the last time something was added beside the count, three group names
+ * collapsed to "C..", "Y.." and "D.." - and the same fact is a tap away in the
+ * panel. On a desk there is room to spare and a list that answers at rest
+ * beats one that has to be opened three times to learn one thing.
+ */
+.group-state {
+  display: none;
+}
+
+@media (min-width: 720px) {
+  .group-state {
+    display: inline;
+    flex: none;
+    padding-left: 12px;
+    color: var(--ink-3);
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+
+  /* Never sent is a fact worth a little more ink than a date, because it is
+     the one that has something to do about it. */
+  .group-state.never {
+    color: var(--warn-deep);
+  }
+}
+
+/*
+ * The name is pressable, and says so when you go near it. The chevron beside
+ * it is the affordance that is always there; this line is what confirms it
+ * under the pointer or the focus ring.
+ */
+.group-name-button:hover,
+.group-name-button:focus-visible,
+.group-name-button[aria-expanded="true"] {
+  border-bottom-color: var(--line-strong);
 }

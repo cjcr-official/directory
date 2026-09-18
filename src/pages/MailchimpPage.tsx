@@ -4,7 +4,12 @@ import { useDirectory } from "@/data/DirectoryContext";
 import { useAuth } from "@/auth/AuthProvider";
 import { EmptyState, LoadingScreen, Notice } from "@/components/ui";
 import { rosterFor } from "@/lib/mailchimp";
-import { audiences as fetchAudiences, settings, syncGroup } from "@/lib/mailchimpClient";
+import {
+  audiences as fetchAudiences,
+  settings,
+  syncGroup,
+  taggedForAll,
+} from "@/lib/mailchimpClient";
 import type { Audience, SyncOutcome } from "@/lib/mailchimpClient";
 import { describeWhen, message } from "@/lib/format";
 
@@ -154,7 +159,7 @@ export function MailchimpPage() {
 
   if (loading && !tags.length) return <LoadingScreen label="Loading groups…" />;
 
-  async function sync(tagId: string, name: string) {
+  async function sync(tagId: string, name: string, known?: readonly string[]) {
     const roster = rosters.get(tagId);
     if (!roster || !audienceId) return;
 
@@ -168,8 +173,12 @@ export function MailchimpPage() {
       return rest;
     });
     try {
-      const outcome = await syncGroup(audienceId, name, roster.recipients, (note) =>
-        setRunning({ tagId, note }),
+      const outcome = await syncGroup(
+        audienceId,
+        name,
+        roster.recipients,
+        (note) => setRunning({ tagId, note }),
+        known,
       );
       setOutcomes((all) => ({ ...all, [tagId]: outcome }));
       setSyncedAt((all) => {
@@ -197,9 +206,31 @@ export function MailchimpPage() {
    * than failed - there is nothing to send them.
    */
   async function syncEverything() {
-    for (const tag of tags) {
-      if (!rosters.get(tag.id)?.recipients.length) continue;
-      await sync(tag.id, tag.name);
+    const due = tags.filter((tag) => (rosters.get(tag.id)?.recipients.length ?? 0) > 0);
+
+    /*
+     * Who already carries what, for every group at once, before any of them
+     * start. Each sync needed that list and each fetched it for itself, which
+     * read the whole audience once per group - the same pages three times over
+     * for three groups. One pass answers for all of them.
+     *
+     * A failure here is not fatal and is not even reported: each sync falls
+     * back to looking it up itself, and says so in its own receipt if that
+     * fails too.
+     */
+    let known: Record<string, string[]> | null = null;
+    try {
+      setRunning({ tagId: due[0]?.id ?? "", note: "Looking up who already has these tags…" });
+      known = await taggedForAll(
+        audienceId,
+        due.map((tag) => tag.name),
+      );
+    } catch {
+      known = null;
+    }
+
+    for (const tag of due) {
+      await sync(tag.id, tag.name, known?.[tag.name]);
     }
   }
 
@@ -256,17 +287,38 @@ export function MailchimpPage() {
         <>
           <div className="card">
             <div className="card-head">
-              <h2>Audience</h2>
+              <h2>Groups</h2>
+              {canEdit && syncable.length > 1 ? (
+                <button
+                  type="button"
+                  className="btn primary small"
+                  disabled={!audienceId || Boolean(running)}
+                  onClick={() => void syncEverything()}
+                  title={
+                    audienceId
+                      ? `Sync all ${syncable.length} groups that have somebody to email`
+                      : "Choose an audience first"
+                  }
+                >
+                  {running ? "Syncing…" : `Sync all ${syncable.length}`}
+                </button>
+              ) : null}
             </div>
-            <div className="card-body">
+
+            {/*
+              The audience, where it belongs: a line saying where these groups
+              are being sent, rather than a card of its own.
+
+              It had one - a whole card, a heading and a full-width select, for
+              a control that is set once and then left alone for a year. That
+              gave the least important decision on the screen the same weight
+              as the list of who is being emailed, and cost a hundred and
+              twenty pixels above the only thing anybody came here for.
+            */}
+            <div className="audience-bar">
+              <label htmlFor="mailchimp_audience">Sending to</label>
               {list.length ? (
-                /* No Field wrapper: the card is already headed "Audience", and a
-                   second label saying it twice is noise. An empty label would
-                   have been worse than noise - it is an unlabelled control to
-                   anything reading the page aloud - so the name lives on the
-                   select itself. */
                 <select
-                  aria-label="Audience"
                   id="mailchimp_audience"
                   value={audienceId}
                   onChange={(event) => setAudienceId(event.target.value)}
@@ -285,27 +337,6 @@ export function MailchimpPage() {
                   Your audiences could not be fetched — see above.
                 </p>
               )}
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="card-head">
-              <h2>Groups</h2>
-              {canEdit && syncable.length > 1 ? (
-                <button
-                  type="button"
-                  className="btn primary small"
-                  disabled={!audienceId || Boolean(running)}
-                  onClick={() => void syncEverything()}
-                  title={
-                    audienceId
-                      ? `Sync all ${syncable.length} groups that have somebody to email`
-                      : "Choose an audience first"
-                  }
-                >
-                  {running ? "Syncing…" : `Sync all ${syncable.length}`}
-                </button>
-              ) : null}
             </div>
             {tags.length ? (
               <ul className="group-list">
@@ -378,6 +409,22 @@ export function MailchimpPage() {
                               ? "1 address"
                               : `${count} addresses`}
                         </span>
+
+                        {/*
+                          Whether this group has ever been sent to Mailchimp,
+                          without having to open it.
+
+                          A list that says nothing until each row is expanded
+                          makes you open three of them to learn one thing. This
+                          is hidden on a phone, where the room it would take
+                          belongs to the name - "Sunday School" has already been
+                          truncated once for a few pixels spent elsewhere.
+                        */}
+                        {count > 0 ? (
+                          <span className={`group-state${when ? "" : " never"}`}>
+                            {when ? `Synced ${when}` : "Not synced"}
+                          </span>
+                        ) : null}
 
                         {canEdit ? (
                           <span className="group-actions">
