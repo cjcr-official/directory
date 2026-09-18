@@ -1604,12 +1604,37 @@ td {
   padding: 2px 18px 14px 37px;
 }
 
+/*
+ * The names a group holds, bounded.
+ *
+ * A group is opened to see who is in it, and then the button under the list
+ * decides whether to write to them. Unbounded, those two things fight: eight
+ * hundred members - which is one ordinary congregation, not a stress test -
+ * render forty-two thousand pixels of names, fifty phone screens, with the
+ * button at the bottom of them. The list is fast to draw; it is the scrolling
+ * that makes the action unreachable.
+ *
+ * So the list keeps its own scroll and the panel stays a predictable size.
+ * Every name is still there to be read, the count beside the group name still
+ * says how many, and "Write email" is a thumb's reach below the list whether
+ * the group holds four people or four hundred. The height lands part-way
+ * through a row on purpose: a half-row showing is what tells you there is more
+ * under it.
+ *
+ * overscroll-behavior stops a flick that reaches the end of the names from
+ * carrying on into the page behind, which on iOS is how you lose your place in
+ * a list you were half way down.
+ */
 .group-member-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
   gap: 9px;
+
+  max-height: 21rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .group-member {
