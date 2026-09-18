@@ -143,14 +143,14 @@ export function ComposePage() {
   }
 
   async function testIt() {
-    setBusy("Sending you a copy…");
+    setBusy("Sending the test…");
     setError(null);
     setNote(null);
     try {
       const id = await draftNow();
       const to = testTo.trim().toLowerCase();
       await sendTestTo(audienceId, id, to);
-      setNote(`Copy sent to ${to}. Check junk as well as the inbox.`);
+      setNote(`Test sent to ${to}. Check junk as well as the inbox.`);
     } catch (cause) {
       setError(message(cause));
     } finally {
@@ -249,6 +249,19 @@ export function ComposePage() {
             </Field>
           </div>
 
+          {/* Beside the address that causes it, rather than at the foot of the
+              card: the reply-to is the whole reason this appears, and a warning
+              four fields away from its cause reads as general noise. Short,
+              because the long version was sixty words of protocol on a phone
+              and the only actionable part is the last clause. */}
+          {isPublicMailbox(replyTo) ? (
+            <Notice kind="warn">
+              <strong>{replyTo.slice(replyTo.lastIndexOf("@") + 1)} costs you delivery.</strong>{" "}
+              Gmail may reject mail Mailchimp sends for an address it cannot authenticate, so a send
+              can look fine and reach nobody. Use a reply-to on a domain the church owns.
+            </Notice>
+          ) : null}
+
           <Field label="Message" htmlFor="body" hint="Blank line starts a paragraph.">
             <textarea
               id="body"
@@ -260,48 +273,56 @@ export function ComposePage() {
               onChange={(event) => setBody(event.target.value)}
             />
           </Field>
-
-          {isPublicMailbox(replyTo) ? (
-            <Notice kind="warn">
-              <strong>{replyTo.slice(replyTo.lastIndexOf("@") + 1)} will cost you delivery.</strong>{" "}
-              Mailchimp sends from its own servers, so mail claiming to be from a mailbox it cannot
-              authenticate fails the check Gmail runs on every message. Gmail may refuse it outright
-              rather than put it in junk, which is why a send can look successful and reach nobody.
-              The fix is an address on a domain the church owns, authenticated in Mailchimp — not
-              anything in this app.
-            </Notice>
-          ) : null}
         </div>
       </div>
 
+      {/*
+        Two things happen here and they are opposites: one goes to a single
+        address and nobody else, the other goes to the whole group and cannot
+        be taken back. Under one heading reading "Send it", with one address
+        field at the top, they read as one action with a setting - which is
+        why the field looked like it might apply to both buttons.
+
+        So each half says what it is and, more importantly, who receives it.
+        That second line is the whole answer to "what is the point of this":
+        the first button reaches one person, the second reaches everyone.
+      */}
       {canEdit ? (
         <div className="card">
           <div className="card-head">
-            <h2>Send it</h2>
+            <h2>Send</h2>
           </div>
           <div className="card-body">
-            <p className="hint" style={{ marginTop: 0 }}>
-              A copy goes to one address. The group gets nothing until you send.
-            </p>
-            <Field label="Copy to" htmlFor="test_to" hint="Try a Gmail address too.">
-              <input
-                id="test_to"
-                type="email"
-                value={testTo}
-                onChange={(event) => setTestTo(event.target.value)}
-              />
-            </Field>
+            <div className="send-step">
+              <h3>Check it first</h3>
+              <p className="hint">
+                Goes to this address only. Nobody in {tag.name} is sent anything.
+              </p>
+              <div className="row">
+                <input
+                  id="test_to"
+                  type="email"
+                  aria-label="Address to send the check to"
+                  value={testTo}
+                  onChange={(event) => setTestTo(event.target.value)}
+                />
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={!canTest || Boolean(busy)}
+                  onClick={() => void testIt()}
+                >
+                  {busy === "Sending the test…" ? "Sending…" : "Send test"}
+                </button>
+              </div>
+            </div>
 
-            <div className="row">
-              <button
-                type="button"
-                className="btn"
-                disabled={!canTest || Boolean(busy)}
-                onClick={() => void testIt()}
-              >
-                {busy === "Sending you a copy…" ? "Sending…" : "Send a copy"}
-              </button>
-
+            <div className="send-step">
+              <h3>Send to {tag.name}</h3>
+              <p className="hint">
+                Goes to {count === 1 ? "the 1 person" : `all ${count} people`} in {tag.name}. It
+                cannot be unsent.
+              </p>
               <ConfirmButton
                 label={count === 1 ? "Send to 1 person" : `Send to ${count} people`}
                 confirmLabel={`Really send to ${tag.name}`}
@@ -309,6 +330,7 @@ export function ComposePage() {
                 onConfirm={sendIt}
               />
             </div>
+
             {busy ? <p className="hint">{busy}</p> : null}
           </div>
         </div>

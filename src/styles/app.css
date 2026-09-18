@@ -4807,3 +4807,53 @@ th.num {
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }
+
+/*
+ * The two halves of sending: check it, then send it.
+ *
+ * They were one block under one heading with one address field at the top, and
+ * the office could not tell what it was for - reasonably, because the field
+ * belongs to only one of the two buttons under it, and nothing said so. The
+ * rule between them is doing real work here: it says these are two acts, not
+ * one act with a setting.
+ *
+ * Each half carries its own line about who receives the mail, which is the
+ * part that was missing. One address, or everybody.
+ */
+.send-step + .send-step {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.send-step h3 {
+  margin: 0 0 3px;
+  font-size: 0.97rem;
+}
+
+/* The who-gets-this line sits under its heading rather than floating in the
+   paragraph rhythm, and is the only thing between the heading and the button
+   it qualifies. */
+.send-step .hint {
+  display: block;
+  margin: 0 0 11px;
+}
+
+/* The address takes the room the button leaves, and drops under it rather than
+   squeezing when there is not enough. A bare .grow was what this wanted, but
+   that class only exists inside .page-head - it would have sized nothing. */
+.send-step .row input {
+  /* Narrow enough that the address and its button share one line at 393px -
+     the card has about 325px inside it and "Send test" wants 115 of them. A
+     15rem basis pushed the button onto its own row. */
+  flex: 1 1 11rem;
+  min-width: 0;
+}
+
+/* A notice standing between fields keeps the rhythm they set. .field carries
+   margin-bottom: 14px and .notice carries none, so a warning dropped between
+   two fields got a normal gap above it and sat flush against the label below.
+   Only when something follows it, so a notice closing a card adds no tail. */
+.card-body .notice:not(:last-child) {
+  margin-bottom: 14px;
+}
