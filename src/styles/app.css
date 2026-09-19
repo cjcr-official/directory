@@ -764,6 +764,20 @@ p:last-child {
 .card-body {
   padding: 18px;
 }
+/*
+ * A line about the card above it.
+ *
+ * It had no margin of any kind: a paragraph's own margin is underneath it, and
+ * :last-child takes even that away, so "Unsubscribes are always respected."
+ * was printed hard against the bottom edge of the card it belongs to - the
+ * text touching the border, and forty-eight pixels of page padding under it.
+ * A caption wants a little air over it and none of the room a paragraph would
+ * take, which is what this is.
+ */
+.card-note {
+  margin: 12px 0 0;
+}
+
 .card-body.tight {
   padding: 12px;
 }
@@ -5223,6 +5237,33 @@ body.moving-a-part {
      the one that has something to do about it. */
   .group-state.never {
     color: var(--warn-deep);
+  }
+}
+
+/*
+ * Under it, the count joins the button instead.
+ *
+ * With the state hidden the count is the only thing left in the middle of the
+ * row, and it starts wherever the name in front of it happens to end: five
+ * groups, five different stops - 141, 160, 166, 172 and 207 across one 393pt
+ * screen - each with a band of nothing between it and the Sync beside it.
+ * Pushed over it reads as a column: every count ends where every other one
+ * ends, a thumb's width from the button it is about, and the name has the rest
+ * of the row to itself.
+ *
+ * Only under it. From 720 up the count is followed by when the group last went
+ * across, so those two travel as a pair and pushing them right would strand
+ * the pair seven hundred pixels from the group they describe - which is the
+ * whole of the note above .group-count, and still true.
+ */
+@media (max-width: 719px) {
+  .group-count {
+    margin-left: auto;
+  }
+  /* The count does the pushing now. Two auto margins in one row split the
+     slack between them, which would open a gap down the middle of the pair. */
+  .group-actions {
+    margin-left: 0;
   }
 }
 
