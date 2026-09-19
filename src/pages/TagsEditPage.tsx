@@ -422,6 +422,9 @@ export function TagsEditPage() {
     <div className="page form desk-page">
       <div className="page-head">
         <div className="grow">
+          <Link className="btn ghost small page-back" to="/tags">
+            ← Back to name tags
+          </Link>
           <h1>{project.name}</h1>
           <div className="sub">
             {people.length} name tag{people.length === 1 ? "" : "s"} · {perSheet} to a sheet · about{" "}
@@ -765,7 +768,7 @@ export function TagsEditPage() {
                   {saving ? "Saving…" : "Save changes"}
                 </button>
                 <Link className="btn ghost" to="/tags">
-                  Back
+                  Cancel
                 </Link>
               </div>
             ) : (

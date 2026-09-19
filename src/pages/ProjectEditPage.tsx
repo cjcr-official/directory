@@ -590,6 +590,9 @@ export function ProjectEditPage() {
     <div className="page form desk-page">
       <div className="page-head">
         <div className="grow">
+          <Link className="btn ghost small page-back" to="/projects">
+            ← Back to directories
+          </Link>
           <h1>{isNew ? "New directory" : name}</h1>
           <div className="sub">
             {included.length} record{included.length === 1 ? "" : "s"} ·{" "}
@@ -1176,7 +1179,7 @@ export function ProjectEditPage() {
                   {saving ? "Saving…" : isNew ? "Create directory" : "Save changes"}
                 </button>
                 <Link className="btn ghost" to="/projects">
-                  Back
+                  Cancel
                 </Link>
               </div>
             ) : (
