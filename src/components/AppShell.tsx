@@ -22,7 +22,7 @@ function Item({ to, label, count }: { to: string; label: string; count?: number 
 
 export function AppShell() {
   const { profile, role, canEdit, isOwner, signOut } = useAuth();
-  const { households, people, tags, entries } = useDirectory();
+  const { households, people, tags } = useDirectory();
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -55,10 +55,6 @@ export function AppShell() {
     return () => window.removeEventListener("keydown", onKey);
   }, [menuOpen]);
 
-  // From the entries the book is built from, for the same reason the overview
-  // counts that way: people here is every row, inactive included.
-  const individuals = entries.filter((entry) => entry.type === "person").length;
-
   return (
     <div className="shell">
       <header className="topbar">
@@ -89,55 +85,71 @@ export function AppShell() {
       {menuOpen ? <div className="scrim" onClick={() => setMenuOpen(false)} /> : null}
 
       <nav className={`sidebar${menuOpen ? " open" : ""}`}>
-        <div className="brand">
-          <Logo />
-          <span className="app-name">Church Directory</span>
+        {/*
+         * The links scroll inside the drawer; the foot below them does not.
+         * Ten links, four headings and the brand come to more than a phone is
+         * tall, and what fell off the bottom was who you are signed in as and
+         * the way back out - the two things that should never need hunting
+         * for. Everything that can grow is in here. The foot is two lines,
+         * whatever the congregation, and stays on screen.
+         */}
+        <div className="sidebar-scroll">
+          <div className="brand">
+            <Logo />
+            <span className="app-name">Church Directory</span>
+          </div>
+
+          <Item to="/" label="Overview" />
+          <NotificationTray />
+
+          <div className="nav-section">Congregation</div>
+          <Item to="/families" label="Families" count={households.length} />
+          <Item to="/people" label="People" count={people.length} />
+          <Item to="/groups" label="Groups" count={tags.length} />
+
+          <div className="nav-section">Printing</div>
+          <Item to="/projects" label="Directories" />
+          <Item to="/tags" label="Name tags" />
+
+          {canEdit ? (
+            <>
+              <div className="nav-section">Email</div>
+              <Item to="/mailchimp" label="Mailchimp" />
+            </>
+          ) : null}
+
+          <div className="nav-section">Settings</div>
+          <Item to="/settings" label="Settings" />
+          <Item to="/backup" label="Backup" />
+          {isOwner ? <Item to="/administrators" label="Administrators" /> : null}
         </div>
-
-        <Item to="/" label="Overview" />
-        <NotificationTray />
-
-        <div className="nav-section">Congregation</div>
-        <Item to="/families" label="Families" count={households.length} />
-        <Item to="/people" label="People" count={people.length} />
-        <Item to="/groups" label="Groups" count={tags.length} />
-
-        <div className="nav-section">Printing</div>
-        <Item to="/projects" label="Directories" />
-        <Item to="/tags" label="Name tags" />
-
-        {canEdit ? (
-          <>
-            <div className="nav-section">Email</div>
-            <Item to="/mailchimp" label="Mailchimp" />
-          </>
-        ) : null}
-
-        <div className="nav-section">Settings</div>
-        <Item to="/settings" label="Settings" />
-        <Item to="/backup" label="Backup" />
-        {isOwner ? <Item to="/administrators" label="Administrators" /> : null}
 
         <div className="sidebar-foot">
           <div className="sidebar-who">
             <span className="sidebar-name">{profile?.full_name || profile?.email}</span>
             <span className="pill role">{role ?? "no access"}</span>
           </div>
-          {individuals > 0 ? (
-            <div className="muted small">{individuals} listed on their own</div>
-          ) : null}
-          <button
-            type="button"
-            className="btn small sidebar-signout"
-            onClick={() => void signOut()}
-          >
-            Sign out
-          </button>
-          {/* So "which version are you on?" has an answer that does not
-              involve reading a URL bar that is not there. */}
-          <div className="sidebar-version" title={`Build ${APP_VERSION}`}>
-            <span>Version</span>
-            <span className="sidebar-build">{APP_VERSION.slice(0, 7)}</span>
+          {/*
+           * Sign out and the build share a line. Standing on the drawer for
+           * good, every row this block takes is a row of links it covers, and
+           * the count of people listed on their own that used to sit here is
+           * the first sentence on the overview anyway.
+           *
+           * The build is here so that "which version are you on?" has an
+           * answer that does not involve reading a URL bar that is not there.
+           */}
+          <div className="sidebar-foot-row">
+            <button
+              type="button"
+              className="btn small sidebar-signout"
+              onClick={() => void signOut()}
+            >
+              Sign out
+            </button>
+            <div className="sidebar-version" title={`Build ${APP_VERSION}`}>
+              <span>Version</span>
+              <span className="sidebar-build">{APP_VERSION.slice(0, 7)}</span>
+            </div>
           </div>
         </div>
       </nav>

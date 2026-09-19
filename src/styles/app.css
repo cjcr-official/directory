@@ -307,14 +307,46 @@ p:last-child {
   flex: 0 0 232px;
   background: var(--paper);
   border-right: 1px solid var(--line);
-  padding: 20px 14px;
+  /* No padding along the sides or the top: the scrolling column inside
+     carries those, so the brand's negative margins have the same gutter to
+     cancel as before and the foot's rule can run the full width of the
+     drawer. What is left is the clearance underneath the foot. */
+  padding: 0 0 20px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
   position: sticky;
   top: 0;
   height: 100vh;
+  /* Not this box. The column inside it is what scrolls, and a foot that
+     scrolls away with the links is a foot nobody can reach. */
+  overflow: hidden;
+}
+
+/*
+ * The part of the drawer that is allowed to grow: the brand, the links, the
+ * bell. It takes whatever room the foot leaves and scrolls when the links come
+ * to more than that, which on a phone is what an owner sees - ten links and
+ * four headings under a brand band, and Mailchimp and Administrators are the
+ * two that tip it over. What used to fall off the bottom was who you are
+ * signed in as and the way out: at 393 by 852 the build was thirteen pixels
+ * past the end of the screen, and on a shorter phone Sign out went with it.
+ *
+ * min-height: 0 is the line that makes it scroll rather than stretch: a flex
+ * item's floor is its own content, so without it this column refuses to shrink
+ * and pushes the foot off the end of the drawer instead - the bug, with extra
+ * steps. overscroll-behavior keeps a flick past the last link from carrying on
+ * into the page behind the drawer, which on iOS is how the screen underneath
+ * ends up somewhere else when the menu is shut.
+ */
+.sidebar-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 20px 14px 14px;
 }
 
 /* A dark band: the logo is white artwork and would vanish on the sidebar's
@@ -380,10 +412,16 @@ p:last-child {
 
 /* Who is signed in, what they may do, and how to leave - two rows, each with
    something at either end, rather than four things stacked hard against the
-   left edge with a different gap above each. */
+   left edge with a different gap above each.
+
+   It sits below the scrolling column rather than at the end of it, so it is on
+   screen whatever the links are doing. Two rows and no more for that reason:
+   this is space the nav does not get back. The rule above it is the drawer's
+   full width now, which is what says these are two regions rather than one
+   list with a line in it. */
 .sidebar-foot {
-  margin-top: auto;
-  padding-top: 14px;
+  flex: 0 0 auto;
+  padding: 12px 14px 0;
   border-top: 1px solid var(--line);
   font-size: 0.82rem;
   display: flex;
@@ -412,10 +450,15 @@ p:last-child {
   flex: 0 0 auto;
 }
 
-/* Left, at its own width - a full-width bar would give a rarely-used action
-   more weight than it deserves. */
-.sidebar-signout {
-  align-self: flex-start;
+/* The way out at one end of the line, the build at the other. Sign out keeps
+   its own width - a full-width bar would give a rarely-used action more weight
+   than it deserves - and the stamp fills the room that leaves instead of
+   costing the drawer another row. */
+.sidebar-foot-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .main {
@@ -2322,17 +2365,16 @@ th.num {
 }
 
 /* The build sits at the very bottom, where it was, but as a label and a value
-   with a rule above them rather than a line of loose mono - so it reads as a
-   stamp on the drawer instead of as text someone forgot to take out. A settled
-   grey, too, rather than a faded one: quiet on purpose, not half-erased. */
+   rather than a line of loose mono - so it reads as a stamp on the drawer
+   instead of as text someone forgot to take out. A settled grey, too, rather
+   than a faded one: quiet on purpose, not half-erased. It shares the line with
+   Sign out and takes no rule of its own: the foot already has one over it, and
+   two hairlines across two lines of drawer was one too many once that foot was
+   there for good. */
 .sidebar-version {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 2px;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
+  gap: 7px;
   font-size: 0.72rem;
   color: var(--ink-3);
 }
@@ -3995,14 +4037,20 @@ body.moving-a-part {
     width: 264px;
     max-width: 84vw;
     flex-direction: column;
-    padding: 0 14px calc(20px + env(safe-area-inset-bottom));
-    overflow-y: auto;
+    padding: 0 0 calc(20px + env(safe-area-inset-bottom));
+    overflow: hidden;
     transform: translateX(-100%);
     transition: transform 0.22s ease;
     box-shadow: 0 0 40px rgb(0 0 0 / 28%);
   }
   .sidebar.open {
     transform: translateX(0);
+  }
+
+  /* No padding over the brand: the band carries the status bar's height
+     itself, and the drawer opens under it. */
+  .sidebar-scroll {
+    padding: 0 14px 10px;
   }
 
   .brand {
@@ -4013,6 +4061,13 @@ body.moving-a-part {
   .nav-link {
     padding: 10px 11px;
     font-size: 0.95rem;
+  }
+
+  /* The one thing in the foot that is pressed, and now the one thing on the
+     drawer that is always under a thumb. Field height rather than the small
+     button's, which is thirty pixels and asks for a careful tap. */
+  .sidebar-signout {
+    min-height: var(--control-h);
   }
 
   .page {
