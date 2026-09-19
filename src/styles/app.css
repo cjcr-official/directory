@@ -4040,11 +4040,19 @@ body.moving-a-part {
     padding: 0 0 calc(20px + env(safe-area-inset-bottom));
     overflow: hidden;
     transform: translateX(-100%);
-    transition: transform 0.22s ease;
-    box-shadow: 0 0 40px rgb(0 0 0 / 28%);
+    transition:
+      transform 0.22s ease,
+      box-shadow 0.22s ease;
   }
+  /* The shadow belongs to a drawer that is over the page, and a shut one is
+     not. Off-canvas at translateX(-100%) its right edge is the left edge of
+     the screen, so forty pixels of blur were being painted over every page in
+     the app at z-index 50: a grey smudge down the side of every phone screen,
+     over the margin and over the first half inch of every card, darkest right
+     at the edge. It is on the open drawer instead, and fades with the slide. */
   .sidebar.open {
     transform: translateX(0);
+    box-shadow: 0 0 40px rgb(0 0 0 / 28%);
   }
 
   /* No padding over the brand: the band carries the status bar's height
@@ -4493,9 +4501,20 @@ body.moving-a-part {
  * drops the stacking margin from a card that follows another one. Left to
  * itself the row came out with the second and third headings sixteen pixels
  * below the first.
+ *
+ * min(420px, 100%) rather than a bare 420px, and this is the whole of what a
+ * phone was getting wrong on these two pages. A track minimum is a minimum:
+ * where the row is narrower than it, the track is drawn at 420 anyway and the
+ * panel hangs off the side of the screen. The row on a phone is the screen
+ * less the page's two 16px margins - 361 on a 393pt phone, 343 on a 375 - so
+ * every panel on Settings and Backup was drawn 420 wide from x=16 and ended at
+ * 436: forty-three pixels past the edge of the glass, no margin down the right
+ * at all, and the page scrolling sideways. Capping the minimum at the row's
+ * own width is the ordinary answer and changes nothing anywhere the row has
+ * 420px to give, which is every screen this rule was written for.
  */
 .grid.panels {
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
   align-items: start;
 }
 
