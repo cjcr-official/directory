@@ -525,7 +525,7 @@ export function MailchimpPage() {
             )}
           </div>
 
-          <p className="muted small">Unsubscribes are always respected.</p>
+          <p className="muted small card-note">Unsubscribes are always respected.</p>
         </>
       ) : null}
     </div>
