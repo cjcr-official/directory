@@ -83,6 +83,16 @@ export function MailchimpPage() {
    * fix something that is not broken.
    */
   const [asked, setAsked] = useState(false);
+  /**
+   * And whether the asking is still going on.
+   *
+   * Without this the round trip to Mailchimp looked exactly like a refusal:
+   * the card appears the moment the settings come back, the audiences are a
+   * second request behind it, and for the whole of that second the bar fell
+   * through to "your audiences could not be fetched - see above" - an error
+   * that had not happened, pointing at a notice that was not there.
+   */
+  const [asking, setAsking] = useState(false);
   const [audienceId, setAudienceId] = useState(remembered);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -107,6 +117,7 @@ export function MailchimpPage() {
         setMissing(state.missing);
         if (!state.ready) return;
 
+        setAsking(true);
         const found = await fetchAudiences();
         if (!live) return;
         setList(found);
@@ -122,6 +133,8 @@ export function MailchimpPage() {
         );
       } catch (cause) {
         if (live) setError(message(cause));
+      } finally {
+        if (live) setAsking(false);
       }
     })();
     return () => {
@@ -329,6 +342,22 @@ export function MailchimpPage() {
                       {one.name} — {one.members} contacts
                     </option>
                   ))}
+                </select>
+              ) : asking ? (
+                /*
+                 * The control it is about to be, rather than a sentence where
+                 * it will be.
+                 *
+                 * The old fall-through was not far off the right height - two
+                 * wrapped lines came to 58px against the select's 59 - so what
+                 * made it jump at the eye was not the pixel, it was a sentence
+                 * about a failure turning into a dropdown. A disabled select
+                 * changes a few words inside a box that is already the right
+                 * one, and the arrival of the real audiences moves nothing
+                 * under it at all.
+                 */
+                <select id="mailchimp_audience" disabled aria-busy="true">
+                  <option>Asking Mailchimp…</option>
                 </select>
               ) : asked ? (
                 <Notice kind="warn">No audiences in Mailchimp yet. Make one there first.</Notice>

@@ -5210,6 +5210,17 @@ body.moving-a-part {
   margin: 0;
 }
 
+/* The audience control while Mailchimp is being asked. Left to the browser a
+   disabled select is drawn in its own grey - and iOS paints the text with
+   -webkit-text-fill-color and dims the whole control besides, which together
+   read as something broken rather than something loading. The app's own quiet
+   ink says waiting instead, in a box the same size as the one replacing it. */
+.audience-bar select:disabled {
+  opacity: 1;
+  color: var(--ink-3);
+  -webkit-text-fill-color: var(--ink-3);
+}
+
 /*
  * When a group last went to Mailchimp, in its own row.
  *
