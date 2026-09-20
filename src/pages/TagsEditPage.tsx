@@ -716,7 +716,7 @@ export function TagsEditPage() {
                       id="tag_line"
                       type="text"
                       value={settings.tagLine}
-                      placeholder="We are a Christ-centered Acts 1:8 Family"
+                      placeholder="You are welcome here"
                       disabled={!canEdit}
                       onChange={(event) => set({ tagLine: event.target.value })}
                     />

@@ -809,7 +809,7 @@ console.log("\nan address Mailchimp cannot authenticate");
   for (const free of ["office@gmail.com", "CHURCH@Hotmail.com", "a@yahoo.com", "b@icloud.com"]) {
     check(`flagged: ${free}`, isPublicMailbox(free));
   }
-  for (const owned of ["office@thealliance.org", "hello@stmarys.church"]) {
+  for (const owned of ["office@example.org", "hello@stmarys.church"]) {
     check(`not flagged: ${owned}`, !isPublicMailbox(owned));
   }
   check("nothing typed is not flagged", !isPublicMailbox(""));

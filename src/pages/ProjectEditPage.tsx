@@ -891,7 +891,9 @@ export function ProjectEditPage() {
                       id="cover_statement"
                       rows={5}
                       value={settings.coverStatement}
-                      placeholder={"OUR MISSION\nTo know Christ, and to make him known."}
+                      placeholder={
+                        "OUR MISSION\nTo worship together, serve our community, and welcome everyone."
+                      }
                       disabled={!canEdit}
                       onChange={(event) => set({ coverStatement: event.target.value })}
                     />

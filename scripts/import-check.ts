@@ -141,13 +141,13 @@ const SIEBERTS = [
     Anniversary: "36365",
     "Marital Status": "Married",
     Status: "active",
-    "Mobile Phone Number": "(307) 286-6959",
-    "Home Phone Number": "(406) 826-1234",
-    "Home Email": "jason@cmaplains.org",
-    "Home Address Street Line 1": "4 Mule Deer Ln",
-    "Home Address City": "Plains",
-    "Home Address State": "MT",
-    "Home Address Zip Code": "59859",
+    "Mobile Phone Number": "(216) 555-0188",
+    "Home Phone Number": "(216) 555-0142",
+    "Home Email": "jason@example.org",
+    "Home Address Street Line 1": "18 Sycamore Lane",
+    "Home Address City": "Fairhaven",
+    "Home Address State": "OH",
+    "Home Address Zip Code": "44092",
     "Household ID": "25700387",
     "Household Name": "Siebert Household",
     "Household Primary Contact": "1",
@@ -161,9 +161,9 @@ const SIEBERTS = [
     Nickname: "Maggie",
     Gender: "Female",
     "Marital Status": "Married",
-    "Home Address Street Line 1": "4 Mule Deer Ln",
-    "Home Address City": "Plains",
-    "Home Address Zip Code": "59859",
+    "Home Address Street Line 1": "18 Sycamore Lane",
+    "Home Address City": "Fairhaven",
+    "Home Address Zip Code": "44092",
     "Household ID": "25700387",
     "Household Name": "Siebert Household",
     "Household Primary Contact": "0",
@@ -175,9 +175,9 @@ const SIEBERTS = [
     Birthdate: "2015-04-02",
     "Household ID": "25700387",
     "Household Name": "Siebert Household",
-    "Home Address Street Line 1": "4 Mule Deer Ln",
-    "Home Address City": "Plains",
-    "Home Address Zip Code": "59859",
+    "Home Address Street Line 1": "18 Sycamore Lane",
+    "Home Address City": "Fairhaven",
+    "Home Address Zip Code": "44092",
     Grade: "4",
   }),
 ];
@@ -211,9 +211,9 @@ same(
   "The Siebert Family",
 );
 same("filed under the surname", plan.households[0].sort_name, "Siebert");
-same("the address is the family's", plan.households[0].address_line1, "4 Mule Deer Ln");
-same("so is the town", plan.households[0].city, "Plains");
-same("the landline is the family's", plan.households[0].phone, "(406) 826-1234");
+same("the address is the family's", plan.households[0].address_line1, "18 Sycamore Lane");
+same("so is the town", plan.households[0].city, "Fairhaven");
+same("the landline is the family's", plan.households[0].phone, "(216) 555-0142");
 same("and so is the anniversary", plan.households[0].anniversary, "1999-07-24");
 
 const [jason, maggie, ezra] = plan.people;
@@ -222,7 +222,7 @@ same("the married one beside them is the spouse", maggie.household_role, "spouse
 same("and the child is a child", ezra.household_role, "child");
 same("a nickname is kept as the name they go by", maggie.preferred_name, "Maggie");
 same("a first name that is also the nickname is not repeated", jason.preferred_name, null);
-same("the mobile wins over the landline", jason.phone, "(307) 286-6959");
+same("the mobile wins over the landline", jason.phone, "(216) 555-0188");
 same("the birthday comes across", jason.date_of_birth, "1978-03-02");
 same(
   "a background check keeps both of its dates",
@@ -293,8 +293,8 @@ const withNewChild = await readSheet(
       Child: "1",
       "Household ID": "25700387",
       "Household Name": "Siebert Household",
-      "Home Address Street Line 1": "4 Mule Deer Ln",
-      "Home Address Zip Code": "59859",
+      "Home Address Street Line 1": "18 Sycamore Lane",
+      "Home Address Zip Code": "44092",
     }),
   ]),
 );
@@ -348,19 +348,19 @@ const loose = await readSheet(
       "First Name": "Ada",
       "Last Name": "Bell",
       "Home Address Street Line 1": "12 Vine St",
-      "Home Address Zip Code": "59859",
+      "Home Address Zip Code": "44092",
     }),
     row({
       "First Name": "Clara",
       "Last Name": "Bell",
       "Home Address Street Line 1": "12 Vine St",
-      "Home Address Zip Code": "59859",
+      "Home Address Zip Code": "44092",
     }),
     row({
       "First Name": "Dora",
       "Last Name": "Bell",
       "Home Address Street Line 1": "88 Far Rd",
-      "Home Address Zip Code": "59859",
+      "Home Address Zip Code": "44092",
     }),
   ]),
 );

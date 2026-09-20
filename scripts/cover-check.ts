@@ -22,9 +22,9 @@ const household: HouseholdRow = {
   sort_name: "Johnston",
   address_line1: "412 Cedar Lane",
   address_line2: null,
-  city: "Plains",
-  state: "MT",
-  postal_code: "59859",
+  city: "Fairhaven",
+  state: "OH",
+  postal_code: "44092",
   country: null,
   phone: null,
   email: null,
@@ -46,16 +46,17 @@ const data: DirectoryData = {
 const metrics = await pdfMetrics("serif");
 
 const LONG =
-  "To be a God-glorifying, Spirit-filled community of believers, discipling one another and impacting the world for Christ, in this valley and beyond, through worship, teaching, fellowship, service and the faithful proclamation of the gospel to every generation entrusted to us.";
+  "To worship together, serve our community and welcome everyone who comes through our doors, in this town and beyond, through teaching, fellowship, service and the steady care of every family and every generation entrusted to us, in every season of their lives.";
 
 const cases: [string, Partial<ProjectSettings>][] = [
   [
     "everything",
     {
-      churchName: "Plains Alliance Church",
+      churchName: "Fairhaven Community Church",
       coverTitle: "2026 Spring Directory",
-      coverStatement: "OUR VISION\nTo be a God-glorifying, Spirit-filled community of believers.",
-      coverContact: "505 West 5th Street\nPlains, MT 59859\n406.826.3916",
+      coverStatement:
+        "OUR MISSION\nTo worship together, serve our community, and welcome everyone.",
+      coverContact: "123 Main Street\nFairhaven, OH 44092\n(216) 555-0142",
       coverPhotoPath: "a.jpg",
       coverLogoPath: "b.jpg",
     },
@@ -64,20 +65,20 @@ const cases: [string, Partial<ProjectSettings>][] = [
   [
     "no photo, no logo",
     {
-      churchName: "Plains Alliance Church",
+      churchName: "Fairhaven Community Church",
       coverTitle: "2026 Spring Directory",
-      coverStatement: "OUR VISION\nTo be a God-glorifying community.",
-      coverContact: "505 West 5th Street\nPlains, MT 59859",
+      coverStatement: "OUR MISSION\nTo worship together.",
+      coverContact: "123 Main Street\nFairhaven, OH 44092",
     },
   ],
   ["photo but nothing else", { churchName: "", coverTitle: "", coverPhotoPath: "a.jpg" }],
   [
     "a very long statement",
     {
-      churchName: "Plains Alliance Church",
+      churchName: "Fairhaven Community Church",
       coverTitle: "2026 Spring Directory",
       coverStatement: LONG,
-      coverContact: "505 West 5th Street\nPlains, MT 59859\n406.826.3916\noffice@cmaplains.org",
+      coverContact: "123 Main Street\nFairhaven, OH 44092\n(216) 555-0142\noffice@example.org",
       coverPhotoPath: "a.jpg",
       coverLogoPath: "b.jpg",
     },
@@ -85,9 +86,9 @@ const cases: [string, Partial<ProjectSettings>][] = [
   [
     "a very long church name",
     {
-      churchName: "The Christian and Missionary Alliance Church of Plains, Montana",
+      churchName: "The Fairhaven Community Church of Northfield Valley, Ohio",
       coverTitle: "2026 Spring Directory",
-      coverContact: "Plains, MT 59859",
+      coverContact: "Fairhaven, OH 44092",
     },
   ],
   [
@@ -95,13 +96,13 @@ const cases: [string, Partial<ProjectSettings>][] = [
     // else, which is what squeezed the picture flat.
     "a short title with everything else",
     {
-      churchName: "Plains Alliance Church",
-      coverTitle: "Yo",
+      churchName: "Fairhaven Community Church",
+      coverTitle: "2026",
       coverSubtitle: "2026 Spring Directory",
       coverStatement:
-        "OUR VISION...\nTo be a God-glorifying, Spirit-filled community of believers, discipling one another & impacting the world for Christ.",
+        "OUR MISSION...\nTo worship together, serve our community and welcome everyone who comes through our doors, in this town and beyond.",
       coverContact:
-        "505 West 5th Street\nP.O. Box 368\nPlains, MT 59859\n406.826.3916\noffice@cmaplains.org",
+        "123 Main Street\nPO Box 100\nFairhaven, OH 44092\n(216) 555-0142\noffice@example.org",
       coverPhotoPath: "a.jpg",
       coverLogoPath: "b.jpg",
     },
@@ -110,10 +111,10 @@ const cases: [string, Partial<ProjectSettings>][] = [
     "one column",
     {
       columns: 1,
-      churchName: "Plains Alliance Church",
+      churchName: "Fairhaven Community Church",
       coverTitle: "2026 Spring Directory",
       coverPhotoPath: "a.jpg",
-      coverContact: "505 West 5th Street\nPlains, MT 59859",
+      coverContact: "123 Main Street\nFairhaven, OH 44092",
     },
   ],
 ];
@@ -216,10 +217,10 @@ for (const [name, overrides] of cases) {
 
 const arranged: ProjectSettings = {
   ...DEFAULT_SETTINGS,
-  churchName: "Plains Alliance Church",
+  churchName: "Fairhaven Community Church",
   coverTitle: "2026 Spring Directory",
-  coverStatement: "OUR VISION...\nTo be a God-glorifying, Spirit-filled community of believers.",
-  coverContact: "505 West 5th Street\nPlains, MT 59859\n406.826.3916",
+  coverStatement: "OUR MISSION...\nTo worship together, serve our community, and welcome everyone.",
+  coverContact: "123 Main Street\nFairhaven, OH 44092\n(216) 555-0142",
   coverPhotoPath: "a.jpg",
   coverLogoPath: "b.jpg",
 };

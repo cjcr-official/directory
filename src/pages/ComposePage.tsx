@@ -324,7 +324,7 @@ export function ComposePage() {
               id="subject"
               type="text"
               value={subject}
-              placeholder="Choir practice moved to Thursday"
+              placeholder="Choir practice has moved to Thursday"
               onChange={(event) => setSubject(event.target.value)}
             />
           </Field>
@@ -335,7 +335,7 @@ export function ComposePage() {
                 id="from_name"
                 type="text"
                 value={fromName}
-                placeholder="The Alliance Church Office"
+                placeholder="Fairhaven Community Church Office"
                 onChange={(event) => setFromName(event.target.value)}
               />
             </Field>
@@ -369,7 +369,7 @@ export function ComposePage() {
               rows={10}
               value={body}
               placeholder={
-                "Dear friends,\n\nPractice has moved to Thursday at 7pm.\n\nThank you,\nThe Office"
+                "Dear friends,\n\nChoir practice has moved to Thursday at 7pm.\n\nWith thanks,\nThe church office"
               }
               onChange={(event) => setBody(event.target.value)}
             />

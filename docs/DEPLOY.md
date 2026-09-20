@@ -63,7 +63,7 @@ inside the browser bundle, so anybody with a stolen password can reach the API
 without ever seeing a screen — and this file has the database refuse every row
 to a session that has not been through the code. It changes nothing for an
 account that has not set one up, so it can be run long before anybody uses it.
-If it fails with _relation auth.mfa\_factors does not exist_, the project
+If it fails with _relation auth.mfa_factors does not exist_, the project
 predates multi-factor authentication in Supabase; nothing is half-applied, and
 the app carries on without the second step.
 
