@@ -564,7 +564,7 @@ export function FamilyEditPage() {
                       type="text"
                       maxLength={24}
                       disabled={!canEdit}
-                      placeholder={`e.g. ${suggestedLabel}, Tim & Sue, Elm St`}
+                      placeholder={`e.g. ${suggestedLabel}, Maria & Sam, Elm Street`}
                       value={form.office_label ?? ""}
                       onChange={(event) => patch({ office_label: event.target.value || null })}
                     />

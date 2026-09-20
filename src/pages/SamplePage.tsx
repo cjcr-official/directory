@@ -50,14 +50,14 @@ export function SamplePage({ tags = false }: { tags?: boolean }) {
         const settings = normalizeSettings({
           ...DEFAULT_SETTINGS,
           churchName: "Fairhaven Community Church",
-          coverSubtitle: "Sample — not real people",
+          coverSubtitle: "Sample edition — invented records",
           footerText: "Sample directory",
           showBirthdays: true,
           showAnniversary: true,
           // Only the tag sheet reads these, and only the sample sets them: a
           // tag with nothing under the name would show half of what the styles
           // can do.
-          tagLine: "We are glad you are here",
+          tagLine: "You are welcome here",
           tagAccent: "#2f6d63",
         });
 

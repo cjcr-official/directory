@@ -561,10 +561,10 @@ async function main() {
     };
 
     const full = coverOf({
-      churchName: "Plains Alliance Church",
+      churchName: "Fairhaven Community Church",
       coverTitle: "2026 Spring Directory",
-      coverStatement: "OUR VISION…\nTo be a God-glorifying, Spirit-filled community.",
-      coverContact: "505 West 5th Street\nP.O. Box 368\nPlains, MT 59859",
+      coverStatement: "OUR VISION…\nTo worship together and serve our community.",
+      coverContact: "123 Main Street\nPO Box 100\nFairhaven, OH 44092",
       coverPhotoPath: "covers/photo.jpg",
       coverLogoPath: "covers/logo.jpg",
     });
@@ -574,12 +574,12 @@ async function main() {
     // out rather than hard-coding one particular way of spelling it.
     const squash = (value: string) => value.replace(/\s+/g, "");
     ok(
-      squash(text).includes(squash("PLAINS ALLIANCE CHURCH")),
+      squash(text).includes(squash("FAIRHAVEN COMMUNITY CHURCH")),
       "the church name is not on the cover",
     );
     ok(text.includes("2026 Spring Directory"), "the title is not on the cover");
     ok(text.includes("OUR VISION…"), "the statement is not on the cover");
-    ok(text.includes("P.O. Box 368"), "the contact block is not on the cover");
+    ok(text.includes("PO Box 100"), "the contact block is not on the cover");
     ok(
       full.page.photos.length === 2,
       `the cover carries ${full.page.photos.length} pictures, not 2`,
@@ -614,14 +614,17 @@ async function main() {
       full.page.runs.find((r) => squash(r.text).startsWith(squash(text)))?.y ?? NaN;
     const logo = full.page.photos.find((p) => p.path === "covers/logo.jpg");
     const shot = full.page.photos.find((p) => p.path === "covers/photo.jpg");
-    ok(!!logo && logo.box.y < at("PLAINS ALLIANCE"), "the logo is not above the church name");
-    ok(!!shot && at("PLAINS ALLIANCE") < shot.box.y, "the church name is not above the photograph");
+    ok(!!logo && logo.box.y < at("FAIRHAVEN COMMUNITY"), "the logo is not above the church name");
+    ok(
+      !!shot && at("FAIRHAVEN COMMUNITY") < shot.box.y,
+      "the church name is not above the photograph",
+    );
     ok(
       !!shot && shot.box.y + shot.box.h <= at("2026 Spring Directory") + 0.5,
       "the photograph overlaps the title",
     );
     ok(at("2026 Spring Directory") < at("OUR VISION"), "the title is not above the statement");
-    ok(at("OUR VISION") < at("505 West"), "the statement is not above the contact block");
+    ok(at("OUR VISION") < at("123 Main"), "the statement is not above the contact block");
     // The sharpest of these: the rules are page rules and the photograph is a
     // page picture, so if only one of the two is moved onto the sheet the
     // picture climbs over them. Nothing else here notices a shift of exactly
@@ -914,8 +917,8 @@ async function main() {
         label: "classic",
         over: {
           tagStyle: "classic",
-          churchName: "Plains Alliance Church",
-          tagLine: "We are a Christ-centered Acts 1:8 Family",
+          churchName: "Fairhaven Community Church",
+          tagLine: "A warm welcome to everyone who joins us",
           coverLogoPath: "covers/logo.jpg",
           tagHeadRule: true,
         },
@@ -926,8 +929,8 @@ async function main() {
         label: "masthead",
         over: {
           tagStyle: "classic",
-          churchName: "Plains Alliance Church",
-          tagLine: "We are a Christ-centered Acts 1:8 Family",
+          churchName: "Fairhaven Community Church",
+          tagLine: "A warm welcome to everyone who joins us",
           coverLogoPath: "covers/logo.jpg",
           tagHeadingPt: 18,
           tagLogoSize: "large",
@@ -937,8 +940,8 @@ async function main() {
         label: "banner",
         over: {
           tagStyle: "banner",
-          churchName: "Plains Alliance Church",
-          tagLine: "We are a Christ-centered Acts 1:8 Family",
+          churchName: "Fairhaven Community Church",
+          tagLine: "A warm welcome to everyone who joins us",
           coverLogoPath: "covers/logo.jpg",
           tagLogoSize: "large",
           tagAccent: "#7b2430",
@@ -946,7 +949,7 @@ async function main() {
       },
       {
         label: "plain",
-        over: { tagStyle: "plain", churchName: "Plains Alliance Church", tagLogoSize: "none" },
+        over: { tagStyle: "plain", churchName: "Fairhaven Community Church", tagLogoSize: "none" },
       },
       {
         label: "mixed faces",
@@ -964,8 +967,8 @@ async function main() {
         label: "name held down",
         over: {
           tagStyle: "classic",
-          churchName: "Plains Alliance Church",
-          tagLine: "We are a Christ-centered Acts 1:8 Family",
+          churchName: "Fairhaven Community Church",
+          tagLine: "A warm welcome to everyone who joins us",
           coverLogoPath: "covers/logo.jpg",
           tagNamePt: 30,
         },
@@ -1059,8 +1062,8 @@ async function main() {
     const longSettings = normalizeSettings({
       ...DEFAULT_SETTINGS,
       tagSize: "avery5395",
-      churchName: "Plains Alliance Church",
-      tagLine: "We are a Christ-centered Acts 1:8 Family",
+      churchName: "Fairhaven Community Church",
+      tagLine: "A warm welcome to everyone who joins us",
       coverLogoPath: "covers/logo.jpg",
     });
     const long = composeTags(
@@ -1225,8 +1228,8 @@ async function main() {
           ...DEFAULT_SETTINGS,
           tagStyle: "banner",
           tagAccent: accent,
-          churchName: "Plains Alliance Church",
-          tagLine: "We are a Christ-centered Acts 1:8 Family",
+          churchName: "Fairhaven Community Church",
+          tagLine: "A warm welcome to everyone who joins us",
         }),
         metrics,
       );

@@ -41,10 +41,10 @@ async function main() {
     // renderer never fetched, artwork left off the sheet - fails here rather
     // than at the printer.
     coverStatement:
-      "OUR VISION\nTo be a God-glorifying, Spirit-filled community of believers, " +
-      "discipling one another & impacting the world for Christ.",
+      "OUR MISSION\nTo worship together, serve our community and welcome everyone " +
+      "who comes through our doors.",
     coverContact:
-      "505 West 5th Street\nP.O. Box 368\nFairhaven, MT 59859\n406.555.0100\noffice@example.org",
+      "123 Main Street\nPO Box 100\nFairhaven, OH 44092\n(216) 555-0142\noffice@example.org",
     coverPhotoPath: "covers/building.jpg",
     coverLogoPath: "covers/logo.jpg",
     footerText: "Please keep this directory for church use only.",
@@ -54,7 +54,7 @@ async function main() {
     // with every piece of furniture on it: a mark, a heading, a coloured band
     // and a line underneath.
     tagStyle: "banner",
-    tagLine: "We are glad you are here",
+    tagLine: "You are welcome here",
     tagAccent: "#7b2430",
     tagSmallFont: "serif",
   });

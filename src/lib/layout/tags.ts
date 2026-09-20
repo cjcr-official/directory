@@ -372,10 +372,10 @@ function fitName(
 /**
  * Small print, shrunk to fit on one line rather than cut short.
  *
- * "We are a Christ-centered Acts 1:8 Family" is forty characters across a tag
- * two and a third inches wide. An ellipsis in the middle of a congregation's
- * own words is worse than half a point smaller, so it shrinks first and is only
- * cut when it has run out of shrinking.
+ * "A warm welcome to everyone who joins us" is thirty-nine characters across a
+ * tag two and a third inches wide. An ellipsis in the middle of a
+ * congregation's own words is worse than half a point smaller, so it shrinks
+ * first and is only cut when it has run out of shrinking.
  */
 function fitOneLine(
   text: string,
