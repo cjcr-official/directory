@@ -382,17 +382,24 @@ export function TagsEditPage() {
     setSaving(true);
     setError(null);
     try {
-      // Upload before deleting, never the other way round: this runs on a phone
-      // on church wifi, and removing first would mean a failed upload took the
-      // existing logo with it.
+      /*
+       * Upload before deleting, and delete after writing the row - never any
+       * other way round. This runs on a phone on church wifi, so removing
+       * first meant a failed upload took the existing logo with it; and the
+       * write below is allowed to fail by design, because a stale write is an
+       * outcome this screen has a whole button for, so removing before it meant
+       * a conflict destroyed the logo and left the directory pointing at it.
+       */
       const current = safeSettings.coverLogoPath;
       let coverLogoPath = current;
+      /** The artwork this save orphans, once there is nothing pointing at it. */
+      let discard: string | null = null;
       if (logoBlob) {
         coverLogoPath = await uploadPhoto("covers", logoBlob);
-        if (current) await removePhoto(current);
+        if (current) discard = current;
       } else if (logoRemoved && current) {
-        await removePhoto(current);
         coverLogoPath = "";
+        discard = current;
       }
 
       const saved = { ...safeSettings, coverLogoPath };
@@ -401,6 +408,8 @@ export function TagsEditPage() {
         { settings: saved as unknown as Record<string, unknown> },
         force ? null : openedAt,
       );
+
+      if (discard) await removePhoto(discard);
 
       setSettings(saved);
       setLogoBlob(null);

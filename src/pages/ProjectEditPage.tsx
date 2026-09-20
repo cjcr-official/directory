@@ -521,18 +521,24 @@ export function ProjectEditPage() {
     setSaving(true);
     setError(null);
     try {
-      // Upload before deleting, never the other way round: this runs on a
-      // phone on church wifi, and removing first would mean a failed upload
-      // took the existing artwork with it.
+      /*
+       * Upload before deleting, and delete after writing the row - never any
+       * other way round. This runs on a phone on church wifi, so removing
+       * first meant a failed upload took the existing artwork with it; and the
+       * write below is allowed to fail by design, because a stale write is an
+       * outcome this screen has a whole button for, so removing before it meant
+       * a conflict destroyed the cover and left the directory pointing at it.
+       */
+      const discard: string[] = [];
       const settle = async (current: string, blob: Blob | null | undefined, gone?: boolean) => {
         if (blob) {
           const replaced = gone ? "" : current;
           const path = await uploadPhoto("covers", blob);
-          if (replaced) await removePhoto(replaced);
+          if (replaced) discard.push(replaced);
           return path;
         }
         if (gone && current) {
-          await removePhoto(current);
+          discard.push(current);
           return "";
         }
         return current;
@@ -559,6 +565,8 @@ export function ProjectEditPage() {
       const project = id
         ? await updateProject(id, payload, force ? null : openedAt)
         : await createProject(payload);
+      for (const path of discard) await removePhoto(path);
+
       await setProjectTags(project.id, mode === "tags" ? tagIds : []);
       await setProjectEntries(
         project.id,
