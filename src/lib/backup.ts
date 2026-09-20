@@ -222,6 +222,39 @@ function readme(data: DirectoryData, photoCount: number, when: Date): string {
   ].join("\n");
 }
 
+/**
+ * How many photographs are fetched at once.
+ *
+ * They were fetched one at a time, and a directory of two hundred faces is
+ * then two hundred round trips end to end - minutes of them, on the church
+ * wifi this is actually run on, for a button the README asks somebody to press
+ * once a month and again before every print run. Six is the budget a browser
+ * already keeps for one host and sits well inside the storage API's rate
+ * limit, and it turns the wait into one a person will sit through.
+ */
+const PHOTO_AT_A_TIME = 6;
+
+/**
+ * Runs `work` over every item with at most `limit` of them in flight.
+ *
+ * Each worker takes the next index that nobody has taken. Results go wherever
+ * `work` puts them - nothing here collects them - because the caller wants
+ * them back in the order it asked, not the order they arrived.
+ */
+async function inParallel<T>(
+  items: T[],
+  limit: number,
+  work: (item: T, index: number) => Promise<void>,
+): Promise<void> {
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    for (let index = next++; index < items.length; index = next++) {
+      await work(items[index], index);
+    }
+  });
+  await Promise.all(workers);
+}
+
 export async function buildBackup(options: BackupOptions): Promise<BackupResult> {
   const { data, includePhotos, onProgress, signal } = options;
   const when = new Date();
@@ -255,12 +288,23 @@ export async function buildBackup(options: BackupOptions): Promise<BackupResult>
   const entries: ZipEntry[] = [];
 
   if (includePhotos) {
-    for (const path of photoPaths) {
-      if (signal?.aborted) throw new Error("Backup cancelled.");
-      const bytes = await downloadPhoto(path);
+    if (signal?.aborted) throw new Error("Backup cancelled.");
+
+    const fetched = new Array<Uint8Array | null>(photoPaths.length).fill(null);
+    await inParallel(photoPaths, PHOTO_AT_A_TIME, async (path, index) => {
+      if (signal?.aborted) return;
+      fetched[index] = await downloadPhoto(path);
+      step(`Photographs (${done - 1} of ${photoPaths.length})`);
+    });
+    if (signal?.aborted) throw new Error("Backup cancelled.");
+
+    // Filed in the order they were asked for rather than the order they came
+    // back, so the archive holds the same photographs in the same places
+    // however the fetches happened to interleave.
+    for (const [index, path] of photoPaths.entries()) {
+      const bytes = fetched[index];
       if (bytes) entries.push({ name: `photos/${path}`, data: bytes });
       else missingPhotos.push(path);
-      step(`Photographs (${done - 1} of ${photoPaths.length})`);
     }
   }
 

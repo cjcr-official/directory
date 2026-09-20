@@ -21,20 +21,28 @@ function Stat({ value, label, to }: { value: number | string; label: string; to?
   );
 }
 
-/** The next handful of birthdays, wrapping around the end of the year. */
-function upcoming(people: PersonRow[], field: "date_of_birth" | "anniversary", limit = 6) {
+/**
+ * The next handful of birthdays, wrapping around the end of the year.
+ *
+ * Birthdays only. It used to take the field to read as an argument, but the
+ * only caller has always asked for birthdays and the table below prints
+ * `date_of_birth` whatever was passed - so asking for anniversaries would have
+ * ordered by one date and printed the other.
+ */
+function upcoming(people: PersonRow[], limit = 6): PersonRow[] {
   const today = new Date();
   const cursor = (today.getMonth() + 1) * 100 + today.getDate();
 
   return people
-    .filter((person) => person[field])
-    .map((person) => ({ person, order: monthDayOrder(person[field]) }))
+    .filter((person) => person.date_of_birth)
+    .map((person) => ({ person, order: monthDayOrder(person.date_of_birth) }))
     .sort((a, b) => {
       const aKey = a.order >= cursor ? a.order : a.order + 10000;
       const bKey = b.order >= cursor ? b.order : b.order + 10000;
       return aKey - bKey;
     })
-    .slice(0, limit);
+    .slice(0, limit)
+    .map(({ person }) => person);
 }
 
 export function OverviewPage() {
@@ -43,20 +51,27 @@ export function OverviewPage() {
 
   if (loading && !people.length) return <LoadingScreen label="Loading the directory…" />;
 
-  const individuals = people.filter((person) => !person.household_id);
-
   // Counted off the entries the book is actually built from, not off the raw
   // tables. households and people here are every row, archived and inactive
   // included, so the old sentence promised families that will not print and
   // missed a member of an archived family who now prints on their own - three
   // numbers that did not add up to each other.
   const printedFamilies = entries.filter((entry) => entry.type === "household").length;
-  const printedIndividuals = entries.length - printedFamilies;
   const withoutPhoto = entries.filter((entry) =>
     entry.type === "household" ? !entry.household.photo_path : !entry.person.photo_path,
   ).length;
 
-  const birthdays = upcoming(people, "date_of_birth");
+  // And for the same reason, the card below is the entries that print alone
+  // rather than the rows with no household_id. The two are not the same set in
+  // either direction: an archived person has no household and prints nothing,
+  // while a member of an archived family has one and prints on their own.
+  const individuals = entries.flatMap((entry) => (entry.type === "person" ? [entry.person] : []));
+
+  // Everyone the book carries, however it carries them. Reading every row here
+  // put an archived person's birthday on the front page and set the nudge below
+  // off over a card that is not printed.
+  const printed = people.filter((person) => person.is_active);
+  const birthdays = upcoming(printed);
 
   return (
     <div className="page">
@@ -65,7 +80,7 @@ export function OverviewPage() {
           <h1>Good to see you, {profile?.full_name?.split(" ")[0] || "friend"}</h1>
           <div className="sub">
             {entries.length} records will print in the directory — {printedFamilies} families and{" "}
-            {printedIndividuals} individuals.
+            {individuals.length} individuals.
           </div>
         </div>
         {canEdit ? (
@@ -120,7 +135,7 @@ export function OverviewPage() {
                 {birthdays.length ? (
                   <table>
                     <tbody>
-                      {birthdays.map(({ person }) => (
+                      {birthdays.map((person) => (
                         <tr key={person.id}>
                           <td>
                             <Link className="list-link" to={`/people/${person.id}`}>
@@ -158,7 +173,7 @@ export function OverviewPage() {
                   <p className="small">Every record has a photo. The book will look great.</p>
                 )}
 
-                {people.some((person) => !person.phone && !person.email) ? (
+                {printed.some((person) => !person.phone && !person.email) ? (
                   <p className="small">
                     Some people have neither a phone number nor an email address. A record with no
                     way to reach anyone still prints, but it is worth a check.

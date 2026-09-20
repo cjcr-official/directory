@@ -679,8 +679,15 @@ export function PersonEditPage() {
                 label="Delete person"
                 confirmLabel="Delete permanently"
                 onConfirm={async () => {
-                  await removePhoto(existing.photo_path);
+                  // The row first, the picture second. removePhoto does not
+                  // report a storage failure and the delete below can fail for
+                  // several ordinary reasons, so doing it the other way round
+                  // destroyed the photograph and then left the record pointing
+                  // at it. An orphaned file in the bucket costs nothing and
+                  // nobody sees it; a record whose photograph has silently gone
+                  // is the loss this order avoids.
                   await deletePerson(existing.id);
+                  await removePhoto(existing.photo_path);
                   await reload();
                   navigate("/people");
                 }}

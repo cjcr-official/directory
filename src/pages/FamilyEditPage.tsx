@@ -315,7 +315,25 @@ export function FamilyEditPage() {
       await setPersonHousehold(person.id, null, null, 0);
     }
 
+    /*
+     * Only the members whose place in the family actually moved.
+     *
+     * This wrote every member on every save, which cost a round trip each -
+     * sequentially, on a phone on church wifi - to change nothing. It also cost
+     * the truth: people.updated_at and updated_by are set by a trigger on any
+     * update at all, so correcting the family's telephone number stamped your
+     * name and the time onto everyone in it, and each of their records then
+     * said you had just changed them.
+     */
+    const was = new Map(before.map((person) => [person.id, person]));
     for (const [order, member] of members.entries()) {
+      const previous = was.get(member.id);
+      const unmoved =
+        previous &&
+        previous.household_id === household.id &&
+        previous.household_role === member.role &&
+        previous.sort_order === order;
+      if (unmoved) continue;
       await setPersonHousehold(member.id, household.id, member.role, order);
     }
 
@@ -849,8 +867,15 @@ export function FamilyEditPage() {
                 label="Delete family"
                 confirmLabel="Delete permanently"
                 onConfirm={async () => {
-                  await removePhoto(existing.photo_path);
+                  // The row first, the picture second. removePhoto does not
+                  // report a storage failure and the delete below can fail for
+                  // several ordinary reasons, so doing it the other way round
+                  // destroyed the photograph and then left the record pointing
+                  // at it. An orphaned file in the bucket costs nothing and
+                  // nobody sees it; a record whose photograph has silently gone
+                  // is the loss this order avoids.
                   await deleteHousehold(existing.id);
+                  await removePhoto(existing.photo_path);
                   await reload();
                   navigate("/families");
                 }}
