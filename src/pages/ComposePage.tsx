@@ -369,7 +369,7 @@ export function ComposePage() {
               rows={10}
               value={body}
               placeholder={
-                "Dear friends,\n\nChoir practice has moved to Thursday at 7pm.\n\nWith thanks,\nThe church office"
+                "Dear friends,\n\nPractice has moved to Thursday at 7pm.\n\nWith thanks,\nThe church office"
               }
               onChange={(event) => setBody(event.target.value)}
             />
