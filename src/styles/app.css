@@ -466,6 +466,26 @@ p:last-child {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  /*
+   * No screen may take the whole app sideways with it.
+   *
+   * Nothing here is meant to be wider than the phone it is read on, and the
+   * two things that legitimately are - a table of ten columns, a sheet at page
+   * size - carry their own scroll (.table-scroll, .sheet-frame) so the gesture
+   * belongs to them. Anything else that overruns is a bug, and until this rule
+   * it took the whole page with it. The top bar is sticky at phone width,
+   * which pins it up and down and not side to side: measured at 393px, a page
+   * scrolled 200px right put the top bar's left edge at -200 and the menu
+   * button at -192, off the screen entirely.
+   *
+   * clip rather than hidden. Both contain it, and the top bar is a sibling of
+   * this box rather than a child, so its stickiness survives either - that was
+   * measured too, rather than assumed. clip earns it by not making this a
+   * scroll container at all: nothing inside a page is sticky today, and this
+   * way nothing has to stay that way, and no scrollIntoView within a page
+   * starts scrolling a box instead of the window.
+   */
+  overflow-x: clip;
 }
 
 /* --- what's new -----------------------------------------------------------
@@ -5198,11 +5218,25 @@ body.moving-a-part {
 }
 
 .audience-bar select {
-  /* Takes the room the label leaves rather than the full width a field would:
-     it is a line, not a form. */
-  flex: 1 1 auto;
+  /*
+   * Takes the room the label leaves rather than the full width a field would:
+   * it is a line, not a form.
+   *
+   * Sized from the room going spare - `flex-basis: 0` - and not from its own
+   * content. Every other select in the app offers words this app wrote, a
+   * handful of characters each; this one offers whatever the audience is
+   * called in somebody's Mailchimp account, with its contact count after it.
+   * "Case Johnston Computer Repair - The Alliance - 3 contacts" is not a width
+   * this row can be asked to be, and a basis of auto invites the browser to
+   * ask for it.
+   */
+  flex: 1 1 0;
   min-width: 0;
   max-width: 34rem;
+  /* So the name that does not fit ends in an ellipsis rather than mid-letter. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .audience-bar .notice,
