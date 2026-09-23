@@ -4801,6 +4801,65 @@ body.moving-a-part {
 }
 
 /*
+ * A panel page that uses the whole screen: Settings.
+ *
+ * Two panels capped at 1336px and ending at their content left a desk monitor
+ * mostly empty - at 1920x1080 the pair stopped 280px short of the right edge
+ * and 600px short of the bottom. On a page this sparse there is nothing the
+ * room is being saved for, so the pair takes all of it: the full width, and
+ * the full height down to the page's own margin.
+ *
+ * The row loses the pair's width cap, and the page's own 1800px cap goes with
+ * it (.wide), so a 2560 screen is filled as well. What the cap was protecting
+ * was the length of a line of text, so that protection moves inside the
+ * panels instead: what a panel says stops at a readable measure however wide
+ * the panel is, and the panel around it still reaches the edge.
+ */
+.panel-page.fill-screen .grid.panels {
+  max-width: none;
+}
+.panel-page.fill-screen .card-body > * {
+  max-width: 80ch;
+}
+
+/*
+ * And down to the bottom of the window, on a desk.
+ *
+ * Laid out rather than calculated: the page fills the main column's height,
+ * the row of panels takes whatever the head leaves, and the panels stretch to
+ * the row. So the bottom edges sit one page margin above the bottom of the
+ * window whatever the head wraps to - a sum of the furniture's heights, the
+ * way the other panel pages cap theirs, is right only while nothing wraps.
+ *
+ * The page is exactly the window's height, and the row's track may shrink
+ * below its content (minmax(0, 1fr)), so a panel that holds more than fits -
+ * the three enrolment steps and a QR code on a short laptop - scrolls inside
+ * itself, the way the panel rules above arrange, rather than growing the
+ * page. The bottom margin matches the top one, so the panels sit in the
+ * window evenly rather than on a 64px shelf.
+ *
+ * Desk only, like every panel rule above: a touch screen keeps panels at their
+ * own heights in a page that scrolls.
+ */
+@media (min-width: 1160px) and (min-height: 620px) and (pointer: fine) {
+  .panel-page.fill-screen {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    padding-bottom: 26px;
+  }
+  .panel-page.fill-screen > .grid.panels {
+    flex: 1;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .panel-page.fill-screen .panels > .card {
+    max-height: none;
+  }
+}
+
+/*
  * How far along a backup, a restore or an import is.
  *
  * There was no rule for this at all: the markup has been in all three panels

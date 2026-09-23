@@ -368,7 +368,7 @@ function TwoStep() {
  */
 export function SettingsPage() {
   return (
-    <div className="page panel-page">
+    <div className="page wide panel-page fill-screen">
       <div className="page-head">
         <div className="grow">
           <h1>Settings</h1>
