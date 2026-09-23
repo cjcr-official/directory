@@ -143,7 +143,11 @@ export function FamiliesPage() {
                     }}
                   >
                     <td>
-                      <Avatar path={household.photo_path} initials={household.sort_name} />
+                      <Avatar
+                        path={household.photo_path}
+                        fit={household.photo_fit}
+                        initials={household.sort_name}
+                      />
                     </td>
                     <td>
                       <Link className="list-link" to={`/families/${household.id}`}>

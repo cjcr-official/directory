@@ -1963,7 +1963,7 @@ th.num {
   height: 99px;
 }
 /* A photograph set to print whole, letterboxed the way the page will have it. */
-.avatar.lg.whole {
+.avatar.whole {
   object-fit: contain;
 }
 .photo-fit {

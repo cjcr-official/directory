@@ -14,6 +14,7 @@ import {
   formatPhone,
   formatShortDate,
   labelledHouseholdName,
+  personPhotoFit,
   personPhotoPath,
   sortKey,
 } from "@/lib/format";
@@ -447,6 +448,7 @@ export function PeoplePage() {
                     <td>
                       <Avatar
                         path={personPhotoPath(person, household)}
+                        fit={personPhotoFit(person, household)}
                         initials={`${person.first_name[0] ?? ""}${person.last_name[0] ?? ""}`}
                       />
                     </td>

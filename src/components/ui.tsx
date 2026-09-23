@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { getPhotoUrl } from "@/lib/photos";
 import { describeChange, message } from "@/lib/format";
+import type { PhotoFit } from "@/lib/database.types";
 
 export function LoadingScreen({ label = "Loading…" }: { label?: string }) {
   return (
@@ -245,11 +246,14 @@ export function Avatar({
   initials,
   size = "sm",
   alt = "",
+  fit,
 }: {
   path: string | null | undefined;
   initials: string;
   size?: "sm" | "lg";
   alt?: string;
+  /** "fit" shows the whole photograph, as the book will print it. */
+  fit?: PhotoFit | null;
 }) {
   const [url, setUrl] = useState<string | null>(null);
 
@@ -272,7 +276,8 @@ export function Avatar({
   }, [path]);
 
   const className = `avatar${size === "lg" ? " lg" : ""}`;
-  if (url) return <img className={className} src={url} alt={alt} />;
+  if (url)
+    return <img className={`${className}${fit === "fit" ? " whole" : ""}`} src={url} alt={alt} />;
   return (
     <span className={className} aria-hidden={!alt}>
       {initials.slice(0, 2).toUpperCase()}
