@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { LoginPage } from "@/auth/LoginPage";
@@ -24,8 +25,20 @@ import { ProjectEditPage } from "@/pages/ProjectEditPage";
 import { ProjectPreviewPage } from "@/pages/ProjectPreviewPage";
 import { TagsEditPage } from "@/pages/TagsEditPage";
 import { AdministratorsPage } from "@/pages/AdministratorsPage";
-import { BackupPage } from "@/pages/BackupPage";
 import { SettingsPage } from "@/pages/SettingsPage";
+
+/**
+ * The backup screen is fetched when it is opened, not on the first visit.
+ *
+ * It carries the ZIP writer and reader, the CSVs, the restore planner and the
+ * Planning Center import - a screen visited once a month, and the one thing
+ * that took the first load over its budget. If a deploy has replaced the chunk
+ * since this page loaded, the error boundary around every screen recognises
+ * the failed import and reloads onto the new build.
+ */
+const BackupPage = lazy(() =>
+  import("@/pages/BackupPage").then((module) => ({ default: module.BackupPage })),
+);
 
 /**
  * The floor under the whole app.
@@ -131,7 +144,14 @@ function Protected() {
             <Route path="projects/new" element={<ProjectEditPage />} />
             <Route path="projects/:id" element={<ProjectEditPage />} />
             <Route path="settings" element={<SettingsPage />} />
-            <Route path="backup" element={<BackupPage />} />
+            <Route
+              path="backup"
+              element={
+                <Suspense fallback={<LoadingScreen label="Opening backups…" />}>
+                  <BackupPage />
+                </Suspense>
+              }
+            />
             <Route path="administrators" element={<AdministratorsPage />} />
           </Route>
           {/* Full-bleed, outside the shell: the preview needs the whole window. */}
