@@ -4,10 +4,9 @@ import { useDirectory } from "@/data/DirectoryContext";
 import { useAuth } from "@/auth/AuthProvider";
 import { Caret, ConfirmButton, EmptyState, Field, LoadingScreen, Notice } from "@/components/ui";
 import { createTag, deleteTag, updateTag } from "@/lib/queries";
-import { resolveEntries } from "@/lib/projectEntries";
 import { fileAsName, firstName, labelledHouseholdName, message, sortKey } from "@/lib/format";
 import type { HouseholdRow, PersonRow, TagRow } from "@/lib/database.types";
-import type { DirectoryEntry } from "@/lib/entries";
+import type { DirectoryEntry, HouseholdWithMembers } from "@/lib/entries";
 
 const PALETTE = [
   "#2f6d63",
@@ -22,43 +21,44 @@ const PALETTE = [
 ];
 
 type GroupRow =
-  { person: PersonRow; household: HouseholdRow | null } | { person: null; household: HouseholdRow };
+  | { person: PersonRow; household: HouseholdRow | null }
+  | { person: null; household: HouseholdWithMembers };
 
 /**
- * Everyone in a group, one person to a line.
+ * Who is in a group: the people ticked into it, one to a line.
  *
- * Worked out by the function the booklets use, asked the way a list of people
- * asks it, and then a family put in as a whole is opened up into its members:
- * "who is in Attenders" is answered with names, not with five families to open
- * one at a time. Each person is listed once however they came to be in it, in
- * the order the book files them. A family with nobody on its card yet has no
- * one to list, so it stays as itself rather than vanishing.
+ * Only people who carry the group themselves. Listing everyone who lives with
+ * them put a wife, a husband and three children under "Deacons" because one of
+ * them is a deacon. Filed by surname, the way the book files them.
+ *
+ * A family ticked into the group as a whole - on the family's own page rather
+ * than a person's - is not one of those people, and is listed after them as
+ * the family it is. Saying so is the whole point: it is why a family can turn
+ * up in a group's booklet when nobody in it is ticked, and the line links to
+ * where that tick can be taken off.
  */
 function peopleIn(entries: DirectoryEntry[], tagId: string): GroupRow[] {
-  const resolved = resolveEntries(entries, {
-    mode: "tags",
-    tagIds: [tagId],
-    entries: [],
-    wholeFamily: false,
-  });
-  const seen = new Set<string>();
-  const rows: GroupRow[] = [];
-  const add = (person: PersonRow, household: HouseholdRow | null) => {
-    if (seen.has(person.id)) return;
-    seen.add(person.id);
-    rows.push({ person, household });
-  };
-  for (const entry of resolved) {
-    if (entry.type === "person") add(entry.person, entry.person.household);
-    else if (entry.household.members.length)
-      for (const member of entry.household.members) add(member, entry.household);
-    else rows.push({ person: null, household: entry.household });
+  const people: GroupRow[] = [];
+  const families: GroupRow[] = [];
+  for (const entry of entries) {
+    if (entry.type === "person") {
+      if (entry.person.tags.some((tag) => tag.id === tagId))
+        people.push({ person: entry.person, household: entry.person.household });
+      continue;
+    }
+    const household = entry.household;
+    for (const member of household.members) {
+      if ((household.memberTags[member.id] ?? []).some((tag) => tag.id === tagId))
+        people.push({ person: member, household });
+    }
+    if (household.tags.some((tag) => tag.id === tagId)) families.push({ person: null, household });
   }
   const key = (row: GroupRow) =>
     row.person
       ? sortKey(row.person.last_name, firstName(row.person))
       : sortKey(row.household.sort_name);
-  return rows.sort((a, b) => key(a).localeCompare(key(b)));
+  const byKey = (x: GroupRow, y: GroupRow) => key(x).localeCompare(key(y));
+  return [...people.sort(byKey), ...families.sort(byKey)];
 }
 
 /**
@@ -126,10 +126,10 @@ export function GroupsPage() {
   const [draftColor, setDraftColor] = useState(PALETTE[0]);
   const [renaming, setRenaming] = useState(false);
 
-  /** How many people each group holds, counted the way the list below lists them. */
+  /** Who each group holds, counted the way the list below lists them. */
   const counts = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const tag of tags) map.set(tag.id, peopleIn(entries, tag.id).length);
+    const map = new Map<string, GroupRow[]>();
+    for (const tag of tags) map.set(tag.id, peopleIn(entries, tag.id));
     return map;
   }, [entries, tags]);
 
@@ -242,7 +242,9 @@ export function GroupsPage() {
           {tags.length ? (
             <ul className="group-list">
               {tags.map((tag) => {
-                const count = counts.get(tag.id) ?? 0;
+                const rows = counts.get(tag.id) ?? [];
+                const count = rows.filter((row) => row.person).length;
+                const families = rows.length - count;
                 const open = openId === tag.id;
                 const panelId = `group-people-${tag.id}`;
                 return (
@@ -266,6 +268,11 @@ export function GroupsPage() {
 
                       <span className="group-count">
                         {count === 0 ? "Nobody" : count === 1 ? "1 person" : `${count} people`}
+                        {families === 1
+                          ? ", 1 family"
+                          : families > 1
+                            ? `, ${families} families`
+                            : ""}
                       </span>
 
                       {canEdit ? (
@@ -321,7 +328,10 @@ export function GroupsPage() {
                                     {labelledHouseholdName(row.household)}
                                   </Link>
                                   <span className="group-member-who">
-                                    Nobody is on this family&rsquo;s card yet
+                                    The whole family is in this group
+                                    {row.household.members.length
+                                      ? ` — ${row.household.members.map(firstName).join(", ")}`
+                                      : ""}
                                   </span>
                                 </li>
                               ),
