@@ -4,7 +4,6 @@ import { useDirectory } from "@/data/DirectoryContext";
 import { useAuth } from "@/auth/AuthProvider";
 import { AddressFields } from "@/components/AddressFields";
 import { PhotoInput } from "@/components/PhotoInput";
-import { TagPicker } from "@/components/TagPicker";
 import {
   Avatar,
   ChangedNote,
@@ -22,7 +21,6 @@ import {
   createHousehold,
   deleteHousehold,
   setPersonHousehold,
-  setTags,
   updateHousehold,
   updatePerson,
 } from "@/lib/queries";
@@ -79,18 +77,8 @@ export function FamilyEditPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { canEdit } = useAuth();
-  const {
-    households,
-    householdById,
-    people,
-    personById,
-    membersOf,
-    tags,
-    tagsOfHousehold,
-    authorName,
-    reload,
-    loading,
-  } = useDirectory();
+  const { households, householdById, people, personById, membersOf, authorName, reload, loading } =
+    useDirectory();
 
   const existing = id ? householdById.get(id) : undefined;
   const isNew = !id;
@@ -98,7 +86,6 @@ export function FamilyEditPage() {
   const [form, setForm] = useState(BLANK);
   const [members, setMembers] = useState<MemberLink[]>([]);
   const [memberQuery, setMemberQuery] = useState("");
-  const [tagIds, setTagIds] = useState<string[]>([]);
   const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
   const [photoRemoved, setPhotoRemoved] = useState(false);
   const [nameTouched, setNameTouched] = useState(false);
@@ -130,7 +117,6 @@ export function FamilyEditPage() {
         role: person.household_role ?? "other",
       })),
     );
-    setTagIds(tagsOfHousehold(existing.id));
     setNameTouched(true);
     setOpenedAt(existing.updated_at);
     setStale(false);
@@ -291,8 +277,6 @@ export function FamilyEditPage() {
       ? await updateHousehold(existing.id, payload, force ? null : openedAt)
       : await createHousehold(payload);
     setOpenedAt(household.updated_at);
-
-    await setTags("household", household.id, tagIds);
 
     // Anyone who was in the family and no longer is. Their record survives -
     // they simply print on their own from now on.
@@ -659,21 +643,13 @@ export function FamilyEditPage() {
                 />
               </Field>
 
-              <fieldset>
-                <legend>Groups</legend>
-                <TagPicker
-                  tags={tags}
-                  selected={tagIds}
-                  disabled={!canEdit}
-                  allowCreate={canEdit}
-                  onCreated={reload}
-                  onChange={setTagIds}
-                />
-                <p className="hint" style={{ marginTop: 8 }}>
-                  Groups are how you build a smaller directory later — tag the choir once, then
-                  print a choir booklet in two clicks.
-                </p>
-              </fieldset>
+              {/* Groups belong to people, not families: a family is in the
+                  choir booklet because somebody in it is in the choir. So
+                  there is no picker here, only where to find one. */}
+              <p className="hint">
+                Groups are set on each person, not on the family. Open a member below to put them in
+                a group.
+              </p>
 
               <div className="form-decision">
                 <Checkbox

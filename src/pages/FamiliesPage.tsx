@@ -2,19 +2,17 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useDirectory } from "@/data/DirectoryContext";
 import { useAuth } from "@/auth/AuthProvider";
-import { Avatar, EmptyState, LoadingScreen, Notice, TagDots } from "@/components/ui";
+import { Avatar, EmptyState, LoadingScreen, Notice } from "@/components/ui";
 import { addressLines, alphaBucket, firstName, formatPhone, sortKey } from "@/lib/format";
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 export function FamiliesPage() {
-  const { households, tags, membersOf, tagsOfHousehold, loading, error } = useDirectory();
+  const { households, membersOf, loading, error } = useDirectory();
   const { canEdit } = useAuth();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [letter, setLetter] = useState<string | null>(null);
-
-  const tagsById = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags]);
 
   // Names carried by more than one family. Both cards would be headed the same
   // way in the printed book, which is worth spotting from the list rather than
@@ -124,7 +122,6 @@ export function FamiliesPage() {
                 <th>Members</th>
                 <th className="hide-sm">Address</th>
                 <th className="hide-sm">Phone</th>
-                <th className="hide-sm">Groups</th>
               </tr>
             </thead>
             <tbody>
@@ -176,13 +173,6 @@ export function FamiliesPage() {
                     <td className="small muted hide-sm">{address[0] ?? "—"}</td>
                     <td className="small muted nowrap hide-sm">
                       {formatPhone(household.phone) || "—"}
-                    </td>
-                    <td className="hide-sm">
-                      <TagDots
-                        tags={tagsOfHousehold(household.id).flatMap(
-                          (tagId) => tagsById.get(tagId) ?? [],
-                        )}
-                      />
                     </td>
                   </tr>
                 );

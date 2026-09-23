@@ -148,8 +148,12 @@ console.log("\nthe family a booklet prints, and the one person an email is for")
   same("nobody is left unreachable", roster.unreachable, []);
 }
 
-console.log("\na family put in a group as a family");
+console.log("\na family ticked into a group, and the people in it who are");
 {
+  // Groups belong to people. The Bakers were ticked into the newsletter as a
+  // family, before families stopped having groups; nobody in the family is on
+  // it, so the family is not written to. Bob, Cass, Col and Dee are on it
+  // themselves, and are reached however each of them can be.
   const data: DirectoryData = {
     households: [
       household({
@@ -158,23 +162,28 @@ console.log("\na family put in a group as a family");
         display_name: "The Baker Family",
         email: "bakers@example.org",
       }),
-      household({ id: "h3", sort_name: "Carter", display_name: "The Carter Family" }),
+      household({
+        id: "h3",
+        sort_name: "Carter",
+        display_name: "The Carter Family",
+        email: "carters@example.org",
+      }),
       household({ id: "h4", sort_name: "Diaz", display_name: "The Diaz Family" }),
+      household({
+        id: "h5",
+        sort_name: "Ellis",
+        display_name: "The Ellis Family",
+        email: "ellis@example.org",
+      }),
     ],
     people: [
-      person({
-        id: "bob",
-        first_name: "Bob",
-        last_name: "Baker",
-        household_id: "h2",
-        household_role: "head",
-      }),
       person({
         id: "bea",
         first_name: "Bea",
         last_name: "Baker",
         household_id: "h2",
-        household_role: "spouse",
+        household_role: "head",
+        email: "bea@example.org",
       }),
       person({
         id: "cass",
@@ -182,7 +191,6 @@ console.log("\na family put in a group as a family");
         last_name: "Carter",
         household_id: "h3",
         household_role: "head",
-        email: "cass@example.org",
       }),
       person({
         id: "col",
@@ -199,49 +207,59 @@ console.log("\na family put in a group as a family");
         household_id: "h4",
         household_role: "head",
       }),
+      person({
+        id: "eve",
+        first_name: "Eve",
+        last_name: "Ellis",
+        household_id: "h5",
+        household_role: "head",
+      }),
     ],
     tags: [NEWS],
-    householdTags: [
-      { household_id: "h2", tag_id: NEWS.id },
-      { household_id: "h3", tag_id: NEWS.id },
-      { household_id: "h4", tag_id: NEWS.id },
+    householdTags: [{ household_id: "h2", tag_id: NEWS.id }],
+    personTags: [
+      { person_id: "cass", tag_id: NEWS.id },
+      { person_id: "col", tag_id: NEWS.id },
+      { person_id: "dee", tag_id: NEWS.id },
+      { person_id: "eve", tag_id: NEWS.id },
     ],
-    personTags: [],
   };
 
   const roster = rosterFor(buildEntries(data), NEWS.id);
   same(
-    "the family with its own address is written to once",
-    roster.recipients.filter((r) => r.email === "bakers@example.org").length,
-    1,
+    "a family ticked in as a whole, with nobody in it on the list, is not written to",
+    roster.recipients.filter((r) => r.email.startsWith("bea") || r.email.startsWith("bakers")),
+    [],
   );
   same(
-    "under the family's name",
-    roster.recipients.find((r) => r.email === "bakers@example.org")?.label,
-    "The Baker Family",
+    "somebody with no address of their own is reached at the family's",
+    roster.recipients.find((r) => r.email === "carters@example.org")?.via,
+    "household",
   );
   same(
-    "but greeted as the head of the household",
-    roster.recipients.find((r) => r.email === "bakers@example.org")?.firstName,
-    "Bob",
+    "and greeted as themselves",
+    roster.recipients.find((r) => r.email === "carters@example.org")?.firstName,
+    "Cass",
   );
   same(
-    "a family with no address of its own is reached through its members",
-    roster.recipients
-      .filter((r) => r.email.endsWith("@example.org") && r.label.startsWith("Carter"))
-      .map((r) => r.email)
-      .sort(),
-    ["cass@example.org", "col@example.org"],
+    "somebody with an address of their own is reached there",
+    roster.recipients.find((r) => r.email === "col@example.org")?.via,
+    "person",
   );
   same(
-    "and one with no address anywhere is named as unreachable",
+    "a family address is used for the person in the group, not the family",
+    roster.recipients.find((r) => r.email === "ellis@example.org")?.label,
+    "Ellis, Eve",
+  );
+  same(
+    "and somebody with no address anywhere is named as unreachable",
     roster.unreachable.map((one) => one.name),
-    ["The Diaz Family"],
+    ["Dee Diaz"],
   );
   same(
     "carrying the id of the record to go and fix",
     roster.unreachable.map((one) => `${one.type}:${one.id}`),
-    ["household:h4"],
+    ["person:dee"],
   );
 }
 
@@ -1010,17 +1028,15 @@ console.log("\nthe segment a multi-group send is aimed at");
 console.log("\na family in one group holding somebody from another");
 {
   /*
-   * The case that made the first multi-group union wrong, and which every
-   * check written for it missed because they all used person tags.
+   * The case that once made a multi-group union wrong: a family holding
+   * somebody from each of two groups. Choir alone reached the chorister, and
+   * Deacons alone reached the deacon, but the two together once reached only
+   * one of them.
    *
-   * resolveEntries, asked for both tags at once, returns a household whole
-   * when the household itself carries a wanted tag and splits it into members
-   * otherwise. So the deacon household came back as a family and Xan - a
-   * chorister living in it, picked deliberately by whoever ticked Choir - was
-   * never emitted at all. Each group alone reached him or the family; the two
-   * together reached only the family.
-   *
-   * The rule this holds: the union can never be smaller than either group.
+   * Groups belong to people now, so both are people in the group - Val, a
+   * deacon with no address of her own, and her son Xan in the choir - and the
+   * rule this holds is the same: the union can never be smaller than either
+   * group.
    */
   const DEACONS = {
     id: "t-dea",
@@ -1040,6 +1056,13 @@ console.log("\na family in one group holding somebody from another");
     ],
     people: [
       person({
+        id: "val",
+        first_name: "Val",
+        last_name: "Vance",
+        household_id: "h1",
+        household_role: "head",
+      }),
+      person({
         id: "xan",
         first_name: "Xan",
         last_name: "Vance",
@@ -1049,8 +1072,11 @@ console.log("\na family in one group holding somebody from another");
       }),
     ],
     tags: [CHOIR, DEACONS],
-    householdTags: [{ household_id: "h1", tag_id: DEACONS.id }],
-    personTags: [{ person_id: "xan", tag_id: CHOIR.id }],
+    householdTags: [],
+    personTags: [
+      { person_id: "val", tag_id: DEACONS.id },
+      { person_id: "xan", tag_id: CHOIR.id },
+    ],
   };
 
   const entries = buildEntries(data);
@@ -1059,7 +1085,7 @@ console.log("\na family in one group holding somebody from another");
   const both = rosterFor(entries, [CHOIR.id, DEACONS.id]).recipients.map((one) => one.email);
 
   same("the chorister is reached through his own address", choir, ["xan@example.org"]);
-  same("the deacon household through the family's", deacons, ["family@example.org"]);
+  same("the deacon through the family's", deacons, ["family@example.org"]);
   same("and both groups together reach both", both.slice().sort(), [
     "family@example.org",
     "xan@example.org",

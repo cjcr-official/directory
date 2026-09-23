@@ -89,7 +89,7 @@ export const FAMILY_COLUMNS: Column<HouseholdRow>[] = [
   { header: "Home phone", column: "phone", value: (row) => formatPhone(row.phone) },
   { header: "Family email", column: "email", value: (row) => row.email },
   { header: "Anniversary", column: "anniversary", value: (row) => row.anniversary },
-  { header: "Groups", value: (row, lookups) => lookups.groups(row.id) },
+  // No Groups column: groups belong to people, and are in people.csv.
   { header: "Notes", column: "notes", value: (row) => row.notes },
   // Office-only, and in the spreadsheet for the same reason it is in the
   // JSON: a backup that cannot rebuild what was on screen is not a backup.
@@ -189,7 +189,7 @@ function sheet<Row>(columns: Column<Row>[], rows: Row[], lookups: Lookups): stri
 
 export function familiesCsv(data: DirectoryData): string {
   return sheet(FAMILY_COLUMNS, data.households, {
-    groups: groupLookup(data.tags, linksBy(data.householdTags, "household_id")),
+    groups: () => "",
     familyName: () => "",
   });
 }

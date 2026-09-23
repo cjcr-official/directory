@@ -202,9 +202,10 @@ export function buildDemoData(householdCount = 34, individualCount = 9, seed = 2
       updated_at: stamp,
     });
 
-    if (chance(0.45)) {
-      householdTags.push({ household_id: householdId, tag_id: pick(tags).id });
-    }
+    // Drawn here, where the family's group used to be, so every other
+    // invented detail comes out as it always has. Groups belong to people, so
+    // it goes on the head of the family once there is one.
+    const headGroup = chance(0.45) ? pick(tags).id : null;
 
     const head: PersonRow = blankPerson(nextPersonId(), stamp);
     head.household_id = householdId;
@@ -216,6 +217,7 @@ export function buildDemoData(householdCount = 34, individualCount = 9, seed = 2
     head.date_of_birth = date(birthYear(1948, 1992));
     head.sort_order = 0;
     people.push(head);
+    if (headGroup) personTags.push({ person_id: head.id, tag_id: headGroup });
 
     const hasSpouse = chance(0.78);
     if (hasSpouse) {

@@ -27,8 +27,9 @@ type GroupRow = { person: PersonRow; household: HouseholdRow | null };
  *
  * Only people who carry the group themselves. Listing everyone who lives with
  * them put a wife, a husband and three children under "Deacons" because one of
- * them is a deacon, and a family ticked in as a whole is not a person anybody
- * ticked. Filed by surname, the way the book files them.
+ * them is a deacon. Groups belong to people, so a family is never in one
+ * except through somebody in it. Filed by surname, the way the book files
+ * them.
  */
 function peopleIn(entries: DirectoryEntry[], tagId: string): GroupRow[] {
   const people: GroupRow[] = [];
@@ -208,8 +209,8 @@ export function GroupsPage() {
         <div className="grow">
           <h1>Groups</h1>
           <div className="sub">
-            Labels you can attach to a family or a person — choir, youth group, a committee, an
-            event. Tagging one member pulls their whole family into a booklet.
+            Labels you put on people — choir, youth group, a committee, an event. A booklet can
+            print just the people in a group, or the whole family of anyone in it.
           </div>
         </div>
       </div>

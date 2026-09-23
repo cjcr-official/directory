@@ -701,7 +701,9 @@ async function main() {
         blankPerson({ id: "p6", first_name: "Ruth", last_name: "Kemp" }),
       ],
       tags: [tag("t1", "Deacons"), tag("t2", "Choir")],
-      // The Jones family is in the group as a family, not through anybody.
+      // The Jones family was ticked into the group as a family, before
+      // families stopped having groups. Nobody in it is a deacon, so it is in
+      // no deacons' booklet of either kind.
       householdTags: [{ household_id: "h2", tag_id: "t1" }],
       personTags: [
         { person_id: "p1", tag_id: "t1" },
@@ -720,7 +722,7 @@ async function main() {
     const families = pick({});
     ok(
       JSON.stringify(ids(families)) ===
-        JSON.stringify(["household:h3", "household:h2", "person:p6", "household:h1"]),
+        JSON.stringify(["household:h3", "person:p6", "household:h1"]),
       `whole families: got ${ids(families).join(", ")}`,
     );
     ok(
@@ -728,13 +730,12 @@ async function main() {
       "saying whole families out loud changed the answer",
     );
 
-    // The people themselves: the two deacons, the family that is in the group
-    // on its own account, and the deacon who belongs to no family. Filed under
-    // their own names, so Zimmer comes last rather than under Alvarez.
+    // The people themselves: the two deacons in families and the deacon who
+    // belongs to no family. Filed under their own names, so Zimmer comes last
+    // rather than under Alvarez.
     const people = pick({ wholeFamily: false });
     ok(
-      JSON.stringify(ids(people)) ===
-        JSON.stringify(["household:h2", "person:p6", "person:p1", "person:p4"]),
+      JSON.stringify(ids(people)) === JSON.stringify(["person:p6", "person:p1", "person:p4"]),
       `people only: got ${ids(people).join(", ")}`,
     );
 
@@ -819,7 +820,10 @@ async function main() {
     ok(printed.includes("Smith, John"), "the deacon is not in his own booklet");
     ok(!printed.includes("Mary"), "a wife printed in a booklet of the people in the group");
     ok(!printed.includes("Isaac"), "somebody in another group printed");
-    ok(printed.includes("The Jones Family"), "a family in the group on its own account stopped");
+    ok(
+      !printed.includes("Jones"),
+      "a family ticked into the group as a whole still printed - groups belong to people",
+    );
     ok(
       drawn(composeBook(pick({}), settings, metrics))
         .join("\n")

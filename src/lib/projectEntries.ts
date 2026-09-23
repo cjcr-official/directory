@@ -62,15 +62,12 @@ export function resolveEntries(all: DirectoryEntry[], selection: Selection): Dir
     const matched = all.filter((entry) => entry.tagIds.some((tagId) => wanted.has(tagId)));
     if (selection.wholeFamily !== false) return matched;
 
-    // Asked for the people in the group rather than their families. A family
-    // that is in the group itself still prints as a family - somebody put the
-    // household in, not one of the people who live there - so only the
-    // families pulled in on a member's behalf come apart.
-    const split = matched.flatMap((entry) => {
-      if (entry.type === "person") return [entry];
-      if (entry.household.tags.some((tag) => wanted.has(tag.id))) return [entry];
-      return membersInGroups(entry, wanted);
-    });
+    // Asked for the people in the group rather than their families. Groups
+    // belong to people, so every family here is here on a member's behalf,
+    // and comes apart into the members who are in the group.
+    const split = matched.flatMap((entry) =>
+      entry.type === "person" ? [entry] : membersInGroups(entry, wanted),
+    );
     // Sorted again rather than filtered in place: a wife keeping her own
     // surname, or a family filed under a name none of its members carry, files
     // somewhere else entirely once it is her record rather than the family's.

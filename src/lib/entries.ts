@@ -3,14 +3,13 @@ import { fileAsName, firstName, sortKey } from "./format";
 
 export interface HouseholdWithMembers extends HouseholdRow {
   members: PersonRow[];
-  tags: TagRow[];
   /**
    * Each member's own groups, by person id, for the members who have any.
    *
-   * The entry's tagIds are the family's groups and its members' rolled into
-   * one, which answers "is this family in the choir booklet at all". This
-   * answers the other question - which of them is actually in the choir - and
-   * that is what a booklet printing people rather than families needs.
+   * The entry's tagIds are its members' groups rolled into one, which answers
+   * "is this family in the choir booklet at all". This answers the other
+   * question - which of them is actually in the choir - and that is what a
+   * booklet printing people rather than families needs.
    */
   memberTags: Record<string, TagRow[]>;
 }
@@ -31,7 +30,7 @@ export type DirectoryEntry =
       id: string;
       sortKey: string;
       title: string;
-      /** Household tags plus every member's tags - what tag selection matches on. */
+      /** Every member's groups - what tag selection matches on. */
       tagIds: string[];
       household: HouseholdWithMembers;
     }
@@ -114,15 +113,6 @@ export function sortMembers(members: PersonRow[]): PersonRow[] {
 export function buildEntries(data: DirectoryData, includeInactive = false): DirectoryEntry[] {
   const tagsById = new Map(data.tags.map((tag) => [tag.id, tag]));
 
-  const tagsForHousehold = new Map<string, TagRow[]>();
-  for (const link of data.householdTags) {
-    const tag = tagsById.get(link.tag_id);
-    if (!tag) continue;
-    const list = tagsForHousehold.get(link.household_id) ?? [];
-    list.push(tag);
-    tagsForHousehold.set(link.household_id, list);
-  }
-
   const tagsForPerson = new Map<string, TagRow[]>();
   for (const link of data.personTags) {
     const tag = tagsById.get(link.tag_id);
@@ -152,12 +142,17 @@ export function buildEntries(data: DirectoryData, includeInactive = false): Dire
 
   for (const household of printedHouseholds) {
     const members = sortMembers(membersByHousehold.get(household.id) ?? []);
-    const householdTags = tagsForHousehold.get(household.id) ?? [];
-    const tagIds = new Set(householdTags.map((tag) => tag.id));
-    // Tagging one chorister should pull their whole family into the choir
-    // booklet, so a member's tags count towards the household. Whose tag it
-    // was is kept as well: a booklet can be asked for the choristers
-    // themselves rather than their families, and then it matters.
+    // Groups belong to people, not families. A family is in a group only
+    // through the people in it: tagging one chorister pulls their whole
+    // family into a choir booklet printed by family, so a member's groups
+    // count towards the household. Whose group it was is kept as well: a
+    // booklet can be asked for the choristers themselves rather than their
+    // families, and then it matters.
+    //
+    // Groups ticked on a family as a whole, before families stopped having
+    // them, are still in household_tags - nothing was deleted, and a backup
+    // still carries them - but they no longer put anybody in anything.
+    const tagIds = new Set<string>();
     const memberTags: Record<string, TagRow[]> = {};
     for (const member of members) {
       const theirs = tagsForPerson.get(member.id) ?? [];
@@ -172,7 +167,7 @@ export function buildEntries(data: DirectoryData, includeInactive = false): Dire
       sortKey: sortKey(household.sort_name, members[0] ? firstName(members[0]) : ""),
       title: household.display_name,
       tagIds: [...tagIds],
-      household: { ...household, members, tags: householdTags, memberTags },
+      household: { ...household, members, memberTags },
     });
   }
 
