@@ -16,6 +16,7 @@
 
 import "./invariants";
 import "./restore-check";
+import "./backup-coverage-check";
 import "./import-check";
 import "./batch-check";
 import "./mailchimp-check";

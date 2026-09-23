@@ -51,9 +51,9 @@ npm run checks
 npm run bundle:check
 ```
 
-`checks` is the layout invariants, the restore decisions, request batching,
-name matching and colour contrast — all pure, all fast, none of them needing a
-database or a browser.
+`checks` is the layout invariants, the restore decisions, backup coverage,
+request batching, name matching and colour contrast — all pure, all fast, none
+of them needing a database or a browser.
 
 Prettier is not advisory - `format:check` fails the build, and it also fails
 the deploy.
@@ -80,3 +80,39 @@ So when a change needs one, print the whole of the SQL in the reply, in plain
 text, in the order it has to run, as well as committing the file. Do not link
 to it, summarise it or say which file it is in: paste it, and say what stays
 broken until it has been run. Every time.
+
+## A change to the data is a change to the backup
+
+Whenever a change adds, removes or renames a table or a column, saves
+photographs somewhere new, or adds a directory setting that points at
+artwork, update the backup in the same pull request. Don't leave it for later
+or wait to be asked. A backup that quietly misses the new thing is found out
+on the day a restore is needed, which is the worst possible day.
+
+`npm run backup:check`, part of `checks`, reads the migrations and fails
+until each new table, column, photo folder and artwork setting is covered or
+is written down in `src/lib/backupSpec.ts` as left out on purpose. Passing it
+is the minimum. The work is:
+
+- **A new table of directory data:** add it to `DIRECTORY_TABLES`. Read it
+  into `directory.json` in `src/lib/backup.ts`, read it back in
+  `src/lib/restorePlan.ts`, decide in `selectRows` what "add back what is
+  missing" does with it, write it in `src/lib/restore.ts`, and add it to
+  `replace_directory` in a new migration. A table that isn't directory data
+  goes in `OUTSIDE_BACKUP` with the reason.
+- **A new column on families or people:** add it to `FAMILY_COLUMNS` or
+  `PERSON_COLUMNS` so it's in the spreadsheet, or to `NOT_IN_SPREADSHEET`
+  with the reason. `directory.json` and the restore pick it up by themselves,
+  but give it a readable name in `FIELD_NAMES` in `restorePlan.ts` so the
+  list of edited records says what changed.
+- **A column on any other directory table:** check that restore and
+  `replace_directory` still write it. They copy whole rows, so they usually
+  do.
+- **A new place photographs are saved:** add the folder to `PHOTO_FOLDERS` in
+  `src/lib/photoFolders.ts`. A new setting that points at artwork goes in
+  `COVER_PATH_KEYS`.
+- **A new migration:** it goes in the list in `scripts/test-rls.sh` and the two
+  lists in `README.md` and `docs/DEPLOY.md`.
+
+Then add restore checks in `scripts/restore-check.ts` for the new data coming
+back, and say in the pull request what the backup now covers.
