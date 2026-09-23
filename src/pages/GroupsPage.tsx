@@ -5,8 +5,9 @@ import { useAuth } from "@/auth/AuthProvider";
 import { Caret, ConfirmButton, EmptyState, Field, LoadingScreen, Notice } from "@/components/ui";
 import { createTag, deleteTag, updateTag } from "@/lib/queries";
 import { resolveEntries } from "@/lib/projectEntries";
-import { fileAsName, firstName, join, labelledHouseholdName, message } from "@/lib/format";
-import type { TagRow } from "@/lib/database.types";
+import { fileAsName, firstName, labelledHouseholdName, message, sortKey } from "@/lib/format";
+import type { HouseholdRow, PersonRow, TagRow } from "@/lib/database.types";
+import type { DirectoryEntry } from "@/lib/entries";
 
 const PALETTE = [
   "#2f6d63",
@@ -19,6 +20,46 @@ const PALETTE = [
   "#4b5c8a",
   "#8a4b4b",
 ];
+
+type GroupRow =
+  { person: PersonRow; household: HouseholdRow | null } | { person: null; household: HouseholdRow };
+
+/**
+ * Everyone in a group, one person to a line.
+ *
+ * Worked out by the function the booklets use, asked the way a list of people
+ * asks it, and then a family put in as a whole is opened up into its members:
+ * "who is in Attenders" is answered with names, not with five families to open
+ * one at a time. Each person is listed once however they came to be in it, in
+ * the order the book files them. A family with nobody on its card yet has no
+ * one to list, so it stays as itself rather than vanishing.
+ */
+function peopleIn(entries: DirectoryEntry[], tagId: string): GroupRow[] {
+  const resolved = resolveEntries(entries, {
+    mode: "tags",
+    tagIds: [tagId],
+    entries: [],
+    wholeFamily: false,
+  });
+  const seen = new Set<string>();
+  const rows: GroupRow[] = [];
+  const add = (person: PersonRow, household: HouseholdRow | null) => {
+    if (seen.has(person.id)) return;
+    seen.add(person.id);
+    rows.push({ person, household });
+  };
+  for (const entry of resolved) {
+    if (entry.type === "person") add(entry.person, entry.person.household);
+    else if (entry.household.members.length)
+      for (const member of entry.household.members) add(member, entry.household);
+    else rows.push({ person: null, household: entry.household });
+  }
+  const key = (row: GroupRow) =>
+    row.person
+      ? sortKey(row.person.last_name, firstName(row.person))
+      : sortKey(row.household.sort_name);
+  return rows.sort((a, b) => key(a).localeCompare(key(b)));
+}
 
 /**
  * The colours a group is usually given, and a well for any other.
@@ -85,37 +126,15 @@ export function GroupsPage() {
   const [draftColor, setDraftColor] = useState(PALETTE[0]);
   const [renaming, setRenaming] = useState(false);
 
-  /** How many printable records each group would pull in. */
+  /** How many people each group holds, counted the way the list below lists them. */
   const counts = useMemo(() => {
     const map = new Map<string, number>();
-    for (const entry of entries) {
-      for (const tagId of entry.tagIds) map.set(tagId, (map.get(tagId) ?? 0) + 1);
-    }
+    for (const tag of tags) map.set(tag.id, peopleIn(entries, tag.id).length);
     return map;
-  }, [entries]);
+  }, [entries, tags]);
 
-  /**
-   * Who is in the group that is open.
-   *
-   * Worked out by the function the booklets already use, asked the way a list
-   * of people rather than of families asks it: a family that carries the group
-   * itself stays one record, because somebody put the household in, and a
-   * family pulled in on a member's behalf comes apart into the members who are
-   * actually in it. So this answers "who is in the choir" with exactly the
-   * names a choir booklet would print, rather than with a second opinion.
-   */
-  const inGroup = useMemo(
-    () =>
-      openId
-        ? resolveEntries(entries, {
-            mode: "tags",
-            tagIds: [openId],
-            entries: [],
-            wholeFamily: false,
-          })
-        : [],
-    [entries, openId],
-  );
+  /** Who is in the group that is open, one person to a line - see peopleIn. */
+  const inGroup = useMemo(() => (openId ? peopleIn(entries, openId) : []), [entries, openId]);
 
   if (loading && !tags.length) return <LoadingScreen label="Loading groups…" />;
 
@@ -246,7 +265,7 @@ export function GroupsPage() {
                       </button>
 
                       <span className="group-count">
-                        {count === 0 ? "No records" : count === 1 ? "1 record" : `${count} records`}
+                        {count === 0 ? "Nobody" : count === 1 ? "1 person" : `${count} people`}
                       </span>
 
                       {canEdit ? (
@@ -278,36 +297,31 @@ export function GroupsPage() {
                       <div className="group-members" id={panelId}>
                         {inGroup.length ? (
                           <ul className="group-member-list">
-                            {inGroup.map((entry) =>
-                              entry.type === "household" ? (
-                                <li key={`household:${entry.id}`} className="group-member">
+                            {inGroup.map((row) =>
+                              row.person ? (
+                                <li key={row.person.id} className="group-member">
                                   <Link
                                     className="list-link group-member-name"
-                                    to={`/families/${entry.id}`}
+                                    to={`/people/${row.person.id}`}
                                   >
-                                    {labelledHouseholdName(entry.household)}
+                                    {fileAsName(row.person)}
                                   </Link>
                                   <span className="group-member-who">
-                                    {entry.household.members.length
-                                      ? `The whole family — ${join(
-                                          entry.household.members.map(firstName),
-                                          ", ",
-                                        )}`
-                                      : "The whole family — nobody is on its card yet"}
+                                    {row.household
+                                      ? labelledHouseholdName(row.household)
+                                      : "On their own"}
                                   </span>
                                 </li>
                               ) : (
-                                <li key={`person:${entry.id}`} className="group-member">
+                                <li key={row.household.id} className="group-member">
                                   <Link
                                     className="list-link group-member-name"
-                                    to={`/people/${entry.id}`}
+                                    to={`/families/${row.household.id}`}
                                   >
-                                    {fileAsName(entry.person)}
+                                    {labelledHouseholdName(row.household)}
                                   </Link>
                                   <span className="group-member-who">
-                                    {entry.person.household
-                                      ? labelledHouseholdName(entry.person.household)
-                                      : "On their own"}
+                                    Nobody is on this family&rsquo;s card yet
                                   </span>
                                 </li>
                               ),
