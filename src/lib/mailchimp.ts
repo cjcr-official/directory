@@ -1,5 +1,5 @@
 import { resolveEntries } from "./projectEntries";
-import { fileAsName, firstName, fullName, labelledHouseholdName } from "./format";
+import { fileAsName, firstName, fullName } from "./format";
 import type { DirectoryEntry } from "./entries";
 
 /**
@@ -113,13 +113,12 @@ export function rosterFor(entries: DirectoryEntry[], tagId: string | string[]): 
  * the same work twice.
  *
  * Merging rosters, rather than asking resolveEntries for all the tags at once,
- * is also the only thing that gives the right answer. With wholeFamily false
- * it returns a household whole when the household itself carries a wanted tag
- * and splits it into members otherwise - so a deacon household containing a
- * chorister comes back as the family, and the chorister's own address is never
- * emitted. Choir alone reached him, Deacons alone reached the family, and the
- * two together reached only the family: somebody the office had deliberately
- * picked got nothing, and the count said one where it meant two.
+ * is also what keeps the union honest. When families could carry groups of
+ * their own, asking for both at once returned a deacon household whole and
+ * never emitted the chorister living in it: Choir alone reached him, Deacons
+ * alone reached the family, and the two together reached only the family.
+ * Groups belong to people now, but a union built from each group's own
+ * answer cannot be smaller than any of them however the resolving changes.
  */
 export function mergeRosters(rosters: readonly Roster[]): Roster {
   // One roster is already the answer, and handing it straight back keeps the
@@ -172,62 +171,27 @@ function oneGroup(entries: DirectoryEntry[], tagId: string): Roster {
     recipients.push(recipient);
   };
 
+  // Asked for the people in the group rather than their families, so every
+  // record here is one person: groups belong to people, and a family only
+  // ever comes into a group through somebody in it.
   for (const entry of inGroup) {
-    if (entry.type === "person") {
-      const person = entry.person;
-      // Their own address first, the household's behind it - the same order
-      // the book uses for an address, and for the same reason: a person who
-      // shares the family's front door usually shares its mailbox too.
-      const email = usable(person.email) ?? usable(person.household?.email);
-      if (!email) {
-        unreachable.push({ id: person.id, type: "person", name: fullName(person) });
-        continue;
-      }
-      take({
-        email,
-        firstName: firstName(person),
-        lastName: person.last_name,
-        via: usable(person.email) ? "person" : "household",
-        label: fileAsName(person),
-      });
+    if (entry.type !== "person") continue;
+    const person = entry.person;
+    // Their own address first, the household's behind it - the same order
+    // the book uses for an address, and for the same reason: a person who
+    // shares the family's front door usually shares its mailbox too.
+    const email = usable(person.email) ?? usable(person.household?.email);
+    if (!email) {
+      unreachable.push({ id: person.id, type: "person", name: fullName(person) });
       continue;
     }
-
-    // A family in the group on its own account - somebody tagged the household,
-    // not one of the people in it - so it is written to as a family.
-    const household = entry.household;
-    const name = labelledHouseholdName(household);
-    const shared = usable(household.email);
-    if (shared) {
-      // Addressed to the head of household where there is one: a merge tag
-      // greeting "Ana" reads better than one greeting "The Alvarez Family",
-      // and the head is the first member sortMembers puts on the card.
-      const head = household.members[0];
-      take({
-        email: shared,
-        firstName: head ? firstName(head) : "",
-        lastName: head ? head.last_name : household.sort_name,
-        via: "household",
-        label: name,
-      });
-      continue;
-    }
-
-    // No address on the family, so it is reached through whoever in it has one.
-    let reached = false;
-    for (const member of household.members) {
-      const email = usable(member.email);
-      if (!email) continue;
-      reached = true;
-      take({
-        email,
-        firstName: firstName(member),
-        lastName: member.last_name,
-        via: "person",
-        label: fileAsName(member),
-      });
-    }
-    if (!reached) unreachable.push({ id: household.id, type: "household", name });
+    take({
+      email,
+      firstName: firstName(person),
+      lastName: person.last_name,
+      via: usable(person.email) ? "person" : "household",
+      label: fileAsName(person),
+    });
   }
 
   return { recipients, unreachable };

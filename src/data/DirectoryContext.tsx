@@ -28,7 +28,6 @@ interface DirectoryState {
   householdById: Map<string, HouseholdRow>;
   personById: Map<string, PersonRow>;
   membersOf(householdId: string): PersonRow[];
-  tagsOfHousehold(householdId: string): string[];
   tagsOfPerson(personId: string): string[];
   /**
    * The name behind an updated_by id, or null when there is nothing to show.
@@ -182,13 +181,6 @@ export function DirectoryProvider({ children }: { children: React.ReactNode }) {
     }
     for (const [id, list] of members) members.set(id, sortMembers(list));
 
-    const householdTagIds = new Map<string, string[]>();
-    for (const link of data.householdTags) {
-      const list = householdTagIds.get(link.household_id);
-      if (list) list.push(link.tag_id);
-      else householdTagIds.set(link.household_id, [link.tag_id]);
-    }
-
     const personTagIds = new Map<string, string[]>();
     for (const link of data.personTags) {
       const list = personTagIds.get(link.person_id);
@@ -206,7 +198,6 @@ export function DirectoryProvider({ children }: { children: React.ReactNode }) {
       householdById,
       personById,
       membersOf: (householdId: string) => members.get(householdId) ?? [],
-      tagsOfHousehold: (householdId: string) => householdTagIds.get(householdId) ?? [],
       tagsOfPerson: (personId: string) => personTagIds.get(personId) ?? [],
     };
   }, [data]);
