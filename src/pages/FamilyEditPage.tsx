@@ -32,6 +32,7 @@ import {
   fullName,
   HOUSEHOLD_ROLES,
   message,
+  personPhotoFit,
   personPhotoPath,
   sameDisplayName,
   sortKey,
@@ -705,6 +706,7 @@ export function FamilyEditPage() {
                         <li key={link.id} className="member-row">
                           <Avatar
                             path={personPhotoPath(person!, form)}
+                            fit={personPhotoFit(person!, form)}
                             initials={`${person!.first_name[0] ?? ""}${person!.last_name[0] ?? ""}`}
                           />
                           <div className="member-name">
@@ -799,6 +801,7 @@ export function FamilyEditPage() {
                               <li key={person.id} className="member-row">
                                 <Avatar
                                   path={personPhotoPath(person, current)}
+                                  fit={personPhotoFit(person, current)}
                                   initials={`${person.first_name[0] ?? ""}${person.last_name[0] ?? ""}`}
                                 />
                                 <div className="member-name">

@@ -331,6 +331,7 @@ export function PersonEditPage() {
                   <div className="photo-inherited">
                     <Avatar
                       path={household.photo_path}
+                      fit={household.photo_fit}
                       initials={household.sort_name}
                       size="lg"
                       alt=""

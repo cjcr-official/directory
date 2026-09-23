@@ -1,4 +1,4 @@
-import type { HouseholdRole, HouseholdRow, PersonRow } from "./database.types";
+import type { HouseholdRole, HouseholdRow, PersonRow, PhotoFit } from "./database.types";
 
 /** A person's place in a family, and what each one is called on screen. */
 export const HOUSEHOLD_ROLES: { value: HouseholdRole; label: string }[] = [
@@ -81,6 +81,14 @@ export function personPhotoPath(
   household: Pick<HouseholdRow, "photo_path"> | null | undefined,
 ): string | null {
   return household ? household.photo_path : person.photo_path;
+}
+
+/** How the photo personPhotoPath picked is set to sit: its owner's choice. */
+export function personPhotoFit(
+  person: Pick<PersonRow, "photo_fit">,
+  household: Pick<HouseholdRow, "photo_fit"> | null | undefined,
+): PhotoFit | null {
+  return (household ? household.photo_fit : person.photo_fit) ?? null;
 }
 
 /** The letter a record files under in an A-Z book. Anything else lands in "#". */

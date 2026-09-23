@@ -14,7 +14,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { useDirectory } from "@/data/DirectoryContext";
 import { Avatar } from "@/components/ui";
 import type { HouseholdRow, PersonRow } from "@/lib/database.types";
-import { describeWhen, fullName, personPhotoPath } from "@/lib/format";
+import { describeWhen, fullName, personPhotoFit, personPhotoPath } from "@/lib/format";
 import { checkState, describeDue, needingAttention } from "@/lib/backgroundChecks";
 import {
   addedBy,
@@ -77,6 +77,7 @@ function TrayRow({
       <Link className="tray-link" to={`/people/${person.id}`} onClick={onFollow}>
         <Avatar
           path={personPhotoPath(person, household)}
+          fit={personPhotoFit(person, household)}
           initials={`${person.first_name[0] ?? ""}${person.last_name[0] ?? ""}`}
         />
         <span className="tray-who">
