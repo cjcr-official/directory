@@ -8,6 +8,7 @@ import type { ProjectRow } from "@/lib/database.types";
 import { TAG_SIZES, normalizeSettings, paperName, recordsPerSheet } from "@/lib/layout/settings";
 import { tagsPerSheet } from "@/lib/layout/tags";
 import { message } from "@/lib/format";
+import { KIND_NAMES, directoryKinds } from "@/lib/directoryKind";
 
 const WORDS = {
   book: {
@@ -40,6 +41,10 @@ export function ProjectsPage({ tags = false }: { tags?: boolean }) {
       .then(setProjects)
       .catch((cause) => setError(message(cause)));
   }, []);
+
+  // Worked out over the whole list, because which one is the main directory
+  // is a question about all of them.
+  const kinds = useMemo(() => directoryKinds(projects ?? []), [projects]);
 
   const summary = useMemo(() => {
     const settings = normalizeSettings({});
@@ -79,7 +84,11 @@ export function ProjectsPage({ tags = false }: { tags?: boolean }) {
                 <div className="card-body">
                   <div className="row" style={{ marginBottom: 6 }}>
                     <h2 style={{ flex: 1 }}>{project.name}</h2>
-                    <span className="pill">{project.kind === "event" ? "Event" : "Main"}</span>
+                    <span
+                      className={`pill${kinds.get(project.id) === "main" ? " tone-owner" : ""}`}
+                    >
+                      {KIND_NAMES[kinds.get(project.id) ?? "group"]}
+                    </span>
                   </div>
                   {project.description ? (
                     <p className="muted small">{project.description}</p>

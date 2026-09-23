@@ -26,12 +26,13 @@ database exists.
 11. Then `supabase/migrations/0008_gender.sql`.
 12. Then `supabase/migrations/0009_background_checks.sql`.
 13. Then `supabase/migrations/0010_photo_fit.sql`.
-14. Last one: `supabase/migrations/0011_backup_safety.sql`.
+14. Then `supabase/migrations/0011_backup_safety.sql`.
+15. Last one: `supabase/migrations/0012_directory_kinds.sql`.
 
-All eleven files are safe to run twice, so if you are unsure whether one took,
+All twelve files are safe to run twice, so if you are unsure whether one took,
 run it again.
 
-An existing directory needs steps 6 to 14 too.
+An existing directory needs steps 6 to 15 too.
 
 **6.** Setting a record's groups used to be a delete and an insert sent
 separately, with a moment in between where the record had none — and a

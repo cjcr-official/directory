@@ -19,6 +19,7 @@ import {
 } from "@/lib/restorePlan";
 import { buildZip, buildZipBlob } from "@/lib/zip";
 import { toCsv } from "@/lib/csv";
+import { directoryKinds, mainDirectoryId } from "@/lib/directoryKind";
 import type { HouseholdRow, PersonRow, ProjectRow, TagRow } from "@/lib/database.types";
 import { check, same } from "./check";
 
@@ -986,4 +987,69 @@ console.log("\nthe archive as a Blob");
   const when = new Date(2026, 0, 1, 12, 0, 0);
   const blob = new Uint8Array(await buildZipBlob(entries, when).arrayBuffer());
   same("is byte for byte the same archive", [...blob], [...buildZip(entries, when)]);
+}
+
+// ---------------------------------------------------------------------------
+// One main directory (0012), and the directories saved before there was one.
+// ---------------------------------------------------------------------------
+
+console.log("\nwhich directory is the main one");
+{
+  const at = (day: string) => `2026-01-${day}T00:00:00Z`;
+  const row = (id: string, kind: ProjectRow["kind"], day: string) => ({
+    ...project(id),
+    kind,
+    created_at: at(day),
+  });
+
+  same(
+    "a directory saved as main is the main one, and old ones are groups",
+    [...directoryKinds([row("a", "directory", "01"), row("b", "main", "05")])],
+    [
+      ["a", "group"],
+      ["b", "main"],
+    ],
+  );
+  same(
+    "with none saved as main, the oldest old directory is",
+    [
+      ...directoryKinds([
+        row("b", "directory", "05"),
+        row("a", "directory", "01"),
+        row("e", "event", "02"),
+      ]),
+    ],
+    [
+      ["b", "group"],
+      ["a", "main"],
+      ["e", "event"],
+    ],
+  );
+  same(
+    "with nothing but events there is no main directory",
+    mainDirectoryId([row("e", "event", "01")]),
+    null,
+  );
+
+  // Adding back the main directory while another one is main now.
+  const file = backup({
+    projects: [{ project: row("gone", "main", "01"), tagIds: [], entries: [] }],
+  });
+  const withMain: LiveDirectory = { ...EMPTY, projects: [row("here", "main", "03")] };
+  same(
+    "a main directory added back beside another comes back as a group one",
+    selectRows(file, withMain, "missing").projects[0]?.kind,
+    "group",
+  );
+  same(
+    "and as the main one when there is none",
+    selectRows(file, { ...EMPTY, projects: [row("e", "event", "03")] }, "missing").projects[0]
+      ?.kind,
+    "main",
+  );
+  same(
+    "a replace writes it as the file has it",
+    selectRows(file, withMain, "replace").projects[0]?.kind,
+    "main",
+  );
 }

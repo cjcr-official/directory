@@ -15,13 +15,17 @@ import { TagPicker } from "@/components/TagPicker";
 import {
   createProject,
   deleteProject,
+  demoteMainDirectory,
   fetchProject,
+  fetchProjects,
   isStaleWrite,
+  restoreMainDirectory,
   setProjectEntries,
   setProjectTags,
   updateProject,
 } from "@/lib/queries";
-import type { ProjectKind, SelectionMode } from "@/lib/database.types";
+import type { ProjectKind, ProjectRow, SelectionMode } from "@/lib/database.types";
+import { directoryKinds, mainDirectoryId, type DirectoryKind } from "@/lib/directoryKind";
 import {
   COVER_PARTS,
   DEFAULT_SETTINGS,
@@ -103,7 +107,12 @@ export function ProjectEditPage() {
   const isNew = !id;
 
   const [name, setName] = useState("Church Directory");
-  const [kind, setKind] = useState<ProjectKind>("directory");
+  const [kind, setKind] = useState<DirectoryKind>("group");
+  /**
+   * Every directory, for which one is the main one. There is only one, so
+   * choosing Main here says which directory stops being it.
+   */
+  const [directories, setDirectories] = useState<ProjectRow[] | null>(null);
   const [description, setDescription] = useState("");
   const [mode, setMode] = useState<SelectionMode>("all");
   const [tagIds, setTagIds] = useState<string[]>([]);
@@ -145,15 +154,33 @@ export function ProjectEditPage() {
    */
   const [changed, setChanged] = useState<{ at: string; by: string | null } | null>(null);
 
+  // A new directory is the main one when there is none yet, and a group one
+  // otherwise.
+  useEffect(() => {
+    if (id) return;
+    let active = true;
+    fetchProjects()
+      .then((all) => {
+        if (!active) return;
+        setDirectories(all);
+        setKind(mainDirectoryId(all) ? "group" : "main");
+      })
+      .catch((cause) => setError(message(cause)));
+    return () => {
+      active = false;
+    };
+  }, [id]);
+
   useEffect(() => {
     if (!id) return;
     let active = true;
     setLoading(true);
-    fetchProject(id)
-      .then((loaded) => {
+    Promise.all([fetchProject(id), fetchProjects()])
+      .then(([loaded, all]) => {
         if (!active) return;
+        setDirectories(all);
         setName(loaded.project.name);
-        setKind(loaded.project.kind);
+        setKind(directoryKinds(all).get(id) ?? "group");
         setDescription(loaded.project.description ?? "");
         setMode(loaded.project.selection_mode);
         setTagIds(loaded.tagIds);
@@ -169,6 +196,11 @@ export function ProjectEditPage() {
       active = false;
     };
   }, [id]);
+
+  /** The directory that is the main one now, and what it is called. */
+  const currentMain = directories ? mainDirectoryId(directories) : null;
+  const currentMainName =
+    directories?.find((row) => row.id === currentMain)?.name ?? "the main directory";
 
   const selection: Selection = useMemo(
     () => ({
@@ -492,9 +524,10 @@ export function ProjectEditPage() {
     if (!id) return;
     setSaving(true);
     try {
-      const loaded = await fetchProject(id);
+      const [loaded, all] = await Promise.all([fetchProject(id), fetchProjects()]);
+      setDirectories(all);
       setName(loaded.project.name);
-      setKind(loaded.project.kind);
+      setKind(directoryKinds(all).get(id) ?? "group");
       setDescription(loaded.project.description ?? "");
       setMode(loaded.project.selection_mode);
       setTagIds(loaded.tagIds);
@@ -556,15 +589,47 @@ export function ProjectEditPage() {
 
       const payload = {
         name: name.trim() || "Untitled directory",
-        kind,
+        kind: kind as ProjectKind,
         description: description.trim() || null,
         selection_mode: mode,
         settings: saved as unknown as Record<string, unknown>,
       };
 
-      const project = id
-        ? await updateProject(id, payload, force ? null : openedAt)
-        : await createProject(payload);
+      // There is one main directory. Choosing Main here hands the role over:
+      // the directory that has it becomes a group one first, because the
+      // database refuses two at once. If this save then fails - somebody else
+      // saved this directory meanwhile - the role goes back where it was, so
+      // the church is never left without a main directory by a failed save.
+      //
+      // A database that has not run 0012 knows only "directory" and "event",
+      // refuses the new kinds by name, and has no main directory to hand
+      // over. There the directory is saved with the old kind it does accept,
+      // so saving keeps working until the migration is run.
+      const beforeKinds = (cause: unknown) => /projects_kind_check/.test(message(cause));
+      let handingOver = kind === "main" && currentMain && currentMain !== id ? currentMain : null;
+      if (handingOver) {
+        try {
+          await demoteMainDirectory(handingOver);
+        } catch (cause) {
+          if (!beforeKinds(cause)) throw cause;
+          handingOver = null;
+        }
+      }
+      const save = (body: typeof payload) =>
+        id ? updateProject(id, body, force ? null : openedAt) : createProject(body);
+      let project: ProjectRow;
+      try {
+        try {
+          project = await save(payload);
+        } catch (cause) {
+          if (!beforeKinds(cause)) throw cause;
+          project = await save({ ...payload, kind: kind === "event" ? "event" : "directory" });
+        }
+      } catch (cause) {
+        if (handingOver) await restoreMainDirectory(handingOver).catch(() => undefined);
+        throw cause;
+      }
+      if (handingOver || !id) setDirectories(await fetchProjects());
       for (const path of discard) await removePhoto(path);
 
       await setProjectTags(project.id, mode === "tags" ? tagIds : []);
@@ -588,7 +653,11 @@ export function ProjectEditPage() {
       if (!id) navigate(`/projects/${project.id}`, { replace: true });
     } catch (cause) {
       setStale(isStaleWrite(cause));
-      setError(message(cause));
+      setError(
+        /projects_one_main/.test(message(cause))
+          ? "Another directory was made the main one while this was open. Reload it and choose again."
+          : message(cause),
+      );
     } finally {
       setSaving(false);
     }
@@ -692,15 +761,28 @@ export function ProjectEditPage() {
                     />
                   </Field>
 
-                  <Field label="Kind" htmlFor="project_kind">
+                  <Field
+                    label="Kind"
+                    htmlFor="project_kind"
+                    hint={
+                      kind === "main"
+                        ? currentMain && currentMain !== id
+                          ? `There is one main directory. Saving makes this it, and “${currentMainName}” becomes a group directory.`
+                          : "The church's main directory. There is only one."
+                        : kind === "group"
+                          ? "For a group — the choir, the deacons, the youth."
+                          : "For one event — a retreat, a picnic, a conference."
+                    }
+                  >
                     <select
                       id="project_kind"
                       value={kind}
                       disabled={!canEdit}
-                      onChange={(event) => setKind(event.target.value as ProjectKind)}
+                      onChange={(event) => setKind(event.target.value as DirectoryKind)}
                     >
-                      <option value="directory">Main directory</option>
-                      <option value="event">Event directory</option>
+                      <option value="main">Main</option>
+                      <option value="group">Group</option>
+                      <option value="event">Event</option>
                     </select>
                   </Field>
                 </div>

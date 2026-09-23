@@ -452,6 +452,28 @@ export async function fetchProject(id: string): Promise<ProjectWithSelection> {
   };
 }
 
+/**
+ * Makes a directory a group one, so that another can be the main one.
+ *
+ * There is only one main directory - the database refuses a second - so
+ * choosing a new one hands the role over: the old one is made a group
+ * directory first. Only its kind changes. See directoryKind.ts.
+ */
+export async function demoteMainDirectory(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("projects")
+    .update({ kind: "group" })
+    .eq("id", id)
+    .in("kind", ["main", "directory"]);
+  if (error) throw new Error(error.message);
+}
+
+/** Makes a directory the main one again, after a hand-over that did not finish. */
+export async function restoreMainDirectory(id: string): Promise<void> {
+  const { error } = await supabase.from("projects").update({ kind: "main" }).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 export type ProjectInput = Pick<
   ProjectRow,
   "name" | "kind" | "description" | "selection_mode" | "settings"

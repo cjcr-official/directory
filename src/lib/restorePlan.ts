@@ -9,6 +9,7 @@ import type {
 import { message } from "./format";
 import { PHOTO_FOLDERS } from "./photoFolders";
 import { COVER_PATH_KEYS } from "./backupSpec";
+import { mainDirectoryId } from "./directoryKind";
 
 /**
  * What loading a backup back in would do.
@@ -750,7 +751,15 @@ export function selectRows(
     people: peopleToWrite,
     householdTags,
     personTags,
-    projects: projects.map((row) => row.project),
+    // One main directory (0012). Adding back the main directory from the
+    // file while another is the main one now would be refused - and would
+    // take the restore down with it - so it comes back as a group directory.
+    // The one here keeps the role; handing it back is one choice on its page.
+    projects: projects.map((row) =>
+      !replacing && row.project.kind === "main" && mainDirectoryId(live.projects)
+        ? { ...row.project, kind: "group" as const }
+        : row.project,
+    ),
     projectTags: projects.flatMap((row) =>
       row.tagIds
         .map(tagId)
