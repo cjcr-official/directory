@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate, useNavigationType } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Logo } from "@/components/Logo";
 import { NotificationTray } from "@/components/NotificationTray";
@@ -33,6 +33,22 @@ export function AppShell() {
 
   // Following a link should put the drawer away.
   useEffect(() => setMenuOpen(false), [location.pathname]);
+
+  /*
+   * A new screen starts at its top. Saving a new person or family is pressed
+   * at the foot of a long form, and the record it opens kept that scroll - so
+   * the name that had just been made was a long way up. Back and forward are
+   * left alone, so a list comes back where it was left.
+   *
+   * Installed to the Home Screen the page scrolls #root rather than the
+   * document (see app.css), so both are sent to the top.
+   */
+  const navigationType = useNavigationType();
+  useEffect(() => {
+    if (navigationType === "POP") return;
+    window.scrollTo(0, 0);
+    document.getElementById("root")?.scrollTo(0, 0);
+  }, [location.pathname, navigationType]);
 
   /*
    * Installed to the Home Screen, the strip behind the home indicator is
