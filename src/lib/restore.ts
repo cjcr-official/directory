@@ -2,7 +2,9 @@ import { PHOTO_BUCKET, supabase } from "./supabase";
 import { PHOTO_FOLDERS, readBackup, selectRows } from "./restorePlan";
 import { fetchAll, withoutAuthor } from "./queries";
 import type {
+  ChangedRecord,
   LiveDirectory,
+  RestoreChoices,
   RestoreMode,
   RestorePlan,
   RestoreProgress,
@@ -297,6 +299,42 @@ async function reattachPeople(
 }
 
 /**
+ * Puts back the backup's version of records chosen on the page.
+ *
+ * Each is written only if it has not been saved again since the page read it:
+ * guarded on updated_at, as every edit screen in the app is. A record somebody
+ * changed in the meantime is left alone and counted, never overwritten - their
+ * edit is newer than both the backup and the preview.
+ */
+async function putBackRecords(
+  records: ChangedRecord[],
+): Promise<{ written: number; skipped: number }> {
+  let written = 0;
+  let skipped = 0;
+  for (const record of records) {
+    const patch = withoutAuthor(record.patch);
+    const { data, error } =
+      record.kind === "household"
+        ? await supabase
+            .from("households")
+            .update(patch as Partial<HouseholdRow>)
+            .eq("id", record.id)
+            .eq("updated_at", record.updatedAt)
+            .select("id")
+        : await supabase
+            .from("people")
+            .update(patch as Partial<PersonRow>)
+            .eq("id", record.id)
+            .eq("updated_at", record.updatedAt)
+            .select("id");
+    if (error) fail(`putting back ${record.name}`, error.message);
+    if (data?.length) written += 1;
+    else skipped += 1;
+  }
+  return { written, skipped };
+}
+
+/**
  * Replaces the directory in one transaction, through replace_directory
  * (migration 0011). Returns false when that function is not in the database
  * yet, so the caller can fall back to doing it a request at a time.
@@ -348,15 +386,39 @@ export async function applyRestore(
   mode: RestoreMode,
   live: LiveDirectory,
   onProgress?: (progress: RestoreProgress) => void,
+  choices: RestoreChoices = {},
 ): Promise<RestoreResult> {
   const replacing = mode === "replace";
+  // Earlier versions only mean anything when adding back: a replace writes
+  // the whole file anyway.
+  const putBack = replacing ? [] : (choices.putBack ?? []);
 
   // Read the existing links before deciding anything, so the decision is made
   // once and everything below is plumbing.
   const existingLinks = replacing ? new Set<string>() : await currentLinkKeys();
-  const rows = selectRows(plan.file, live, mode, existingLinks, plan.photos);
+  const rows = selectRows(plan.file, live, mode, existingLinks, plan.photos, choices);
 
-  const steps = (replacing ? 1 : 5) + rows.photoPaths.length + (rows.photosToRemove.length ? 1 : 0);
+  // A record put back to a version with a different photograph needs that
+  // picture in storage, if it has gone and the archive has it.
+  const stored = live.storedPhotos ?? null;
+  for (const record of putBack) {
+    const path = record.patch.photo_path;
+    if (
+      typeof path === "string" &&
+      path &&
+      plan.photos.has(path) &&
+      !(stored?.has(path) ?? false) &&
+      !rows.photoPaths.includes(path)
+    ) {
+      rows.photoPaths.push(path);
+    }
+  }
+
+  const steps =
+    (replacing ? 1 : 5) +
+    (putBack.length ? 1 : 0) +
+    rows.photoPaths.length +
+    (rows.photosToRemove.length ? 1 : 0);
   let done = 0;
   const step = (label: string) => {
     done += 1;
@@ -410,6 +472,12 @@ export async function applyRestore(
     step(`Directories (${rows.projects.length})`);
   }
 
+  let putBackResult = { written: 0, skipped: 0 };
+  if (putBack.length) {
+    putBackResult = await putBackRecords(putBack);
+    step(`Earlier versions (${putBackResult.written})`);
+  }
+
   let photos = { uploaded: 0, failed: 0 };
   if (rows.photoPaths.length) {
     let n = 0;
@@ -437,6 +505,9 @@ export async function applyRestore(
     photosFailed: photos.failed,
     reattached,
     photosRemoved,
+    putBack: putBackResult.written,
+    putBackSkipped: putBackResult.skipped,
+    typedAgainSkipped: rows.typedAgainSkipped,
     orphaned: rows.orphaned,
   };
 }

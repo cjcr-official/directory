@@ -116,8 +116,41 @@ export interface RestorePlan {
   };
   /** Photographs in the archive that failed their checksum and are left out. */
   damagedPhotos: number;
+  /**
+   * Missing records that look as if they were typed in again since the
+   * backup: a record added since with the same name. Restoring the original
+   * as well would put the family or person in the directory twice.
+   */
+  typedAgain: { households: string[]; people: string[] };
+  /**
+   * Records in both the file and the directory whose details differ: edited
+   * since the backup was taken. Only put back when chosen, one by one.
+   */
+  changed: ChangedRecord[];
   /** Records in the directory now that the file has never heard of. */
   newerThanBackup: { households: number; people: number };
+}
+
+/** A record the backup holds an earlier version of. */
+export interface ChangedRecord {
+  kind: "household" | "person";
+  id: string;
+  /** How the record is known now, for the list. */
+  name: string;
+  /** What differs, in words. */
+  fields: string[];
+  /** The backup's values for exactly the columns that differ. */
+  patch: Record<string, unknown>;
+  /** The record's updated_at when this was read, so a later edit is not overwritten. */
+  updatedAt: string;
+}
+
+/** What the person chose on the page, beyond which of the two modes. */
+export interface RestoreChoices {
+  /** Leave out missing records that look as if they were typed in again. */
+  skipTypedAgain?: boolean;
+  /** Earlier versions to put back over records that are still here. */
+  putBack?: ChangedRecord[];
 }
 
 export interface RestoreResult {
@@ -130,6 +163,12 @@ export interface RestoreResult {
   reattached: number;
   /** Photographs nothing pointed at any more, removed after a replace. */
   photosRemoved: number;
+  /** Records put back to the backup's version. */
+  putBack: number;
+  /** Chosen records edited again after the preview, and so left alone. */
+  putBackSkipped: number;
+  /** Missing records left out because they had been typed in again. */
+  typedAgainSkipped: number;
   /**
    * People whose family could not be found in the file or the directory. They
    * come back without one rather than not at all.
@@ -152,6 +191,164 @@ export function coverPaths(project: ProjectRow): string[] {
   return [settings.coverPhotoPath, settings.coverLogoPath].filter(
     (path): path is string => typeof path === "string" && path.trim() !== "",
   );
+}
+
+const squash = (value: unknown) =>
+  typeof value === "string" ? value.trim().replace(/\s+/g, " ").toLowerCase() : "";
+
+/**
+ * Missing records that were typed in again since the backup, file id to the
+ * id they have now.
+ *
+ * Deleting somebody by mistake and then entering them again by hand is the
+ * obvious repair, and the new record has a new id - so to a restore the
+ * original is simply missing, and putting it back makes two. A match is a
+ * record added since the backup (one the file has never heard of) with the
+ * same name - and, for a person, the same birthday. Only one-to-one matches
+ * count: two new John Smiths for one missing is not something to guess at.
+ */
+export function findTypedAgain(
+  file: BackupFile,
+  live: LiveDirectory,
+): { households: Map<string, string>; people: Map<string, string> } {
+  const pair = <F extends { id: string }, L extends { id: string }>(
+    missing: F[],
+    added: L[],
+    keyOfFile: (row: F) => string,
+    keyOfLive: (row: L) => string,
+  ) => {
+    const group = <T>(rows: T[], key: (row: T) => string) => {
+      const out = new Map<string, T[]>();
+      for (const row of rows) out.set(key(row), [...(out.get(key(row)) ?? []), row]);
+      return out;
+    };
+    const was = group(missing, keyOfFile);
+    const now = group(added, keyOfLive);
+    const matched = new Map<string, string>();
+    for (const [key, rows] of was) {
+      const here = now.get(key);
+      if (rows.length === 1 && here?.length === 1) matched.set(rows[0].id, here[0].id);
+    }
+    return matched;
+  };
+
+  const fileHouseholds = new Set(file.households.map((row) => row.id));
+  const filePeople = new Set(file.people.map((row) => row.id));
+  const liveHouseholds = new Set(live.households.map((row) => row.id));
+  const livePeople = new Set(live.people.map((row) => row.id));
+
+  const familyKey = (row: HouseholdRow) => `${squash(row.display_name)}|${squash(row.sort_name)}`;
+  const personKey = (row: PersonRow) =>
+    `${squash(row.first_name)}|${squash(row.last_name)}|${row.date_of_birth ?? ""}`;
+
+  return {
+    households: pair(
+      file.households.filter((row) => !liveHouseholds.has(row.id)),
+      live.households.filter((row) => !fileHouseholds.has(row.id)),
+      familyKey,
+      familyKey,
+    ),
+    people: pair(
+      file.people.filter((row) => !livePeople.has(row.id)),
+      live.people.filter((row) => !filePeople.has(row.id)),
+      personKey,
+      personKey,
+    ),
+  };
+}
+
+/** Columns that are bookkeeping, not details anybody edited. */
+const NOT_DETAILS = new Set(["id", "created_at", "updated_at", "updated_by"]);
+
+/** What a column is called on screen, so a list of changes reads as words. */
+const FIELD_NAMES: Record<string, string> = {
+  display_name: "name",
+  sort_name: "name",
+  first_name: "name",
+  last_name: "name",
+  preferred_name: "name",
+  address_line1: "address",
+  address_line2: "address",
+  city: "address",
+  state: "address",
+  postal_code: "address",
+  country: "address",
+  use_household_address: "address",
+  household_id: "family",
+  household_role: "family",
+  sort_order: "family",
+  date_of_birth: "birthday",
+  photo_path: "photograph",
+  photo_fit: "photograph",
+  is_active: "in printed directories",
+  office_label: "office label",
+  background_check_on: "background check",
+  background_check_due: "background check",
+};
+
+/**
+ * Records the backup holds an earlier version of.
+ *
+ * Only columns both sides have are compared, so a backup from before or after
+ * a migration does not report a column one side has never had. A person's
+ * move to another family is a change like any other, but is only offered back
+ * where that family is still here to go back into.
+ */
+export function findChanged(file: BackupFile, live: LiveDirectory): ChangedRecord[] {
+  const liveHouseholds = new Map(live.households.map((row) => [row.id, row]));
+  const livePeople = new Map(live.people.map((row) => [row.id, row]));
+
+  const differ = (
+    was: Record<string, unknown>,
+    now: Record<string, unknown>,
+    skip: Set<string> = new Set(),
+  ) => {
+    const patch: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(was)) {
+      if (NOT_DETAILS.has(key) || skip.has(key) || !(key in now)) continue;
+      if (JSON.stringify(value ?? null) !== JSON.stringify(now[key] ?? null)) patch[key] = value;
+    }
+    return patch;
+  };
+  const describe = (patch: Record<string, unknown>) => [
+    ...new Set(Object.keys(patch).map((key) => FIELD_NAMES[key] ?? key.replace(/_/g, " "))),
+  ];
+
+  const changed: ChangedRecord[] = [];
+  for (const was of file.households) {
+    const now = liveHouseholds.get(was.id);
+    if (!now) continue;
+    const patch = differ(was, now);
+    if (!Object.keys(patch).length) continue;
+    changed.push({
+      kind: "household",
+      id: was.id,
+      name: now.display_name,
+      fields: describe(patch),
+      patch,
+      updatedAt: now.updated_at,
+    });
+  }
+  for (const was of file.people) {
+    const now = livePeople.get(was.id);
+    if (!now) continue;
+    const familyGone = Boolean(was.household_id) && !liveHouseholds.has(was.household_id!);
+    const patch = differ(
+      was,
+      now,
+      familyGone ? new Set(["household_id", "household_role", "sort_order"]) : undefined,
+    );
+    if (!Object.keys(patch).length) continue;
+    changed.push({
+      kind: "person",
+      id: was.id,
+      name: `${now.preferred_name || now.first_name} ${now.last_name}`.trim(),
+      fields: describe(patch),
+      patch,
+      updatedAt: now.updated_at,
+    });
+  }
+  return changed.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
@@ -279,6 +476,13 @@ export async function readBackup(bytes: Uint8Array, live: LiveDirectory): Promis
   // ids are present, come from the same function the restore itself runs, so
   // the preview cannot promise something the restore then does not do.
   const adding = selectRows(backup, live, "missing", liveLinks, photos);
+  const typedAgain = findTypedAgain(backup, live);
+  const nameOf = new Map([
+    ...backup.households.map((row) => [row.id, row.display_name] as const),
+    ...backup.people.map(
+      (row) => [row.id, `${row.preferred_name || row.first_name} ${row.last_name}`.trim()] as const,
+    ),
+  ]);
 
   return {
     file: backup,
@@ -302,6 +506,11 @@ export async function readBackup(bytes: Uint8Array, live: LiveDirectory): Promis
       photos: adding.repairedPhotos,
     },
     damagedPhotos,
+    typedAgain: {
+      households: [...typedAgain.households.keys()].map((id) => nameOf.get(id) ?? id),
+      people: [...typedAgain.people.keys()].map((id) => nameOf.get(id) ?? id),
+    },
+    changed: findChanged(backup, live),
     newerThanBackup: {
       households: live.households.filter((row) => !backupHouseholds.has(row.id)).length,
       people: live.people.filter((row) => !backupPeople.has(row.id)).length,
@@ -337,6 +546,8 @@ export interface RestoreRows {
   photosToRemove: string[];
   /** People whose family is in neither the file nor the directory. */
   orphaned: number;
+  /** Missing records left out because they were typed in again. */
+  typedAgainSkipped: number;
 }
 
 /**
@@ -357,6 +568,7 @@ export function selectRows(
   mode: RestoreMode,
   existingLinks: Set<string> = new Set(),
   photos: Map<string, Uint8Array> = new Map(),
+  choices: RestoreChoices = {},
 ): RestoreRows {
   const liveHouseholds = new Set(live.households.map((row) => row.id));
   const livePeople = new Set(live.people.map((row) => row.id));
@@ -381,9 +593,25 @@ export function selectRows(
   }
   const tagId = (id: string) => sameGroup.get(id) ?? id;
 
+  // Families and people typed in again since the backup, when the person
+  // restoring has said to treat them as the same: not written twice, and
+  // everything that pointed at the original points at the one here now.
+  const typedAgain =
+    !replacing && choices.skipTypedAgain
+      ? findTypedAgain(file, live)
+      : { households: new Map<string, string>(), people: new Map<string, string>() };
+  const householdId = (id: string) => typedAgain.households.get(id) ?? id;
+  const personId = (id: string) => typedAgain.people.get(id) ?? id;
+
   const tags = keep(file.tags, (row) => !liveTags.has(row.id) && !sameGroup.has(row.id));
-  const households = keep(file.households, (row) => !liveHouseholds.has(row.id));
-  const people = keep(file.people, (row) => !livePeople.has(row.id));
+  const households = keep(
+    file.households,
+    (row) => !liveHouseholds.has(row.id) && !typedAgain.households.has(row.id),
+  );
+  const people = keep(
+    file.people,
+    (row) => !livePeople.has(row.id) && !typedAgain.people.has(row.id),
+  );
   const projects = keep(file.projects, (row) => !liveProjects.has(row.project.id));
 
   // What will exist once this has run: everything the file holds, plus - when
@@ -403,7 +631,11 @@ export function selectRows(
   // come back without one rather than taking the restore down with them.
   let orphaned = 0;
   const peopleToWrite = people.map((person) => {
-    if (!person.household_id || willHaveHousehold.has(person.household_id)) return person;
+    if (!person.household_id) return person;
+    const family = householdId(person.household_id);
+    if (willHaveHousehold.has(family)) {
+      return family === person.household_id ? person : { ...person, household_id: family };
+    }
     orphaned += 1;
     return { ...person, household_id: null, household_role: null };
   });
@@ -414,7 +646,7 @@ export function selectRows(
   // honouring it there would drop links that have to go back in.
   const already = replacing ? new Set<string>() : existingLinks;
   const householdTags = file.householdTags
-    .map((link) => ({ ...link, tag_id: tagId(link.tag_id) }))
+    .map((link) => ({ household_id: householdId(link.household_id), tag_id: tagId(link.tag_id) }))
     .filter(
       (link) =>
         willHaveHousehold.has(link.household_id) &&
@@ -422,7 +654,7 @@ export function selectRows(
         !already.has(`h:${link.household_id}:${link.tag_id}`),
     );
   const personTags = file.personTags
-    .map((link) => ({ ...link, tag_id: tagId(link.tag_id) }))
+    .map((link) => ({ person_id: personId(link.person_id), tag_id: tagId(link.tag_id) }))
     .filter(
       (link) =>
         willHavePerson.has(link.person_id) &&
@@ -450,13 +682,15 @@ export function selectRows(
     ? []
     : file.people
         .filter((person) => {
-          if (!person.household_id || !reattachable.has(person.household_id)) return false;
+          if (!person.household_id || !reattachable.has(householdId(person.household_id))) {
+            return false;
+          }
           const now = livePeopleById.get(person.id);
           return now !== undefined && !now.household_id;
         })
         .map((person) => ({
           id: person.id,
-          household_id: person.household_id,
+          household_id: person.household_id ? householdId(person.household_id) : null,
           household_role: person.household_role,
           sort_order: person.sort_order ?? 0,
         }));
@@ -522,12 +756,19 @@ export function selectRows(
         .map((id) => ({ project_id: row.project.id, tag_id: id })),
     ),
     projectEntries: projects.flatMap((row) =>
-      row.entries.filter((entry) =>
-        entry.entry_type === "household"
-          ? willHaveHousehold.has(entry.ref_id)
-          : willHavePerson.has(entry.ref_id),
-      ),
+      row.entries
+        .map((entry) => ({
+          ...entry,
+          ref_id:
+            entry.entry_type === "household" ? householdId(entry.ref_id) : personId(entry.ref_id),
+        }))
+        .filter((entry) =>
+          entry.entry_type === "household"
+            ? willHaveHousehold.has(entry.ref_id)
+            : willHavePerson.has(entry.ref_id),
+        ),
     ),
+    typedAgainSkipped: typedAgain.households.size + typedAgain.people.size,
     reattach,
     photoPaths: [...photoPaths, ...repairs],
     repairedPhotos: repairs.length,

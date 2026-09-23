@@ -66,6 +66,11 @@ class Writer {
     );
   }
 
+  /** The pieces as written, without copying them into one array. */
+  pieces(): Uint8Array[] {
+    return this.parts;
+  }
+
   toBytes(): Uint8Array {
     const out = new Uint8Array(this.length);
     let offset = 0;
@@ -77,7 +82,11 @@ class Writer {
   }
 }
 
-export function buildZip(entries: ZipEntry[], now = new Date()): Uint8Array {
+/**
+ * The archive as the pieces it is made of, in order: headers and file data
+ * as they were written, never copied into one array.
+ */
+function zipPieces(entries: ZipEntry[], now: Date): Uint8Array[] {
   const encoder = new TextEncoder();
   const stamp = dosDateTime(now);
   const body = new Writer();
@@ -136,9 +145,29 @@ export function buildZip(entries: ZipEntry[], now = new Date()): Uint8Array {
   end.u32(body.length);
   end.u16(0); // comment length
 
-  const out = new Uint8Array(body.length + directory.length + end.length);
-  out.set(body.toBytes(), 0);
-  out.set(directory.toBytes(), body.length);
-  out.set(end.toBytes(), body.length + directory.length);
+  return [...body.pieces(), ...directory.pieces(), ...end.pieces()];
+}
+
+/** The archive as one array. For the checks, and anything small. */
+export function buildZip(entries: ZipEntry[], now = new Date()): Uint8Array {
+  const pieces = zipPieces(entries, now);
+  const out = new Uint8Array(pieces.reduce((total, piece) => total + piece.length, 0));
+  let offset = 0;
+  for (const piece of pieces) {
+    out.set(piece, offset);
+    offset += piece.length;
+  }
   return out;
+}
+
+/**
+ * The archive as a Blob, built straight from its pieces.
+ *
+ * A backup with photographs is most of its size in pictures that are already
+ * in memory once. Copying them into one array and then into a Blob held three
+ * copies at the peak, which is what an older phone runs out of first. The
+ * browser assembles the Blob from the pieces itself, and may keep it on disk.
+ */
+export function buildZipBlob(entries: ZipEntry[], now = new Date()): Blob {
+  return new Blob(zipPieces(entries, now) as BlobPart[], { type: "application/zip" });
 }

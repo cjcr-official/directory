@@ -403,6 +403,26 @@ p:last-child {
   color: var(--accent);
   font-weight: 600;
 }
+/* The restore preview's list of records edited since the backup. Closed until
+   opened, because most restores have nothing to do with it, and each record in
+   it is one tap target at phone width. */
+.restore-changes {
+  margin: 14px 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.restore-changes > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.restore-changes > p {
+  margin: 8px 0;
+}
+.restore-changes .check {
+  padding: 6px 0;
+}
+
 /* Something to act on, such as a backup that is due. It takes the place a
    count would have, at the far end of the row. */
 .nav-link .pill {

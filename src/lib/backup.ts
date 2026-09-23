@@ -1,9 +1,9 @@
 import type { DirectoryData } from "./entries";
-import type { ProjectEntryRow, ProjectRow, TagRow } from "./database.types";
+import type { ProfileRow, ProjectEntryRow, ProjectRow, TagRow } from "./database.types";
 import { toCsv, type CsvValue } from "./csv";
-import { buildZip, type ZipEntry } from "./zip";
+import { buildZipBlob, type ZipEntry } from "./zip";
 import { downloadPhoto } from "./photos";
-import { fetchProject, fetchProjects } from "./queries";
+import { fetchProfiles, fetchProject, fetchProjects } from "./queries";
 import { coverPaths } from "./restorePlan";
 import { formatPhone } from "./format";
 
@@ -24,7 +24,7 @@ export interface BackupProgress {
 }
 
 export interface BackupResult {
-  bytes: Uint8Array;
+  file: Blob;
   fileName: string;
   photoCount: number;
   /** Photos referenced by a record but missing from storage. */
@@ -186,6 +186,25 @@ function groupsCsv(data: DirectoryData): string {
   return toCsv(["Group", "Description", "Families", "People", "Colour", "Id"], rows);
 }
 
+/**
+ * Who could sign in, and as what.
+ *
+ * Accounts live in Supabase's own sign-in system, which a backup cannot write
+ * back into: a password is not something this app ever sees. But a church
+ * moving to a new project has to invite everybody again and give each of them
+ * the right role, and this list is what saves them from reconstructing it
+ * from memory. Reference only; a restore never reads it.
+ */
+function administratorsCsv(profiles: ProfileRow[]): string {
+  const rows: CsvValue[][] = profiles.map((profile) => [
+    profile.full_name,
+    profile.email,
+    profile.role,
+    profile.is_active,
+  ]);
+  return toCsv(["Name", "Email", "Role", "Has access"], rows);
+}
+
 function readme(data: DirectoryData, photoCount: number, when: Date): string {
   return [
     "CHURCH DIRECTORY - BACKUP",
@@ -198,6 +217,10 @@ function readme(data: DirectoryData, photoCount: number, when: Date): string {
     "  families.csv    One row per family. Opens in Excel, Numbers or Sheets.",
     "  people.csv      One row per person, with the family they belong to.",
     "  groups.csv      The group labels and how many records carry each.",
+    "  administrators.csv",
+    "                  Who could sign in, and with what role. For reference:",
+    "                  accounts are not restored, so after moving to a new",
+    "                  project, invite these people again from this list.",
     "  photos/         Every photograph and directory cover, in the folders the",
     "                  app stores them in.",
     "  directory.json  The same information exactly as the database holds it,",
@@ -262,8 +285,8 @@ async function inParallel<T>(
 }
 
 /** Hands a finished archive to the browser as a download. */
-export function saveBackupFile(bytes: Uint8Array, fileName: string): void {
-  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/zip" }));
+export function saveBackupFile(file: Blob, fileName: string): void {
+  const url = URL.createObjectURL(file);
   const link = document.createElement("a");
   link.href = url;
   link.download = fileName;
@@ -331,11 +354,15 @@ export async function buildBackup(options: BackupOptions): Promise<BackupResult>
 
   const photoCount = entries.length;
 
+  // Not worth failing a backup over: the directory is the part that matters.
+  const profiles = await fetchProfiles().catch(() => null);
+
   entries.unshift(
     { name: "README.txt", data: text(readme(data, photoCount, when)) },
     { name: "families.csv", data: text(familiesCsv(data)) },
     { name: "people.csv", data: text(peopleCsv(data)) },
     { name: "groups.csv", data: text(groupsCsv(data)) },
+    ...(profiles ? [{ name: "administrators.csv", data: text(administratorsCsv(profiles)) }] : []),
     {
       name: "directory.json",
       data: text(
@@ -366,7 +393,7 @@ export async function buildBackup(options: BackupOptions): Promise<BackupResult>
   const stamp = `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())}`;
 
   return {
-    bytes: buildZip(entries, when),
+    file: buildZipBlob(entries, when),
     fileName: `church-directory-backup-${stamp}.zip`,
     photoCount,
     missingPhotos,

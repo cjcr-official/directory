@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { useDirectory } from "@/data/DirectoryContext";
-import { Notice } from "@/components/ui";
+import { Checkbox, Notice } from "@/components/ui";
 import { fetchDirectory, fetchProjects } from "@/lib/queries";
 import { buildBackup, saveBackupFile } from "@/lib/backup";
 import { recordBackup } from "@/lib/backupLog";
@@ -57,10 +57,19 @@ export function RestorePanel() {
   const [progress, setProgress] = useState<RestoreProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<RestoreResult | null>(null);
+  /**
+   * Leave out records that look typed in again. On by default: two copies of
+   * a family is the mistake, and one is what the person almost certainly wants.
+   */
+  const [skipTypedAgain, setSkipTypedAgain] = useState(true);
+  /** Records to put back to the backup's version. None until somebody picks. */
+  const [putBack, setPutBack] = useState<Set<string>>(new Set());
   /** Set when a write failed, so the notice can say what to do about it. */
   const [partial, setPartial] = useState(false);
 
   function forget() {
+    setSkipTypedAgain(true);
+    setPutBack(new Set());
     setPlan(null);
     setLive(null);
     setFileName("");
@@ -81,6 +90,8 @@ export function RestorePanel() {
     setPlan(null);
     setTyped("");
     setMode("missing");
+    setSkipTypedAgain(true);
+    setPutBack(new Set());
     setFileName(file.name);
     try {
       const current = await readLive();
@@ -124,7 +135,10 @@ export function RestorePanel() {
               `nothing has been replaced.`,
           );
         }
-        saveBackupFile(safety.bytes, safety.fileName.replace("-backup-", "-before-replace-"));
+        saveBackupFile(safety.file, safety.fileName.replace("-backup-", "-before-replace-"));
+        // Let it go before the restore reads anything else in: on a phone
+        // the two together are what runs out of memory.
+        safety = undefined;
         await recordBackup({
           photosIncluded: true,
           households: live.households.length,
@@ -136,7 +150,10 @@ export function RestorePanel() {
       // the moment of writing rather than when the file was chosen.
       const current = await readLive();
       writing = true;
-      const done = await applyRestore(plan, mode, current, setProgress);
+      const done = await applyRestore(plan, mode, current, setProgress, {
+        skipTypedAgain,
+        putBack: plan.changed.filter((record) => putBack.has(record.id)),
+      });
       setResult(done);
       setPlan(null);
       setFileName("");
@@ -189,16 +206,34 @@ export function RestorePanel() {
   const liveFamilies = live?.households.length ?? 0;
   const livePeople = live?.people.length ?? 0;
   const confirmed = !replacing || typed.trim().toLowerCase() === "replace";
+  // What adding back would actually write, once the ones typed in again are
+  // left out - the figure the button's promise has to match.
+  const leaveOut = !replacing && skipTypedAgain;
+  const addFamilies = plan
+    ? plan.missing.households - (leaveOut ? plan.typedAgain.households.length : 0)
+    : 0;
+  const addPeople = plan ? plan.missing.people - (leaveOut ? plan.typedAgain.people.length : 0) : 0;
   const nothingToDo =
     plan !== null &&
     !replacing &&
-    plan.missing.households === 0 &&
-    plan.missing.people === 0 &&
+    addFamilies === 0 &&
+    addPeople === 0 &&
     plan.missing.tags === 0 &&
     plan.missing.projects === 0 &&
     plan.missing.links === 0 &&
     plan.missing.reattach === 0 &&
-    plan.missing.photos === 0;
+    plan.missing.photos === 0 &&
+    putBack.size === 0;
+  const typedAgainCount = plan
+    ? plan.typedAgain.households.length + plan.typedAgain.people.length
+    : 0;
+  const toggle = (id: string, on: boolean) =>
+    setPutBack((current) => {
+      const next = new Set(current);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
 
   return (
     <div className="card">
@@ -280,10 +315,9 @@ export function RestorePanel() {
                 <span>
                   <strong>Add back what is missing</strong>
                   <span className="choice-hint">
-                    Puts back the {plan.missing.households} famil
-                    {plan.missing.households === 1 ? "y" : "ies"} and {plan.missing.people}{" "}
-                    {plan.missing.people === 1 ? "person" : "people"} this file has and the
-                    directory does not
+                    Puts back the {addFamilies} famil
+                    {addFamilies === 1 ? "y" : "ies"} and {addPeople}{" "}
+                    {addPeople === 1 ? "person" : "people"} this file has and the directory does not
                     {plan.missing.links > 0
                       ? `, and ${plan.missing.links} group ${plan.missing.links === 1 ? "membership" : "memberships"} that ${plan.missing.links === 1 ? "is" : "are"} no longer recorded`
                       : ""}
@@ -294,7 +328,8 @@ export function RestorePanel() {
                     {plan.missing.photos > 0
                       ? ` ${plan.missing.photos} missing ${plan.missing.photos === 1 ? "photograph is" : "photographs are"} put back.`
                       : ""}{" "}
-                    Nothing else already here is changed or deleted.
+                    Nothing else already here is changed or deleted
+                    {putBack.size > 0 ? ", apart from the edited records ticked below" : ""}.
                   </span>
                 </span>
               </label>
@@ -347,6 +382,45 @@ export function RestorePanel() {
                   directory as it is now is downloaded to this device — keep it until you are sure.
                 </span>
               </div>
+            ) : null}
+
+            {!replacing && typedAgainCount > 0 ? (
+              <Checkbox
+                label={`Don't add ${typedAgainCount} that ${typedAgainCount === 1 ? "looks" : "look"} typed in again`}
+                hint={`Missing from the directory, but somebody with the same name has been added since: ${[
+                  ...plan.typedAgain.households,
+                  ...plan.typedAgain.people,
+                ].join(
+                  ", ",
+                )}. Left out, their groups and places in directories go onto the one that is here.`}
+                checked={skipTypedAgain}
+                onChange={setSkipTypedAgain}
+                disabled={busy}
+              />
+            ) : null}
+
+            {!replacing && plan.changed.length > 0 ? (
+              <details className="restore-changes">
+                <summary>
+                  {plan.changed.length} {plan.changed.length === 1 ? "record has" : "records have"}{" "}
+                  been edited since this backup
+                  {putBack.size > 0 ? ` — ${putBack.size} chosen to put back` : ""}
+                </summary>
+                <p className="muted small">
+                  Tick any to put back as the backup has it. Only what differs is changed, and a
+                  record somebody edits again before you press the button is left alone.
+                </p>
+                {plan.changed.map((record) => (
+                  <Checkbox
+                    key={record.id}
+                    label={record.name}
+                    hint={`Differs in: ${record.fields.join(", ")}`}
+                    checked={putBack.has(record.id)}
+                    onChange={(on) => toggle(record.id, on)}
+                    disabled={busy}
+                  />
+                ))}
+              </details>
             ) : null}
 
             {plan.damagedPhotos > 0 ? (
@@ -411,6 +485,7 @@ export function RestorePanel() {
                   result.added.people +
                   result.added.tags +
                   result.reattached +
+                  result.putBack +
                   result.photosUploaded ===
                 0 ? (
                 <>Nothing needed putting back.</>
@@ -432,6 +507,15 @@ export function RestorePanel() {
                 : ""}
               {result.orphaned > 0
                 ? ` ${result.orphaned} ${result.orphaned === 1 ? "person" : "people"} had no family left to belong to and ${result.orphaned === 1 ? "was" : "were"} restored without one.`
+                : ""}
+              {result.putBack > 0
+                ? ` ${result.putBack} edited ${result.putBack === 1 ? "record is" : "records are"} back as the backup had ${result.putBack === 1 ? "it" : "them"}.`
+                : ""}
+              {result.putBackSkipped > 0
+                ? ` ${result.putBackSkipped} ${result.putBackSkipped === 1 ? "was" : "were"} edited again while this ran and ${result.putBackSkipped === 1 ? "was" : "were"} left as ${result.putBackSkipped === 1 ? "it is" : "they are"}.`
+                : ""}
+              {result.typedAgainSkipped > 0
+                ? ` ${result.typedAgainSkipped} typed in again since ${result.typedAgainSkipped === 1 ? "was" : "were"} not added twice.`
                 : ""}
             </Notice>
             {result.photosFailed > 0 ? (
