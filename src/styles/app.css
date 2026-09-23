@@ -2231,17 +2231,32 @@ th.num {
 }
 
 /*
- * The saved directories, as cards of a settled size.
+ * The saved directories: three columns across a desk, two on a tablet, one
+ * on a phone - always filling the width.
  *
- * They were in the page's auto-fit grid, which collapses the columns it has
- * no cards for and hands what is left to the ones it has - so a church with
- * one directory got a single card the full width of a desk monitor, a name in
- * the top left corner of it and a great deal of nothing to the right.
- * auto-fill keeps the columns, and the cap keeps a lone card the size it
- * would have been with three beside it.
+ * They were cards of a settled 420px, which kept a lone card from stretching
+ * across a monitor but left the row short of the edge everywhere else: at
+ * 1920 the three cards stopped 324px from the right, and at 1440 only two fit.
+ * A fixed count of equal columns fixes both. The row always reaches the edge,
+ * and a lone card is still a third of it rather than all of it, because the
+ * columns it has no cards for are kept - auto-fit would have collapsed them
+ * and handed one directory the whole screen.
+ *
+ * minmax(0, 1fr) rather than 1fr, so a long directory name wraps inside its
+ * card instead of widening its column past the other two.
  */
 .project-grid {
-  grid-template-columns: repeat(auto-fill, minmax(260px, 420px));
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 700px) {
+  .project-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1160px) {
+  .project-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 /* The checklist a hand-picked directory is chosen from: a search line, and

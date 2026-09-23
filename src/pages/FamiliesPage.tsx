@@ -108,12 +108,15 @@ export function FamiliesPage() {
         {filtered.length ? (
           <table className="list-table grid-table">
             <colgroup>
+              {/* One col per column, and the address - the longest thing in a
+                  row - takes whatever the others leave. A col with no column
+                  under it is an empty column: when Groups went, its col
+                  stayed and held a quarter of the table blank on the right. */}
               <col className="c-portrait" />
               <col className="c-wide" />
               <col className="c-wide" />
-              <col className="c-mid" />
-              <col className="c-narrow" />
               <col className="c-rest" />
+              <col className="c-narrow" />
             </colgroup>
             <thead>
               <tr>
