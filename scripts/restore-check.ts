@@ -552,14 +552,36 @@ console.log("\na deleted family, as the database leaves it");
     selectRows(file, moved, "missing").reattach.map((row) => row.id),
     ["p2"],
   );
+  // p2 is still in the Smiths; p1 was taken out of the family on purpose.
   const leftOnPurpose: LiveDirectory = {
     ...afterDelete,
     households: [household("h1", "Smith"), household("h2", "Jones")],
+    people: [person("p1", null), person("p2", "h1"), person("p3", "h2")],
   };
   same(
-    "somebody taken out of a family that still exists is not put back",
+    "somebody taken out of a family that still has members is not put back",
     selectRows(file, leftOnPurpose, "missing").reattach.length,
     0,
+  );
+
+  // An earlier restore put the family back and stopped before its people went
+  // into it - or ran before members were put back at all. The family is here
+  // and empty; running the restore again has to finish the job.
+  const halfRestored: LiveDirectory = {
+    ...afterDelete,
+    households: [household("h1", "Smith"), household("h2", "Jones")],
+  };
+  const again = selectRows(file, halfRestored, "missing");
+  same("running it again writes no family twice", again.households.length, 0);
+  same(
+    "and puts the members into the family that came back empty",
+    again.reattach.map((row) => row.id).sort(),
+    ["p1", "p2"],
+  );
+  same(
+    "which the preview counts, so it is not called nothing to do",
+    (await readBackup(archive(), halfRestored)).missing.reattach,
+    2,
   );
   same(
     "replacing writes everyone afresh instead",

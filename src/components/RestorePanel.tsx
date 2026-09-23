@@ -289,7 +289,7 @@ export function RestorePanel() {
                       : ""}
                     .
                     {plan.missing.reattach > 0
-                      ? ` ${plan.missing.reattach} ${plan.missing.reattach === 1 ? "person who is" : "people who are"} still here but lost their family when it was deleted ${plan.missing.reattach === 1 ? "goes" : "go"} back into it.`
+                      ? ` ${plan.missing.reattach} ${plan.missing.reattach === 1 ? "person who is" : "people who are"} still here but no longer in their family ${plan.missing.reattach === 1 ? "goes" : "go"} back into it.`
                       : ""}
                     {plan.missing.photos > 0
                       ? ` ${plan.missing.photos} missing ${plan.missing.photos === 1 ? "photograph is" : "photographs are"} put back.`
