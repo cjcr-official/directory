@@ -390,3 +390,38 @@ export function TagPill({ name, color }: { name: string; color: string }) {
     </span>
   );
 }
+
+/**
+ * A record's groups, kept to one line.
+ *
+ * A pill each stacked a record three and four lines tall in the lists, and the
+ * names were the least of what anyone came to the row for. One group is named
+ * and the rest are its colour alone; tapping a dot names that one instead, in
+ * its place, so the row never grows. The names are still there to a pointer
+ * that rests on a dot, and to a screen reader, which is read every one.
+ */
+export function TagDots({ tags }: { tags: { id: string; name: string; color: string }[] }) {
+  const [open, setOpen] = useState(0);
+  if (!tags.length) return null;
+  const shown = Math.min(open, tags.length - 1);
+  return (
+    <span className="tag-dots">
+      {tags.map((tag, index) =>
+        index === shown ? (
+          <TagPill key={tag.id} name={tag.name} color={tag.color} />
+        ) : (
+          <button
+            key={tag.id}
+            type="button"
+            className="tag-dot"
+            title={tag.name}
+            aria-label={tag.name}
+            onClick={() => setOpen(index)}
+          >
+            <span className="dot" style={{ background: tag.color }} />
+          </button>
+        ),
+      )}
+    </span>
+  );
+}
