@@ -6,7 +6,7 @@ import { Caret, ConfirmButton, EmptyState, Field, LoadingScreen, Notice } from "
 import { createTag, deleteTag, updateTag } from "@/lib/queries";
 import { fileAsName, firstName, labelledHouseholdName, message, sortKey } from "@/lib/format";
 import type { HouseholdRow, PersonRow, TagRow } from "@/lib/database.types";
-import type { DirectoryEntry, HouseholdWithMembers } from "@/lib/entries";
+import type { DirectoryEntry } from "@/lib/entries";
 
 const PALETTE = [
   "#2f6d63",
@@ -20,26 +20,18 @@ const PALETTE = [
   "#8a4b4b",
 ];
 
-type GroupRow =
-  | { person: PersonRow; household: HouseholdRow | null }
-  | { person: null; household: HouseholdWithMembers };
+type GroupRow = { person: PersonRow; household: HouseholdRow | null };
 
 /**
  * Who is in a group: the people ticked into it, one to a line.
  *
  * Only people who carry the group themselves. Listing everyone who lives with
  * them put a wife, a husband and three children under "Deacons" because one of
- * them is a deacon. Filed by surname, the way the book files them.
- *
- * A family ticked into the group as a whole - on the family's own page rather
- * than a person's - is not one of those people, and is listed after them as
- * the family it is. Saying so is the whole point: it is why a family can turn
- * up in a group's booklet when nobody in it is ticked, and the line links to
- * where that tick can be taken off.
+ * them is a deacon, and a family ticked in as a whole is not a person anybody
+ * ticked. Filed by surname, the way the book files them.
  */
 function peopleIn(entries: DirectoryEntry[], tagId: string): GroupRow[] {
   const people: GroupRow[] = [];
-  const families: GroupRow[] = [];
   for (const entry of entries) {
     if (entry.type === "person") {
       if (entry.person.tags.some((tag) => tag.id === tagId))
@@ -51,14 +43,9 @@ function peopleIn(entries: DirectoryEntry[], tagId: string): GroupRow[] {
       if ((household.memberTags[member.id] ?? []).some((tag) => tag.id === tagId))
         people.push({ person: member, household });
     }
-    if (household.tags.some((tag) => tag.id === tagId)) families.push({ person: null, household });
   }
-  const key = (row: GroupRow) =>
-    row.person
-      ? sortKey(row.person.last_name, firstName(row.person))
-      : sortKey(row.household.sort_name);
-  const byKey = (x: GroupRow, y: GroupRow) => key(x).localeCompare(key(y));
-  return [...people.sort(byKey), ...families.sort(byKey)];
+  const key = (row: GroupRow) => sortKey(row.person.last_name, firstName(row.person));
+  return people.sort((x, y) => key(x).localeCompare(key(y)));
 }
 
 /**
@@ -242,9 +229,7 @@ export function GroupsPage() {
           {tags.length ? (
             <ul className="group-list">
               {tags.map((tag) => {
-                const rows = counts.get(tag.id) ?? [];
-                const count = rows.filter((row) => row.person).length;
-                const families = rows.length - count;
+                const count = counts.get(tag.id)?.length ?? 0;
                 const open = openId === tag.id;
                 const panelId = `group-people-${tag.id}`;
                 return (
@@ -268,11 +253,6 @@ export function GroupsPage() {
 
                       <span className="group-count">
                         {count === 0 ? "Nobody" : count === 1 ? "1 person" : `${count} people`}
-                        {families === 1
-                          ? ", 1 family"
-                          : families > 1
-                            ? `, ${families} families`
-                            : ""}
                       </span>
 
                       {canEdit ? (
@@ -304,43 +284,26 @@ export function GroupsPage() {
                       <div className="group-members" id={panelId}>
                         {inGroup.length ? (
                           <ul className="group-member-list">
-                            {inGroup.map((row) =>
-                              row.person ? (
-                                <li key={row.person.id} className="group-member">
-                                  <Link
-                                    className="list-link group-member-name"
-                                    to={`/people/${row.person.id}`}
-                                  >
-                                    {fileAsName(row.person)}
-                                  </Link>
-                                  <span className="group-member-who">
-                                    {row.household
-                                      ? labelledHouseholdName(row.household)
-                                      : "On their own"}
-                                  </span>
-                                </li>
-                              ) : (
-                                <li key={row.household.id} className="group-member">
-                                  <Link
-                                    className="list-link group-member-name"
-                                    to={`/families/${row.household.id}`}
-                                  >
-                                    {labelledHouseholdName(row.household)}
-                                  </Link>
-                                  <span className="group-member-who">
-                                    The whole family is in this group
-                                    {row.household.members.length
-                                      ? ` — ${row.household.members.map(firstName).join(", ")}`
-                                      : ""}
-                                  </span>
-                                </li>
-                              ),
-                            )}
+                            {inGroup.map((row) => (
+                              <li key={row.person.id} className="group-member">
+                                <Link
+                                  className="list-link group-member-name"
+                                  to={`/people/${row.person.id}`}
+                                >
+                                  {fileAsName(row.person)}
+                                </Link>
+                                <span className="group-member-who">
+                                  {row.household
+                                    ? labelledHouseholdName(row.household)
+                                    : "On their own"}
+                                </span>
+                              </li>
+                            ))}
                           </ul>
                         ) : (
                           <p className="hint" style={{ margin: 0 }}>
-                            Nobody is in this group yet. Open a family or a person and tick “
-                            {tag.name}” under Groups.
+                            Nobody is in this group yet. Open a person and tick “{tag.name}” under
+                            Groups.
                           </p>
                         )}
 
