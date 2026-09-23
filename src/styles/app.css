@@ -1987,6 +1987,57 @@ th.num {
   padding: 6px;
 }
 
+/* A photo that opens full screen: the button is only there to be tapped. */
+.photo-zoom {
+  display: block;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  cursor: zoom-in;
+}
+.photo-zoom img {
+  display: block;
+}
+
+/* The whole screen, dark, with the photo as large as it will go and whole. */
+.photo-viewer {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: rgb(0 0 0 / 96%);
+  cursor: zoom-out;
+  overflow: hidden;
+}
+.photo-viewer::backdrop {
+  background: transparent;
+}
+.photo-viewer img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.photo-viewer-close {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 12px);
+  right: calc(env(safe-area-inset-right) + 12px);
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 16%);
+  color: #fff;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
 .pill {
   display: inline-flex;
   align-items: center;
