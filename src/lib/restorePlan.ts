@@ -7,6 +7,8 @@ import type {
   TagRow,
 } from "./database.types";
 import { message } from "./format";
+import { PHOTO_FOLDERS } from "./photoFolders";
+import { COVER_PATH_KEYS } from "./backupSpec";
 
 /**
  * What loading a backup back in would do.
@@ -183,12 +185,12 @@ function isRowArray(value: unknown): value is Record<string, unknown>[] {
 }
 
 /** The folders of the photo bucket the directory's records point into. */
-export const PHOTO_FOLDERS = ["households", "people", "covers"] as const;
+export { PHOTO_FOLDERS } from "./photoFolders";
 
 /** The cover artwork a directory's settings point at, if any. */
 export function coverPaths(project: ProjectRow): string[] {
   const settings = (project.settings ?? {}) as Record<string, unknown>;
-  return [settings.coverPhotoPath, settings.coverLogoPath].filter(
+  return COVER_PATH_KEYS.map((key) => settings[key]).filter(
     (path): path is string => typeof path === "string" && path.trim() !== "",
   );
 }

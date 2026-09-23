@@ -1,5 +1,6 @@
 import { PHOTO_BUCKET, supabase } from "./supabase";
 import { createBatcher } from "./batch";
+import type { PhotoFolder } from "./photoFolders";
 
 /**
  * Photographs, end to end.
@@ -64,10 +65,7 @@ function randomId(): string {
 }
 
 /** Uploads a prepared photo and returns its storage path. */
-export async function uploadPhoto(
-  kind: "households" | "people" | "covers",
-  blob: Blob,
-): Promise<string> {
+export async function uploadPhoto(kind: PhotoFolder, blob: Blob): Promise<string> {
   const path = `${kind}/${randomId()}.jpg`;
   const { error } = await supabase.storage.from(PHOTO_BUCKET).upload(path, blob, {
     contentType: "image/jpeg",

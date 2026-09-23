@@ -1,11 +1,11 @@
 import type { DirectoryData } from "./entries";
-import type { ProfileRow, ProjectEntryRow, ProjectRow, TagRow } from "./database.types";
+import type { ProfileRow, ProjectEntryRow, ProjectRow } from "./database.types";
 import { toCsv, type CsvValue } from "./csv";
+import { familiesCsv, peopleCsv } from "./backupSpec";
 import { buildZipBlob, type ZipEntry } from "./zip";
 import { downloadPhoto } from "./photos";
 import { fetchProfiles, fetchProject, fetchProjects } from "./queries";
 import { coverPaths } from "./restorePlan";
-import { formatPhone } from "./format";
 
 /**
  * A complete, self-contained copy of the directory as a single ZIP.
@@ -40,139 +40,6 @@ export interface BackupOptions {
 
 const encoder = new TextEncoder();
 const text = (value: string): Uint8Array => encoder.encode(value);
-
-function tagNames(tags: TagRow[], ids: string[]): string {
-  const byId = new Map(tags.map((tag) => [tag.id, tag.name]));
-  return ids
-    .map((id) => byId.get(id))
-    .filter(Boolean)
-    .join("; ");
-}
-
-function familiesCsv(data: DirectoryData): string {
-  const linked = new Map<string, string[]>();
-  for (const link of data.householdTags) {
-    linked.set(link.household_id, [...(linked.get(link.household_id) ?? []), link.tag_id]);
-  }
-
-  const rows: CsvValue[][] = data.households.map((household) => [
-    household.display_name,
-    household.sort_name,
-    household.address_line1,
-    household.address_line2,
-    household.city,
-    household.state,
-    household.postal_code,
-    household.country,
-    formatPhone(household.phone),
-    household.email,
-    household.anniversary,
-    tagNames(data.tags, linked.get(household.id) ?? []),
-    household.notes,
-    // Office-only, and in the spreadsheet for the same reason it is in the
-    // JSON: a backup that cannot rebuild what was on screen is not a backup.
-    household.office_label ?? "",
-    household.is_active,
-    household.photo_path ? `photos/${household.photo_path}` : "",
-    household.photo_fit ?? "",
-    household.id,
-  ]);
-
-  return toCsv(
-    [
-      "Family name",
-      "Files under",
-      "Address line 1",
-      "Address line 2",
-      "City",
-      "State",
-      "ZIP",
-      "Country",
-      "Home phone",
-      "Family email",
-      "Anniversary",
-      "Groups",
-      "Notes",
-      "Which one (office only)",
-      "In printed directories",
-      "Photo file",
-      "Photo shape",
-      "Id",
-    ],
-    rows,
-  );
-}
-
-function peopleCsv(data: DirectoryData): string {
-  const linked = new Map<string, string[]>();
-  for (const link of data.personTags) {
-    linked.set(link.person_id, [...(linked.get(link.person_id) ?? []), link.tag_id]);
-  }
-  const households = new Map(data.households.map((h) => [h.id, h.display_name]));
-
-  const rows: CsvValue[][] = data.people.map((person) => [
-    person.last_name,
-    person.first_name,
-    person.preferred_name,
-    person.household_id ? (households.get(person.household_id) ?? "") : "",
-    person.household_role,
-    person.gender,
-    formatPhone(person.phone),
-    person.email,
-    person.date_of_birth,
-    person.anniversary,
-    person.use_household_address,
-    person.address_line1,
-    person.address_line2,
-    person.city,
-    person.state,
-    person.postal_code,
-    person.country,
-    tagNames(data.tags, linked.get(person.id) ?? []),
-    person.notes,
-    // Office-only and never printed, and in the spreadsheet for the reason
-    // everything office-only is: a backup that cannot rebuild what was on
-    // screen is not a backup. Whoever opens people.csv to work out who is due
-    // wants these two beside the name.
-    person.background_check_on,
-    person.background_check_due,
-    person.is_active,
-    person.photo_path ? `photos/${person.photo_path}` : "",
-    person.photo_fit ?? "",
-    person.id,
-  ]);
-
-  return toCsv(
-    [
-      "Last name",
-      "First name",
-      "Goes by",
-      "Family",
-      "Role in family",
-      "Gender",
-      "Phone",
-      "Email",
-      "Date of birth",
-      "Anniversary",
-      "Uses family address",
-      "Address line 1",
-      "Address line 2",
-      "City",
-      "State",
-      "ZIP",
-      "Country",
-      "Groups",
-      "Notes",
-      "Background check done",
-      "Background check due",
-      "In printed directories",
-      "Photo file",
-      "Photo shape",
-      "Id",
-    ],
-    rows,
-  );
-}
 
 function groupsCsv(data: DirectoryData): string {
   const rows: CsvValue[][] = data.tags.map((tag) => [
