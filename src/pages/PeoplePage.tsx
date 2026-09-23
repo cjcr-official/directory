@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, type CSSProperties, type ReactNode } from "r
 import { Link, useNavigate } from "react-router-dom";
 import { useDirectory } from "@/data/DirectoryContext";
 import { useAuth } from "@/auth/AuthProvider";
-import { Avatar, EmptyState, LoadingScreen, Notice, TagPill } from "@/components/ui";
+import { Avatar, EmptyState, LoadingScreen, Notice, TagDots } from "@/components/ui";
 import { ColumnPicker } from "@/components/ColumnPicker";
 import { readColumns, readWidths, rememberColumns, rememberWidths } from "@/lib/columns";
 import type { Gender, HouseholdRow, PersonRow, TagRow } from "@/lib/database.types";
@@ -201,13 +201,7 @@ const COLUMNS: {
     label: "Groups",
     width: "c-wide",
     cellClass: "",
-    cell: (_person, { tagsOf }) => (
-      <span className="row tight">
-        {tagsOf().map((tag) => (
-          <TagPill key={tag.id} name={tag.name} color={tag.color} />
-        ))}
-      </span>
-    ),
+    cell: (_person, { tagsOf }) => <TagDots tags={tagsOf()} />,
   },
 ];
 

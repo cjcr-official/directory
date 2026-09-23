@@ -2001,6 +2001,37 @@ th.num {
   height: 7px;
   border-radius: 50%;
 }
+/* A record's groups on one line: one named, the rest a dot to tap. */
+.tag-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.tag-dots .pill {
+  margin: 0 2px;
+}
+.tag-dot {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+.tag-dot:hover {
+  background: var(--canvas);
+}
+.tag-dot .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
 .pill.role {
   text-transform: capitalize;
 }

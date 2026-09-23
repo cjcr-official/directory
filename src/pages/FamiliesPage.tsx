@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useDirectory } from "@/data/DirectoryContext";
 import { useAuth } from "@/auth/AuthProvider";
-import { Avatar, EmptyState, LoadingScreen, Notice, TagPill } from "@/components/ui";
+import { Avatar, EmptyState, LoadingScreen, Notice, TagDots } from "@/components/ui";
 import { addressLines, alphaBucket, firstName, formatPhone, sortKey } from "@/lib/format";
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
@@ -174,14 +174,11 @@ export function FamiliesPage() {
                       {formatPhone(household.phone) || "—"}
                     </td>
                     <td className="hide-sm">
-                      <span className="row tight">
-                        {tagsOfHousehold(household.id).map((tagId) => {
-                          const tag = tagsById.get(tagId);
-                          return tag ? (
-                            <TagPill key={tag.id} name={tag.name} color={tag.color} />
-                          ) : null;
-                        })}
-                      </span>
+                      <TagDots
+                        tags={tagsOfHousehold(household.id).flatMap(
+                          (tagId) => tagsById.get(tagId) ?? [],
+                        )}
+                      />
                     </td>
                   </tr>
                 );
