@@ -10,8 +10,14 @@
  * Run with: npm run restore:check
  */
 
-import { readBackup, selectRows, type BackupFile, type LiveDirectory } from "@/lib/restorePlan";
-import { buildZip } from "@/lib/zip";
+import {
+  findChanged,
+  readBackup,
+  selectRows,
+  type BackupFile,
+  type LiveDirectory,
+} from "@/lib/restorePlan";
+import { buildZip, buildZipBlob } from "@/lib/zip";
 import { toCsv } from "@/lib/csv";
 import type { HouseholdRow, PersonRow, ProjectRow, TagRow } from "@/lib/database.types";
 import { check, same } from "./check";
@@ -821,4 +827,163 @@ console.log("\na group made again under the same name");
     selectRows(file, live, "replace").tags.map((row) => row.id),
     ["t-old"],
   );
+}
+
+// ---------------------------------------------------------------------------
+// A record deleted by mistake and typed in again by hand before anybody
+// thought of the backup. It has a new id, so to the restore the original is
+// missing - and putting it back makes two.
+// ---------------------------------------------------------------------------
+
+console.log("\na family and a person typed in again");
+{
+  const file = backup({
+    householdTags: [{ household_id: "h1", tag_id: "t1" }],
+    personTags: [{ person_id: "p1", tag_id: "t2" }],
+    projects: [
+      {
+        project: project("pr1"),
+        tagIds: [],
+        entries: [{ project_id: "pr1", entry_type: "household", ref_id: "h1", position: 0 }],
+      },
+    ],
+  });
+  // The Smiths (h1) and p1 were deleted, then entered again as h9 and p9.
+  // p2, also a Smith, was deleted and not typed in again.
+  const retyped: LiveDirectory = {
+    ...EMPTY,
+    households: [household("h2", "Jones"), household("h9", " smith ")],
+    people: [{ ...person("p9", "h9"), first_name: "P1" }, person("p3", "h2")],
+    tags: file.tags,
+  };
+
+  const plan = await readBackup(archive(file), retyped);
+  same("the preview names the family", plan.typedAgain.households, ["Smith"]);
+  same("and the person", plan.typedAgain.people, ["p1 Person"]);
+
+  const rows = selectRows(file, retyped, "missing", new Set(), new Map(), {
+    skipTypedAgain: true,
+  });
+  same("the family is not written twice", ids(rows.households), []);
+  same("nor the person", ids(rows.people), ["p2"]);
+  same(
+    "somebody missing from it goes into the family that is here",
+    rows.people[0]?.household_id,
+    "h9",
+  );
+  same("its group goes onto the one here", rows.householdTags, [
+    { household_id: "h9", tag_id: "t1" },
+  ]);
+  same("and so does the person's", rows.personTags, [{ person_id: "p9", tag_id: "t2" }]);
+  same("a restored directory lists the one here", rows.projectEntries[0]?.ref_id, "h9");
+  same("both are counted as left out", rows.typedAgainSkipped, 2);
+
+  same(
+    "without the choice, both come back as they were",
+    ids(selectRows(file, retyped, "missing").households),
+    ["h1"],
+  );
+
+  // Two new Smiths for one missing is a guess, and it is not made.
+  const twoNew: LiveDirectory = {
+    ...retyped,
+    households: [...retyped.households, household("h8", "Smith")],
+  };
+  same(
+    "an ambiguous match is not treated as the same family",
+    ids(
+      selectRows(file, twoNew, "missing", new Set(), new Map(), { skipTypedAgain: true })
+        .households,
+    ),
+    ["h1"],
+  );
+  // Same name, different birthday: a different person.
+  const otherBirthday: LiveDirectory = {
+    ...retyped,
+    people: [{ ...person("p9", "h9"), first_name: "P1", date_of_birth: "1990-01-01" }],
+  };
+  same(
+    "a person with the same name and another birthday is somebody else",
+    (await readBackup(archive(file), otherBirthday)).typedAgain.people,
+    [],
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Records edited since the backup: offered back one by one, never by default.
+// ---------------------------------------------------------------------------
+
+console.log("\nrecords edited since the backup");
+{
+  const file = backup();
+  const edited: LiveDirectory = {
+    ...EMPTY,
+    households: [
+      { ...household("h1", "Smith"), city: "Elsewhere", updated_at: "2026-02-01T00:00:00Z" },
+      household("h2", "Jones"),
+    ],
+    people: [
+      { ...person("p1", "h1"), phone: "555", notes: "new", updated_at: "2026-02-02T00:00:00Z" },
+      person("p2", "h2"),
+      person("p3", "h2"),
+    ],
+    tags: file.tags,
+  };
+  const changed = findChanged(file, edited);
+  same(
+    "each edited record is listed with what differs, by name",
+    changed.map((record) => [record.id, record.fields]),
+    [
+      ["p1", ["phone", "notes"]],
+      ["p2", ["family"]],
+      ["h1", ["address"]],
+    ],
+  );
+  const smith = changed.find((record) => record.id === "h1");
+  same("only the columns that differ are put back", smith?.patch, { city: null });
+  same("guarded on the version that was read", smith?.updatedAt, "2026-02-01T00:00:00Z");
+
+  same(
+    "an unedited directory lists nothing",
+    findChanged(file, {
+      ...EMPTY,
+      households: file.households,
+      people: file.people,
+    }).length,
+    0,
+  );
+
+  // p1's family is gone: moving them back into it is not offered.
+  const familyGone = findChanged(file, {
+    ...EMPTY,
+    households: [household("h2", "Jones")],
+    people: [person("p1", "h2")],
+  });
+  same(
+    "a move back into a family that is gone is not offered",
+    familyGone.find((record) => record.id === "p1"),
+    undefined,
+  );
+
+  // A column one side has never had is not a change.
+  const older = backup({
+    households: [{ ...household("h1", "Smith") } as HouseholdRow],
+  });
+  delete (older.households[0] as Partial<HouseholdRow>).notes;
+  same(
+    "a column missing from an older backup is not reported",
+    findChanged(older, { ...EMPTY, households: [household("h1", "Smith")] }).length,
+    0,
+  );
+}
+
+console.log("\nthe archive as a Blob");
+{
+  const entries = [
+    { name: "a.txt", data: enc.encode("one") },
+    { name: "photos/b.jpg", data: new Uint8Array([1, 2, 3]) },
+  ];
+  const when = new Date(2026, 0, 1, 12, 0, 0);
+  const blob = new Uint8Array(await buildZipBlob(entries, when).arrayBuffer());
+  same("is byte for byte the same archive", [...blob], [...buildZip(entries, when)]);
 }

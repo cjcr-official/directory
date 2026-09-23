@@ -58,7 +58,7 @@ export function BackupPage() {
         onProgress: setProgress,
       });
 
-      saveBackupFile(backup.bytes, backup.fileName);
+      saveBackupFile(backup.file, backup.fileName);
 
       await recordBackup({
         photosIncluded: includePhotos,
@@ -67,7 +67,7 @@ export function BackupPage() {
       });
       setResult({
         fileName: backup.fileName,
-        size: backup.bytes.length,
+        size: backup.file.size,
         missing: backup.missingPhotos.length,
       });
     } catch (cause) {
