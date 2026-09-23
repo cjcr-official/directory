@@ -1995,7 +1995,7 @@ th.num {
   border: 0;
   border-radius: 8px;
   background: none;
-  cursor: zoom-in;
+  cursor: pointer;
 }
 .photo-zoom img {
   display: block;
@@ -2012,7 +2012,7 @@ th.num {
   padding: 0;
   border: 0;
   background: rgb(0 0 0 / 96%);
-  cursor: zoom-out;
+  cursor: pointer;
   overflow: hidden;
 }
 .photo-viewer::backdrop {
