@@ -6,8 +6,20 @@ import { NotificationTray } from "@/components/NotificationTray";
 import { useAuth } from "@/auth/AuthProvider";
 import { useDirectory } from "@/data/DirectoryContext";
 import { APP_VERSION } from "@/lib/version";
+import { isBackupDue, useLastBackup } from "@/lib/backupLog";
 
-function Item({ to, label, count }: { to: string; label: string; count?: number }) {
+function Item({
+  to,
+  label,
+  count,
+  flag,
+}: {
+  to: string;
+  label: string;
+  count?: number;
+  /** A word that needs doing something about, in place of a count. */
+  flag?: string;
+}) {
   return (
     <NavLink
       to={to}
@@ -15,6 +27,7 @@ function Item({ to, label, count }: { to: string; label: string; count?: number 
       end={to === "/"}
     >
       <span>{label}</span>
+      {flag ? <span className="pill warn">{flag}</span> : null}
       {count === undefined ? null : <span className="count">{count}</span>}
     </NavLink>
   );
@@ -24,6 +37,11 @@ export function AppShell() {
   const { profile, role, canEdit, isOwner, signOut } = useAuth();
   const { households, people, tags } = useDirectory();
   const [menuOpen, setMenuOpen] = useState(false);
+  // Only the people who can take a backup are told one is due. A backup that
+  // has quietly stopped is the failure nobody notices until the day it is
+  // needed, so it is said where every editor passes, not just on its own page.
+  const lastBackup = useLastBackup(canEdit);
+  const backupDue = canEdit && lastBackup.loaded && isBackupDue(lastBackup.takenAt);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -136,7 +154,7 @@ export function AppShell() {
 
           <div className="nav-section">Settings</div>
           <Item to="/settings" label="Settings" />
-          <Item to="/backup" label="Backup" />
+          <Item to="/backup" label="Backup" flag={backupDue ? "Due" : undefined} />
           {isOwner ? <Item to="/administrators" label="Administrators" /> : null}
         </div>
 

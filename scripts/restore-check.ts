@@ -12,6 +12,7 @@
 
 import { readBackup, selectRows, type BackupFile, type LiveDirectory } from "@/lib/restorePlan";
 import { buildZip } from "@/lib/zip";
+import { toCsv } from "@/lib/csv";
 import type { HouseholdRow, PersonRow, ProjectRow, TagRow } from "@/lib/database.types";
 import { check, same } from "./check";
 
@@ -504,4 +505,252 @@ console.log("\ncounting what is missing, so the page can say so before writing")
     personTags: [],
   });
   same("both kinds of link are counted", lostBoth.missing.links, 2);
+}
+
+// ---------------------------------------------------------------------------
+// A deleted family. The database does not delete a family's members with it -
+// it clears their link to the family and leaves them in the directory - so the
+// case the restore exists for is a family missing and its people present,
+// each with no family at all.
+// ---------------------------------------------------------------------------
+
+console.log("\na deleted family, as the database leaves it");
+{
+  const file = backup();
+  const afterDelete: LiveDirectory = {
+    ...EMPTY,
+    households: [household("h2", "Jones")],
+    people: [person("p1", null), person("p2", null), person("p3", "h2")],
+    tags: file.tags,
+    projects: [project("pr1")],
+  };
+  const rows = selectRows(file, afterDelete, "missing");
+  same("the family comes back", ids(rows.households), ["h1"]);
+  same("its members are not written again", rows.people.length, 0);
+  same(
+    "they are put back into it, with their role",
+    rows.reattach.map((row) => [row.id, row.household_id, row.household_role]).sort(),
+    [
+      ["p1", "h1", "head"],
+      ["p2", "h1", "head"],
+    ],
+  );
+  same("nobody else is moved", rows.reattach.length, 2);
+
+  const plan = await readBackup(archive(), afterDelete);
+  same("the preview counts them", plan.missing.reattach, 2);
+  same("and does not call them missing people", plan.missing.people, 0);
+
+  // Moved into another family since, or taken out of this one while it still
+  // exists: both were done on purpose, and both are left alone.
+  const moved: LiveDirectory = {
+    ...afterDelete,
+    people: [person("p1", "h2"), person("p2", null), person("p3", "h2")],
+  };
+  same(
+    "somebody since moved into another family stays there",
+    selectRows(file, moved, "missing").reattach.map((row) => row.id),
+    ["p2"],
+  );
+  const leftOnPurpose: LiveDirectory = {
+    ...afterDelete,
+    households: [household("h1", "Smith"), household("h2", "Jones")],
+  };
+  same(
+    "somebody taken out of a family that still exists is not put back",
+    selectRows(file, leftOnPurpose, "missing").reattach.length,
+    0,
+  );
+  same(
+    "replacing writes everyone afresh instead",
+    selectRows(file, afterDelete, "replace").reattach.length,
+    0,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Photographs: pictures missing from records that are still here, cover
+// artwork, and what a replace leaves behind in storage.
+// ---------------------------------------------------------------------------
+
+console.log("\nphotographs of records that are still here");
+{
+  const file = backup({
+    households: [household("h1", "Smith", "households/a.jpg"), household("h2", "Jones")],
+    people: [person("p1", "h1", "people/b.jpg"), person("p2", "h1"), person("p3", "h2")],
+    projects: [
+      {
+        project: { ...project("pr1"), settings: { coverPhotoPath: "covers/c.jpg" } },
+        tagIds: [],
+        entries: [],
+      },
+    ],
+  });
+  const photos = new Map([
+    ["households/a.jpg", new Uint8Array([1])],
+    ["people/b.jpg", new Uint8Array([2])],
+    ["covers/c.jpg", new Uint8Array([3])],
+  ]);
+  const everything: LiveDirectory = {
+    ...EMPTY,
+    households: file.households,
+    people: file.people,
+    tags: file.tags,
+    projects: file.projects.map((row) => row.project),
+  };
+
+  const lostOne = selectRows(
+    file,
+    { ...everything, storedPhotos: new Set(["households/a.jpg", "covers/c.jpg"]) },
+    "missing",
+    new Set(),
+    photos,
+  );
+  same("a picture gone from a surviving record is put back", lostOne.photoPaths, ["people/b.jpg"]);
+  same("and counted as a repair", lostOne.repairedPhotos, 1);
+
+  const lostCover = selectRows(
+    file,
+    { ...everything, storedPhotos: new Set(["households/a.jpg", "people/b.jpg"]) },
+    "missing",
+    new Set(),
+    photos,
+  );
+  same("so is a directory's cover", lostCover.photoPaths, ["covers/c.jpg"]);
+
+  same(
+    "nothing is uploaded when every picture is there",
+    selectRows(
+      file,
+      { ...everything, storedPhotos: new Set(photos.keys()) },
+      "missing",
+      new Set(),
+      photos,
+    ).photoPaths.length,
+    0,
+  );
+  same(
+    "nor when storage could not be listed",
+    selectRows(file, { ...everything, storedPhotos: null }, "missing", new Set(), photos).photoPaths
+      .length,
+    0,
+  );
+
+  const restoringAll = selectRows(file, EMPTY, "missing", new Set(), photos);
+  same(
+    "a restored directory brings its cover with it",
+    restoringAll.photoPaths.includes("covers/c.jpg"),
+    true,
+  );
+
+  const replaced = selectRows(
+    file,
+    {
+      ...everything,
+      storedPhotos: new Set([
+        "households/a.jpg",
+        "people/b.jpg",
+        "covers/c.jpg",
+        "people/added-since.jpg",
+        "elsewhere/kept.jpg",
+      ]),
+    },
+    "replace",
+    new Set(),
+    photos,
+  );
+  same("a replace does not re-upload pictures already there", replaced.photoPaths.length, 0);
+  same(
+    "and clears only pictures in the directory's folders that nothing points at",
+    replaced.photosToRemove,
+    ["people/added-since.jpg"],
+  );
+  same(
+    "adding back never clears anything",
+    selectRows(
+      file,
+      { ...everything, storedPhotos: new Set(["people/added-since.jpg"]) },
+      "missing",
+      new Set(),
+      photos,
+    ).photosToRemove.length,
+    0,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Archives that have been handled: unzipped and zipped up again, or damaged.
+// ---------------------------------------------------------------------------
+
+console.log("\nan archive that was unzipped and zipped up again");
+{
+  const inner = archive({}, [{ name: "photos/people/b.jpg", data: new Uint8Array([4, 5]) }]);
+  // Rebuild it the way Finder's Compress would: everything one folder down,
+  // plus the resource forks macOS adds beside it.
+  const { readZip } = await import("@/lib/unzip");
+  const entries = await readZip(inner);
+  const folder = "church-directory-backup-2026-09-23/";
+  const rezipped = buildZip([
+    ...entries.map((entry) => ({ name: folder + entry.name, data: entry.data })),
+    { name: `__MACOSX/${folder}._directory.json`, data: new Uint8Array([0]) },
+  ]);
+  const plan = await readBackup(rezipped, EMPTY);
+  same("it reads", plan.inFile.households, 2);
+  same("its photographs are found", [...plan.photos.keys()], ["people/b.jpg"]);
+
+  const twoBackups = buildZip([
+    ...entries.map((entry) => ({ name: `one/${entry.name}`, data: entry.data })),
+    ...entries.map((entry) => ({ name: `two/${entry.name}`, data: entry.data })),
+  ]);
+  await refuses(
+    "two backups zipped together are refused rather than guessed between",
+    twoBackups,
+    /no directory\.json/,
+  );
+}
+
+console.log("\na damaged archive");
+{
+  const marker = [9, 8, 7, 6, 5, 4, 3, 2];
+  const bytes = archive({}, [
+    { name: "photos/people/good.jpg", data: new Uint8Array([1, 2]) },
+    { name: "photos/people/bad.jpg", data: new Uint8Array(marker) },
+  ]);
+  const at = bytes.findIndex((_, i) => marker.every((value, k) => bytes[i + k] === value));
+  bytes[at + 3] ^= 0xff;
+
+  const plan = await readBackup(bytes, EMPTY);
+  same(
+    "a photograph that fails its checksum is left out",
+    [...plan.photos.keys()],
+    ["people/good.jpg"],
+  );
+  same("and counted", plan.damagedPhotos, 1);
+
+  const json = archive();
+  const text = enc.encode('"format": "church-directory-backup"');
+  const where = json.findIndex((_, i) => text.every((value, k) => json[i + k] === value));
+  json[where + 12] ^= 0x01;
+  await refuses("a damaged directory.json is refused", json, /damaged/);
+}
+
+console.log("\nthe spreadsheets in a backup");
+{
+  const csv = toCsv(
+    ["Name", "Notes"],
+    [
+      ['=HYPERLINK("http://x")', "+1 then"],
+      ["@SUM(A1)", "-5"],
+      ["Plain", 42],
+      [-3, "ok"],
+    ],
+  );
+  const lines = csv
+    .replace(/^\uFEFF/, "")
+    .trim()
+    .split("\r\n");
+  same("a formula is written as text", lines[1], `"'=HYPERLINK(""http://x"")",'+1 then`);
+  same("so are @ and -", lines[2], "'@SUM(A1),'-5");
+  same("ordinary text and numbers are untouched", lines[3], "Plain,42");
+  same("a negative number stays a number", lines[4], "-3,ok");
 }

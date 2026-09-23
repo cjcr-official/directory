@@ -1,9 +1,21 @@
 export type CsvValue = string | number | boolean | null | undefined;
 
+/**
+ * Text a spreadsheet would run as a formula rather than show.
+ *
+ * Excel, Numbers and Sheets all treat a cell opening with one of these as a
+ * formula, so a note typed as "=HYPERLINK(...)" would become a live link - or
+ * worse - in the office's copy of the backup. Numbers are safe as they are.
+ */
+const FORMULA_START = /^[=+\-@\t\r]/;
+
 /** Quotes a field only when it needs it, doubling any embedded quotes. */
 function escape(value: CsvValue): string {
   if (value === null || value === undefined) return "";
-  const text = typeof value === "boolean" ? (value ? "yes" : "no") : String(value);
+  let text = typeof value === "boolean" ? (value ? "yes" : "no") : String(value);
+  // A leading apostrophe is the spreadsheet convention for "this is text": it
+  // is shown as written and never evaluated.
+  if (typeof value === "string" && FORMULA_START.test(text)) text = `'${text}`;
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 

@@ -2,8 +2,10 @@ import { useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { useDirectory } from "@/data/DirectoryContext";
 import { Notice } from "@/components/ui";
-import { fetchProjects } from "@/lib/queries";
-import { applyRestore, readBackupFile } from "@/lib/restore";
+import { fetchDirectory, fetchProjects } from "@/lib/queries";
+import { buildBackup, saveBackupFile } from "@/lib/backup";
+import { recordBackup } from "@/lib/backupLog";
+import { applyRestore, listStoredPhotos, readBackupFile } from "@/lib/restore";
 import { message } from "@/lib/format";
 import type {
   LiveDirectory,
@@ -20,11 +22,29 @@ import type {
  * things this can do are very different sizes and the person choosing between
  * them deserves to see which one they are about to press. Adding back what is
  * missing is the default and is safe; replacing everything is not, so it is
- * owner-only and asks for the word to be typed.
+ * owner-only, asks for the word to be typed, and downloads a copy of the
+ * directory as it stands before it touches anything.
  */
+
+/**
+ * The directory as the database holds it right now.
+ *
+ * Not the copy the rest of the app is showing: that is only refreshed when
+ * somebody is added, so a family another editor deleted an hour ago would
+ * still be in it, and would not be offered back. Storage is listed alongside,
+ * so a photograph missing from a record that is still here can be put back.
+ */
+async function readLive(): Promise<LiveDirectory> {
+  const [directory, projects, storedPhotos] = await Promise.all([
+    fetchDirectory(),
+    fetchProjects(),
+    listStoredPhotos(),
+  ]);
+  return { ...directory, projects, storedPhotos };
+}
 export function RestorePanel() {
   const { canEdit, isOwner } = useAuth();
-  const { households, people, tags, householdTags, personTags, reload } = useDirectory();
+  const { reload } = useDirectory();
 
   const fileInput = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState("");
@@ -63,17 +83,7 @@ export function RestorePanel() {
     setMode("missing");
     setFileName(file.name);
     try {
-      // Directories are not in the shared context, and the plan needs to know
-      // which of them are missing, so they are read alongside the file.
-      const projects = await fetchProjects();
-      const current: LiveDirectory = {
-        households,
-        people,
-        tags,
-        projects,
-        householdTags,
-        personTags,
-      };
+      const current = await readLive();
       setLive(current);
       setPlan(await readBackupFile(file, current));
     } catch (cause) {
@@ -89,8 +99,44 @@ export function RestorePanel() {
     setBusy(true);
     setError(null);
     setPartial(false);
+    // Nothing is written until applyRestore starts. A failure before then -
+    // the safety copy, or reading the directory - leaves the directory as it
+    // was and the chosen file still good to use.
+    let writing = false;
     try {
-      const done = await applyRestore(plan, mode, live, setProgress);
+      if (mode === "replace") {
+        // Everything added since the chosen file was taken is about to go, and
+        // a replace that fails part way on a database without 0011 leaves the
+        // directory half-loaded. Either way, what is here now is kept on this
+        // device first. If that copy cannot be made, nothing is replaced.
+        setProgress({ done: 0, total: 1, label: "Saving a copy of the directory as it is now" });
+        let safety;
+        try {
+          safety = await buildBackup({
+            data: await fetchDirectory(),
+            includePhotos: true,
+            onProgress: (step) =>
+              setProgress({ ...step, label: `Saving a copy first: ${step.label.toLowerCase()}` }),
+          });
+        } catch (cause) {
+          throw new Error(
+            `A copy of the directory as it is now could not be saved (${message(cause)}), so ` +
+              `nothing has been replaced.`,
+          );
+        }
+        saveBackupFile(safety.bytes, safety.fileName.replace("-backup-", "-before-replace-"));
+        await recordBackup({
+          photosIncluded: true,
+          households: live.households.length,
+          people: live.people.length,
+        });
+      }
+
+      // Read again, so the decision is made against the directory as it is at
+      // the moment of writing rather than when the file was chosen.
+      const current = await readLive();
+      writing = true;
+      const done = await applyRestore(plan, mode, current, setProgress);
       setResult(done);
       setPlan(null);
       setFileName("");
@@ -98,6 +144,10 @@ export function RestorePanel() {
       if (fileInput.current) fileInput.current.value = "";
       await reload();
     } catch (cause) {
+      if (!writing) {
+        setError(message(cause));
+        return;
+      }
       // The writes are separate requests, so a failure part way through leaves
       // a half-restored directory. Running it again is safe - adding back
       // skips what is already there by id, and replacing starts by clearing -
@@ -136,6 +186,8 @@ export function RestorePanel() {
   }
 
   const replacing = mode === "replace";
+  const liveFamilies = live?.households.length ?? 0;
+  const livePeople = live?.people.length ?? 0;
   const confirmed = !replacing || typed.trim().toLowerCase() === "replace";
   const nothingToDo =
     plan !== null &&
@@ -144,7 +196,9 @@ export function RestorePanel() {
     plan.missing.people === 0 &&
     plan.missing.tags === 0 &&
     plan.missing.projects === 0 &&
-    plan.missing.links === 0;
+    plan.missing.links === 0 &&
+    plan.missing.reattach === 0 &&
+    plan.missing.photos === 0;
 
   return (
     <div className="card">
@@ -197,6 +251,12 @@ export function RestorePanel() {
                 <dd>
                   {plan.missing.households} families, {plan.missing.people} people,{" "}
                   {plan.missing.tags} groups, {plan.missing.links} group memberships
+                  {plan.missing.reattach > 0
+                    ? `, ${plan.missing.reattach} ${plan.missing.reattach === 1 ? "person" : "people"} no longer in their family`
+                    : ""}
+                  {plan.missing.photos > 0
+                    ? `, ${plan.missing.photos} ${plan.missing.photos === 1 ? "photograph" : "photographs"}`
+                    : ""}
                 </dd>
               </div>
               {plan.newerThanBackup.households + plan.newerThanBackup.people > 0 ? (
@@ -227,7 +287,14 @@ export function RestorePanel() {
                     {plan.missing.links > 0
                       ? `, and ${plan.missing.links} group ${plan.missing.links === 1 ? "membership" : "memberships"} that ${plan.missing.links === 1 ? "is" : "are"} no longer recorded`
                       : ""}
-                    . Nothing already here is changed or deleted.
+                    .
+                    {plan.missing.reattach > 0
+                      ? ` ${plan.missing.reattach} ${plan.missing.reattach === 1 ? "person who is" : "people who are"} still here but lost their family when it was deleted ${plan.missing.reattach === 1 ? "goes" : "go"} back into it.`
+                      : ""}
+                    {plan.missing.photos > 0
+                      ? ` ${plan.missing.photos} missing ${plan.missing.photos === 1 ? "photograph is" : "photographs are"} put back.`
+                      : ""}{" "}
+                    Nothing else already here is changed or deleted.
                   </span>
                 </span>
               </label>
@@ -247,11 +314,11 @@ export function RestorePanel() {
                   <span className="choice-hint">
                     {isOwner ? (
                       <>
-                        Deletes all {households.length} famil
-                        {households.length === 1 ? "y" : "ies"} and {people.length}{" "}
-                        {people.length === 1 ? "person" : "people"} in the directory now, then loads
-                        this file exactly. Anything added since it was taken is gone. This cannot be
-                        undone.
+                        Deletes all {liveFamilies} famil
+                        {liveFamilies === 1 ? "y" : "ies"} and {livePeople}{" "}
+                        {livePeople === 1 ? "person" : "people"} in the directory now, then loads
+                        this file exactly. Anything added since it was taken is gone. A copy of the
+                        directory as it is now downloads first.
                       </>
                     ) : (
                       "Owners only."
@@ -276,10 +343,18 @@ export function RestorePanel() {
                   onChange={(event) => setTyped(event.target.value)}
                 />
                 <span className="hint">
-                  Everything in the directory is deleted first. There is no undo — download a fresh
-                  backup before doing this if you have not already.
+                  Everything in the directory is replaced. Before anything is touched, a copy of the
+                  directory as it is now is downloaded to this device — keep it until you are sure.
                 </span>
               </div>
+            ) : null}
+
+            {plan.damagedPhotos > 0 ? (
+              <Notice kind="warn">
+                {plan.damagedPhotos} {plan.damagedPhotos === 1 ? "photograph" : "photographs"} in
+                this file {plan.damagedPhotos === 1 ? "is" : "are"} damaged and will be left out.
+                Everything else in it reads correctly.
+              </Notice>
             ) : null}
 
             {nothingToDo ? (
@@ -332,7 +407,12 @@ export function RestorePanel() {
                   {result.added.households === 1 ? "y" : "ies"} and {result.added.people}{" "}
                   {result.added.people === 1 ? "person" : "people"} are in it now.
                 </>
-              ) : result.added.households + result.added.people + result.added.tags === 0 ? (
+              ) : result.added.households +
+                  result.added.people +
+                  result.added.tags +
+                  result.reattached +
+                  result.photosUploaded ===
+                0 ? (
                 <>Nothing needed putting back.</>
               ) : (
                 <>
@@ -341,13 +421,28 @@ export function RestorePanel() {
                   {result.added.people === 1 ? "person" : "people"}.
                 </>
               )}
+              {result.reattached > 0
+                ? ` ${result.reattached} ${result.reattached === 1 ? "person is" : "people are"} back in their family.`
+                : ""}
               {result.photosUploaded > 0
-                ? ` ${result.photosUploaded} photograph${result.photosUploaded === 1 ? "" : "s"} came back with them.`
+                ? ` ${result.photosUploaded} photograph${result.photosUploaded === 1 ? "" : "s"} put back.`
+                : ""}
+              {result.photosRemoved > 0
+                ? ` ${result.photosRemoved} photograph${result.photosRemoved === 1 ? "" : "s"} nothing used any more ${result.photosRemoved === 1 ? "was" : "were"} cleared from storage.`
                 : ""}
               {result.orphaned > 0
                 ? ` ${result.orphaned} ${result.orphaned === 1 ? "person" : "people"} had no family left to belong to and ${result.orphaned === 1 ? "was" : "were"} restored without one.`
                 : ""}
             </Notice>
+            {result.photosFailed > 0 ? (
+              <div style={{ marginTop: 8 }}>
+                <Notice kind="warn">
+                  {result.photosFailed} {result.photosFailed === 1 ? "photograph" : "photographs"}{" "}
+                  could not be uploaded. The records are restored; choose the same file again and
+                  add back what is missing to try the photographs again.
+                </Notice>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>

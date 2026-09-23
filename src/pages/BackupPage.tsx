@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { useDirectory } from "@/data/DirectoryContext";
 import { Checkbox, LoadingScreen, Notice } from "@/components/ui";
 import { RestorePanel } from "@/components/RestorePanel";
 import { ImportPanel } from "@/components/ImportPanel";
-import { buildBackup, type BackupProgress } from "@/lib/backup";
+import { buildBackup, saveBackupFile, type BackupProgress } from "@/lib/backup";
+import { BACKUP_DUE_DAYS, isBackupDue, recordBackup, useLastBackup } from "@/lib/backupLog";
+import { fetchDirectory } from "@/lib/queries";
 import { message } from "@/lib/format";
-
-const LAST_BACKUP_KEY = "church-directory:last-backup";
 
 function describeAge(iso: string | null): string | null {
   if (!iso) return null;
@@ -22,7 +22,7 @@ function describeAge(iso: string | null): string | null {
 
 export function BackupPage() {
   const { canEdit } = useAuth();
-  const { households, people, tags, householdTags, personTags, entries, loading } = useDirectory();
+  const { households, people, entries, loading } = useDirectory();
 
   const [includePhotos, setIncludePhotos] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -31,15 +31,7 @@ export function BackupPage() {
   const [result, setResult] = useState<{ fileName: string; size: number; missing: number } | null>(
     null,
   );
-  const [lastBackup, setLastBackup] = useState<string | null>(null);
-
-  useEffect(() => {
-    try {
-      setLastBackup(localStorage.getItem(LAST_BACKUP_KEY));
-    } catch {
-      // Private browsing, or storage disabled. The reminder is a nicety.
-    }
-  }, []);
+  const { takenAt: lastBackup, loaded: lastBackupLoaded } = useLastBackup();
 
   const withPhotos = [
     ...households.map((row) => row.photo_path),
@@ -53,28 +45,26 @@ export function BackupPage() {
     setError(null);
     setResult(null);
     try {
+      // Read fresh rather than taken from what this screen has in memory.
+      // That copy is only refreshed when somebody is added, so in a tab or a
+      // Home Screen app left open for days it can be missing every edit and
+      // deletion another editor has made since - and a backup is exactly the
+      // file that has to be current.
+      setProgress({ done: 0, total: 1, label: "Reading the directory" });
+      const data = await fetchDirectory();
       const backup = await buildBackup({
-        data: { households, people, tags, householdTags, personTags },
+        data,
         includePhotos,
         onProgress: setProgress,
       });
 
-      const url = URL.createObjectURL(
-        new Blob([backup.bytes as BlobPart], { type: "application/zip" }),
-      );
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = backup.fileName;
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      saveBackupFile(backup.bytes, backup.fileName);
 
-      const now = new Date().toISOString();
-      try {
-        localStorage.setItem(LAST_BACKUP_KEY, now);
-      } catch {
-        // Not worth failing the backup over.
-      }
-      setLastBackup(now);
+      await recordBackup({
+        photosIncluded: includePhotos,
+        households: data.households.length,
+        people: data.people.length,
+      });
       setResult({
         fileName: backup.fileName,
         size: backup.bytes.length,
@@ -89,6 +79,7 @@ export function BackupPage() {
   }
 
   const age = describeAge(lastBackup);
+  const due = lastBackupLoaded && isBackupDue(lastBackup);
 
   return (
     <div className="page panel-page with-figures">
@@ -119,7 +110,7 @@ export function BackupPage() {
           <span className="label">Photographs</span>
         </div>
         <div className="stat worded">
-          <span className="value">{age ?? "Never"}</span>
+          <span className="value">{age ?? (lastBackupLoaded ? "Never" : "…")}</span>
           <span className="label">Last backup</span>
         </div>
       </div>
@@ -185,6 +176,17 @@ export function BackupPage() {
               </div>
             ) : null}
 
+            {due && canEdit && !result ? (
+              <div style={{ marginTop: 14 }}>
+                <Notice kind="warn">
+                  {lastBackup
+                    ? `The last backup was taken ${age}. One is due every month.`
+                    : "No backup has been recorded yet."}{" "}
+                  Download one now and keep it somewhere other than the database.
+                </Notice>
+              </div>
+            ) : null}
+
             {/* Deleting a family has no undo, so the interval is the whole
                 advice: often enough that a bad afternoon costs a month, and
                 kept somewhere that is not the database it copies. */}
@@ -207,7 +209,11 @@ export function BackupPage() {
               >
                 {busy ? "Building…" : "Download backup"}
               </button>
-              {age ? <span className="note">Last one from this browser: {age}.</span> : null}
+              {age ? (
+                <span className="note">
+                  Last one, from any device: {age}. Due every {BACKUP_DUE_DAYS} days.
+                </span>
+              ) : null}
             </div>
           ) : null}
         </div>

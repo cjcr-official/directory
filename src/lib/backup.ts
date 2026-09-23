@@ -4,6 +4,7 @@ import { toCsv, type CsvValue } from "./csv";
 import { buildZip, type ZipEntry } from "./zip";
 import { downloadPhoto } from "./photos";
 import { fetchProject, fetchProjects } from "./queries";
+import { coverPaths } from "./restorePlan";
 import { formatPhone } from "./format";
 
 /**
@@ -197,7 +198,8 @@ function readme(data: DirectoryData, photoCount: number, when: Date): string {
     "  families.csv    One row per family. Opens in Excel, Numbers or Sheets.",
     "  people.csv      One row per person, with the family they belong to.",
     "  groups.csv      The group labels and how many records carry each.",
-    "  photos/         Every photograph, in the folders the app stores them in.",
+    "  photos/         Every photograph and directory cover, in the folders the",
+    "                  app stores them in.",
     "  directory.json  The same information exactly as the database holds it,",
     "                  including the ids that link people to families. This is",
     "                  the file to restore from.",
@@ -259,33 +261,46 @@ async function inParallel<T>(
   await Promise.all(workers);
 }
 
+/** Hands a finished archive to the browser as a download. */
+export function saveBackupFile(bytes: Uint8Array, fileName: string): void {
+  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/zip" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
 export async function buildBackup(options: BackupOptions): Promise<BackupResult> {
   const { data, includePhotos, onProgress, signal } = options;
   const when = new Date();
 
+  onProgress?.({ done: 0, total: 1, label: "Collecting directories" });
+
+  const projects: { project: ProjectRow; tagIds: string[]; entries: ProjectEntryRow[] }[] = [];
+  for (const row of await fetchProjects()) {
+    projects.push(await fetchProject(row.id));
+  }
+
+  // The directories' cover artwork lives in the same bucket as the portraits,
+  // and a directory restored without it prints with a gap where its cover was.
   const photoPaths = [
     ...new Set(
       [
         ...data.households.map((row) => row.photo_path),
         ...data.people.map((row) => row.photo_path),
+        ...projects.flatMap((row) => coverPaths(row.project)),
       ].filter((path): path is string => Boolean(path)),
     ),
   ];
 
-  // Text first, then projects, then one step per photograph.
+  // Projects, then one step per photograph, then the archive itself.
   const total = 2 + (includePhotos ? photoPaths.length : 0);
   let done = 0;
   const step = (label: string) => {
     done += 1;
     onProgress?.({ done, total, label });
   };
-
-  onProgress?.({ done: 0, total, label: "Collecting records" });
-
-  const projects: { project: ProjectRow; tagIds: string[]; entries: ProjectEntryRow[] }[] = [];
-  for (const row of await fetchProjects()) {
-    projects.push(await fetchProject(row.id));
-  }
   step("Collecting directories");
 
   const missingPhotos: string[] = [];
@@ -298,7 +313,9 @@ export async function buildBackup(options: BackupOptions): Promise<BackupResult>
     await inParallel(photoPaths, PHOTO_AT_A_TIME, async (path, index) => {
       if (signal?.aborted) return;
       fetched[index] = await downloadPhoto(path);
-      step(`Photographs (${done - 1} of ${photoPaths.length})`);
+      // `done` counts the directories step too, so the photographs finished
+      // so far - this one included - are everything after it.
+      step(`Photographs (${done} of ${photoPaths.length})`);
     });
     if (signal?.aborted) throw new Error("Backup cancelled.");
 

@@ -81,6 +81,14 @@ export interface LiveDirectory {
    */
   householdTags: { household_id: string; tag_id: string }[];
   personTags: { person_id: string; tag_id: string }[];
+  /**
+   * Every photograph in storage, by path, or null when that could not be
+   * read. Knowing it is what lets a restore put back a picture that went
+   * missing from a record that is still here, skip uploading the ones already
+   * there, and tidy away the ones nothing points at after a replace. Without
+   * it those three are simply not attempted.
+   */
+  storedPhotos?: Set<string> | null;
 }
 
 /** What is in a chosen file, and what restoring it would come to. */
@@ -92,7 +100,22 @@ export interface RestorePlan {
   /** Counts held in the file. */
   inFile: { households: number; people: number; tags: number; projects: number };
   /** Of those, the ones the live directory no longer has. */
-  missing: { households: number; people: number; tags: number; projects: number; links: number };
+  missing: {
+    households: number;
+    people: number;
+    tags: number;
+    projects: number;
+    links: number;
+    /**
+     * People still in the directory who lost their family when it was
+     * deleted, and go back into it when it is restored.
+     */
+    reattach: number;
+    /** Photographs of records still here whose picture is gone from storage. */
+    photos: number;
+  };
+  /** Photographs in the archive that failed their checksum and are left out. */
+  damagedPhotos: number;
   /** Records in the directory now that the file has never heard of. */
   newerThanBackup: { households: number; people: number };
 }
@@ -101,6 +124,12 @@ export interface RestoreResult {
   added: { households: number; people: number; tags: number; projects: number };
   removed: { households: number; people: number; tags: number; projects: number };
   photosUploaded: number;
+  /** Photographs that were meant to go back and could not be uploaded. */
+  photosFailed: number;
+  /** People put back into the family they belonged to. */
+  reattached: number;
+  /** Photographs nothing pointed at any more, removed after a replace. */
+  photosRemoved: number;
   /**
    * People whose family could not be found in the file or the directory. They
    * come back without one rather than not at all.
@@ -112,6 +141,38 @@ const decoder = new TextDecoder();
 
 function isRowArray(value: unknown): value is Record<string, unknown>[] {
   return Array.isArray(value) && value.every((row) => typeof row === "object" && row !== null);
+}
+
+/** The folders of the photo bucket the directory's records point into. */
+export const PHOTO_FOLDERS = ["households", "people", "covers"] as const;
+
+/** The cover artwork a directory's settings point at, if any. */
+export function coverPaths(project: ProjectRow): string[] {
+  const settings = (project.settings ?? {}) as Record<string, unknown>;
+  return [settings.coverPhotoPath, settings.coverLogoPath].filter(
+    (path): path is string => typeof path === "string" && path.trim() !== "",
+  );
+}
+
+/**
+ * Finds the backup inside a chosen archive.
+ *
+ * Usually directory.json sits at the top. But a person who unzipped the file
+ * to look inside and then zipped it up again with Finder's Compress or
+ * Windows' Send to > Compressed folder gets everything one folder down, under
+ * the folder's name - and macOS adds a __MACOSX folder of resource forks
+ * beside it. Both are the same backup, so both are read.
+ */
+function locateBackup(contents: UnzipEntry[]): { json: UnzipEntry; root: string } | null {
+  const usable = contents.filter(
+    (entry) => !entry.name.startsWith("__MACOSX/") && !/(^|\/)\._/.test(entry.name),
+  );
+  const top = usable.find((entry) => entry.name === "directory.json");
+  if (top) return { json: top, root: "" };
+
+  const nested = usable.filter((entry) => /^[^/]+\/directory\.json$/.test(entry.name));
+  if (nested.length !== 1) return null;
+  return { json: nested[0], root: nested[0].name.slice(0, -"directory.json".length) };
 }
 
 /**
@@ -131,11 +192,19 @@ export async function readBackup(bytes: Uint8Array, live: LiveDirectory): Promis
     throw new Error(`${message(cause)} Choose the .zip file the backup page produced.`);
   }
 
-  const json = contents.find((entry) => entry.name === "directory.json");
-  if (!json) {
+  const found = locateBackup(contents);
+  if (!found) {
     throw new Error(
       "That ZIP has no directory.json in it, so it is not a directory backup. The file to " +
         "choose is the one the backup page downloaded, whole and unchanged.",
+    );
+  }
+
+  const { json, root } = found;
+  if (!json.intact) {
+    throw new Error(
+      "The directory.json inside that archive is damaged - it does not match the checksum " +
+        "it was saved with. Try another copy of the backup.",
     );
   }
 
@@ -180,10 +249,16 @@ export async function readBackup(bytes: Uint8Array, live: LiveDirectory): Promis
     missingPhotos: Array.isArray(raw.missingPhotos) ? (raw.missingPhotos as string[]) : [],
   };
 
+  // A photograph that fails its checksum is left out rather than uploaded:
+  // putting back a corrupt picture would replace a gap nobody minds with a
+  // broken image in the printed book.
   const photos = new Map<string, Uint8Array>();
+  let damagedPhotos = 0;
+  const photoPrefix = `${root}photos/`;
   for (const entry of contents) {
-    if (entry.name.startsWith("photos/"))
-      photos.set(entry.name.slice("photos/".length), entry.data);
+    if (!entry.name.startsWith(photoPrefix)) continue;
+    if (entry.intact) photos.set(entry.name.slice(photoPrefix.length), entry.data);
+    else damagedPhotos += 1;
   }
 
   const liveHouseholds = new Set(live.households.map((row) => row.id));
@@ -200,6 +275,11 @@ export async function readBackup(bytes: Uint8Array, live: LiveDirectory): Promis
   ]);
 
   const takenAt = backup.takenAt ? new Date(backup.takenAt) : null;
+
+  // The two figures that depend on how records relate, rather than on which
+  // ids are present, come from the same function the restore itself runs, so
+  // the preview cannot promise something the restore then does not do.
+  const adding = selectRows(backup, live, "missing", liveLinks, photos);
 
   return {
     file: backup,
@@ -222,7 +302,10 @@ export async function readBackup(bytes: Uint8Array, live: LiveDirectory): Promis
         ).length +
         backup.personTags.filter((link) => !liveLinks.has(`p:${link.person_id}:${link.tag_id}`))
           .length,
+      reattach: adding.reattach.length,
+      photos: adding.repairedPhotos,
     },
+    damagedPhotos,
     newerThanBackup: {
       households: live.households.filter((row) => !backupHouseholds.has(row.id)).length,
       people: live.people.filter((row) => !backupPeople.has(row.id)).length,
@@ -240,8 +323,22 @@ export interface RestoreRows {
   projects: ProjectRow[];
   projectTags: { project_id: string; tag_id: string }[];
   projectEntries: ProjectEntryRow[];
+  /**
+   * People still in the directory whose family is being restored, and who
+   * were in it when the backup was taken. Deleting a family does not delete
+   * its members - the database only clears their link to it - so without this
+   * a restored family comes back empty, with its members beside it.
+   */
+  reattach: Pick<PersonRow, "id" | "household_id" | "household_role" | "sort_order">[];
   /** Photographs to put back, by storage path. */
   photoPaths: string[];
+  /** Of those, the ones for records that are already in the directory. */
+  repairedPhotos: number;
+  /**
+   * Photographs in storage that nothing will point at once a replace has run.
+   * Only ever filled when replacing, and only when storage could be listed.
+   */
+  photosToRemove: string[];
   /** People whose family is in neither the file nor the directory. */
   orphaned: number;
 }
@@ -318,6 +415,74 @@ export function selectRows(
       !already.has(`p:${link.person_id}:${link.tag_id}`),
   );
 
+  // Members left behind when their family was deleted. Only people whose
+  // family is one being put back, who have no family now, and who were in that
+  // family in the file: somebody an editor has since moved into another
+  // family, or out of this one on purpose, is left where they are.
+  const restoredHouseholds = new Set(households.map((row) => row.id));
+  const livePeopleById = new Map(live.people.map((row) => [row.id, row]));
+  const reattach = replacing
+    ? []
+    : file.people
+        .filter((person) => {
+          if (!person.household_id || !restoredHouseholds.has(person.household_id)) return false;
+          const now = livePeopleById.get(person.id);
+          return now !== undefined && !now.household_id;
+        })
+        .map((person) => ({
+          id: person.id,
+          household_id: person.household_id,
+          household_role: person.household_role,
+          sort_order: person.sort_order ?? 0,
+        }));
+
+  // Photographs. For records being written, every picture the archive has.
+  // For records already here, the ones whose picture has gone from storage -
+  // which can only be known when storage was listed. Either way, a picture
+  // already in storage is not uploaded again: its path is a fresh id each time
+  // a photograph is saved, so the same path is the same picture.
+  const stored = live.storedPhotos ?? null;
+  const wanted = (path: string) => photos.has(path) && !(stored?.has(path) ?? false);
+
+  const writtenPaths = [
+    ...households.map((row) => row.photo_path),
+    ...people.map((row) => row.photo_path),
+    ...projects.flatMap((row) => coverPaths(row.project)),
+  ].filter((path): path is string => typeof path === "string" && path !== "");
+
+  const writtenIds = new Set([
+    ...households.map((row) => row.id),
+    ...people.map((row) => row.id),
+    ...projects.map((row) => row.project.id),
+  ]);
+  const survivingPaths =
+    replacing || !stored
+      ? []
+      : [
+          ...live.households.filter((row) => !writtenIds.has(row.id)).map((row) => row.photo_path),
+          ...live.people.filter((row) => !writtenIds.has(row.id)).map((row) => row.photo_path),
+          ...live.projects.filter((row) => !writtenIds.has(row.id)).flatMap(coverPaths),
+        ].filter((path): path is string => typeof path === "string" && path !== "");
+
+  const photoPaths = [...new Set(writtenPaths.filter(wanted))];
+  const repairs = [...new Set(survivingPaths.filter(wanted))].filter(
+    (path) => !photoPaths.includes(path),
+  );
+
+  // After a replace, the only pictures anything points at are the file's.
+  const referenced = new Set([
+    ...file.households.map((row) => row.photo_path),
+    ...file.people.map((row) => row.photo_path),
+    ...file.projects.flatMap((row) => coverPaths(row.project)),
+  ]);
+  const photosToRemove =
+    replacing && stored
+      ? [...stored].filter(
+          (path) =>
+            PHOTO_FOLDERS.some((folder) => path.startsWith(`${folder}/`)) && !referenced.has(path),
+        )
+      : [];
+
   return {
     tags,
     households,
@@ -337,15 +502,10 @@ export function selectRows(
           : willHavePerson.has(entry.ref_id),
       ),
     ),
-    // Only pictures that are actually in the archive, and only for records
-    // being written - a photograph nobody is restoring is not worth uploading.
-    photoPaths: [
-      ...new Set(
-        [...households.map((row) => row.photo_path), ...people.map((row) => row.photo_path)].filter(
-          (path): path is string => typeof path === "string" && photos.has(path),
-        ),
-      ),
-    ],
+    reattach,
+    photoPaths: [...photoPaths, ...repairs],
+    repairedPhotos: repairs.length,
+    photosToRemove,
     orphaned,
   };
 }
