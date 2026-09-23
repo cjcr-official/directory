@@ -757,5 +757,139 @@ select assert(
   (select owner is null from storage.objects where name = 'people/spare.jpg'),
   'with nobody named as its owner');
 
+-- --------------------------------------------------------------------------
+-- Backups (0011)
+--
+-- replace_directory empties the directory and refills it. That is the most
+-- destructive thing the app can do, so the owner check has to be the
+-- function's own, and it has to be all or nothing: a restore that fails part
+-- way must leave the directory exactly as it was, not empty.
+-- --------------------------------------------------------------------------
+
+-- Like rows_written, but reports what went wrong instead of letting any error
+-- end the script: 'ok', or the SQLSTATE the statement raised.
+create or replace function outcome_as(actor uuid, statement text)
+returns text language plpgsql as $$
+begin
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', actor)::text, true);
+  begin
+    execute statement;
+  exception when others then
+    reset role;
+    return sqlstate;
+  end;
+  reset role;
+  return 'ok';
+end $$;
+
+select count(*) as households_before from public.households \gset
+select count(*) as people_before from public.people \gset
+
+select assert(
+  outcome_as(:'editor_id',
+    $q$select public.replace_directory('{"households":[],"people":[],"tags":[]}'::jsonb)$q$)
+    = '42501',
+  'an editor cannot replace the directory');
+
+select assert(
+  outcome_as(:'viewer_id',
+    $q$select public.replace_directory('{"households":[],"people":[],"tags":[]}'::jsonb)$q$)
+    = '42501',
+  'nor can a viewer');
+
+select assert(
+  (select count(*) from public.households) = :households_before
+    and (select count(*) from public.people) = :people_before,
+  'and neither of them removed anything');
+
+select assert(
+  outcome_as(:'owner_id', $q$select public.replace_directory('{"people":[]}'::jsonb)$q$)
+    = '22023',
+  'a directory with no families in it is refused rather than treated as empty');
+
+-- A person pointing at a family that is not in the file fails on the foreign
+-- key after every table has been emptied. The whole thing has to roll back.
+select assert(
+  outcome_as(:'owner_id', $q$select public.replace_directory('{
+      "households": [],
+      "tags": [],
+      "people": [{"id": "abababab-0000-0000-0000-00000000000a",
+                  "household_id": "cdcdcdcd-0000-0000-0000-00000000000c",
+                  "first_name": "Nobody", "last_name": "Anywhere",
+                  "use_household_address": true, "sort_order": 0, "is_active": true,
+                  "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z"}]
+    }'::jsonb)$q$) = '23503',
+  'an owner restoring a file that does not hold together is refused');
+
+select assert(
+  (select count(*) from public.households) = :households_before
+    and (select count(*) from public.people) = :people_before,
+  'and the directory is exactly as it was, not emptied');
+
+select assert(
+  outcome_as(:'owner_id', $q$select public.replace_directory('{
+      "households": [{"id": "abababab-0000-0000-0000-0000000000b1",
+                      "display_name": "The Restored Family", "sort_name": "Restored",
+                      "is_active": true, "a_column_from_the_future": "ignored",
+                      "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z"}],
+      "people": [{"id": "abababab-0000-0000-0000-0000000000b2",
+                  "household_id": "abababab-0000-0000-0000-0000000000b1",
+                  "household_role": "head",
+                  "first_name": "Ruth", "last_name": "Restored",
+                  "use_household_address": true, "sort_order": 0, "is_active": true,
+                  "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z"}],
+      "tags": [{"id": "abababab-0000-0000-0000-0000000000b3", "name": "Restored group",
+                "color": "#4f6d7a", "created_at": "2026-01-01T00:00:00Z"}],
+      "person_tags": [{"person_id": "abababab-0000-0000-0000-0000000000b2",
+                       "tag_id": "abababab-0000-0000-0000-0000000000b3"}]
+    }'::jsonb)$q$) = 'ok',
+  'an owner can replace the directory, with a column this database lacks ignored');
+
+select assert(
+  (select count(*) from public.households) = 1
+    and (select count(*) from public.people) = 1
+    and (select count(*) from public.person_tags) = 1,
+  'and the directory holds exactly what was restored');
+
+select assert(
+  (select household_id = 'abababab-0000-0000-0000-0000000000b1' from public.people),
+  'with the person back in their family');
+
+select assert(
+  (select updated_by = :'owner_id'::uuid from public.households),
+  'stamped as written by the owner who restored it');
+
+-- The shared record of backups taken.
+
+select assert(
+  rows_written(:'editor_id', 'insert into public.backup_log (households, people) values (3, 7)') = 1,
+  'an editor can record a backup');
+
+select assert(
+  (select taken_by = :'editor_id'::uuid from public.backup_log),
+  'and it is recorded against them');
+
+select assert(
+  rows_written(:'editor_id',
+    format($q$insert into public.backup_log (taken_by) values ('%s')$q$, :'owner_id')) <= 0,
+  'an editor cannot record a backup in somebody else''s name');
+
+select assert(
+  rows_written(:'viewer_id', 'insert into public.backup_log (households) values (1)') <= 0,
+  'a viewer cannot record a backup');
+
+select assert(
+  count_as(:'viewer_id', 'select * from public.backup_log') = 1,
+  'but can see when the last one was taken');
+
+select assert(
+  count_as(:'stranger_id', 'select * from public.backup_log') = 0,
+  'and a stranger cannot');
+
+select assert(
+  rows_written(:'owner_id', 'delete from public.backup_log') <= 0,
+  'nobody can erase the record, owners included');
+
 \echo ''
 \echo 'All row level security checks passed.'

@@ -139,6 +139,15 @@ export type ProjectEntryRow = {
   position: number;
 };
 
+export type BackupLogRow = {
+  id: string;
+  taken_at: string;
+  taken_by: string | null;
+  photos_included: boolean;
+  households: number;
+  people: number;
+};
+
 type Table<Row, Insert = Partial<Row>, Update = Partial<Row>> = {
   Row: Row;
   Insert: Insert;
@@ -158,6 +167,8 @@ export interface Database {
       person_tags: Table<{ person_id: string; tag_id: string }>;
       project_tags: Table<{ project_id: string; tag_id: string }>;
       project_entries: Table<ProjectEntryRow>;
+      /** Added by 0011. One row per backup downloaded. */
+      backup_log: Table<BackupLogRow>;
     };
     Views: Record<string, never>;
     /**
@@ -193,6 +204,15 @@ export interface Database {
        */
       delete_account: {
         Args: { p_user_id: string };
+        Returns: undefined;
+      };
+      /**
+       * Added by 0011. Empties the directory and loads the given rows in one
+       * transaction, so a failure part way changes nothing. Owners only; the
+       * function checks that itself.
+       */
+      replace_directory: {
+        Args: { p_directory: Record<string, unknown[]> };
         Returns: undefined;
       };
     };

@@ -178,6 +178,9 @@ export async function readSheet(name: string, bytes: Uint8Array): Promise<SheetT
   }
 
   const entries = await readZip(bytes);
+  if (entries.some((entry) => !entry.intact)) {
+    throw new Error("That .xlsx is damaged and will not read. Export the file again.");
+  }
   const decoder = new TextDecoder();
   const sheets = entries
     .filter((entry) => /^xl\/worksheets\/sheet\d+\.xml$/.test(entry.name))

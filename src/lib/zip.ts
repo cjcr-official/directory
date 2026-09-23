@@ -27,7 +27,8 @@ const CRC_TABLE = (() => {
   return table;
 })();
 
-function crc32(bytes: Uint8Array): number {
+/** The checksum every ZIP entry carries. Exported so the reader can verify it. */
+export function crc32(bytes: Uint8Array): number {
   let c = 0xffffffff;
   for (let i = 0; i < bytes.length; i += 1) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
   return (c ^ 0xffffffff) >>> 0;

@@ -138,9 +138,12 @@ useful and also the thing people photograph and text around. Some suggestions:
 with data entry but not see everyone's address, that needs a fourth role — worth
 adding if it comes up, but do not build it speculatively.
 
-**Backups.** Built — see _Backup_ in the app. Supabase keeps its own, but a
-monthly file you can hold onto is worth more than a restore procedure you have
-never run. Keep it somewhere other than the database.
+**Backups.** Built — see _Backup_ in the app. Do not count on Supabase's own:
+check what your plan includes, because the free plan does not give you daily
+backups you can restore from. A monthly file you hold onto is worth more than
+a restore procedure you have never run. Keep it somewhere other than the
+database. The app marks _Backup_ as due for every editor once the last one is
+more than 35 days old.
 
 ---
 

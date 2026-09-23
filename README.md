@@ -94,6 +94,9 @@ addresses. What follows is the short form.
    - `0008_gender.sql` — recording whether a person is male or female
    - `0009_background_checks.sql` — when a person's background check was done,
      and when the next one is due
+   - `0010_photo_fit.sql` — showing one photograph whole instead of cropped
+   - `0011_backup_safety.sql` — a shared record of backups taken, and a
+     "Replace everything" restore that lands whole or not at all
 3. From **Project Settings → API**, copy the **Project URL** and the
    **anon public** key.
 

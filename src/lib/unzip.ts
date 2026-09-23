@@ -13,10 +13,19 @@
  * archives carry, and it is how every other reader does it.
  */
 
+import { crc32 } from "./zip";
+
 export interface UnzipEntry {
   name: string;
   /** Uncompressed bytes. */
   data: Uint8Array;
+  /**
+   * False when the bytes do not match the checksum the archive recorded for
+   * them - a file damaged on a USB stick or cut short in a download. The entry
+   * is still returned, so the caller can decide how much that matters: a
+   * damaged photograph is left out, a damaged directory.json is refused.
+   */
+  intact: boolean;
 }
 
 const EOCD_SIGNATURE = 0x06054b50;
@@ -73,6 +82,7 @@ export async function readZip(bytes: Uint8Array): Promise<UnzipEntry[]> {
     }
 
     const method = view.getUint16(at + 10, true);
+    const expectedCrc = view.getUint32(at + 16, true);
     const compressedSize = view.getUint32(at + 20, true);
     const nameLength = view.getUint16(at + 28, true);
     const extraLength = view.getUint16(at + 30, true);
@@ -93,9 +103,21 @@ export async function readZip(bytes: Uint8Array): Promise<UnzipEntry[]> {
       localAt + 30 + view.getUint16(localAt + 26, true) + view.getUint16(localAt + 28, true);
     const raw = bytes.subarray(dataAt, dataAt + compressedSize);
 
-    if (method === 0) entries.push({ name, data: raw });
-    else if (method === 8) entries.push({ name, data: await inflateRaw(raw) });
-    else throw new Error(`${name} is compressed in a way this app cannot read (method ${method}).`);
+    let data: Uint8Array;
+    if (method === 0) data = raw;
+    else if (method === 8) {
+      try {
+        data = await inflateRaw(raw);
+      } catch (cause) {
+        if (cause instanceof Error && /cannot read compressed/.test(cause.message)) throw cause;
+        // Deflate that will not inflate is damage, the same as a bad checksum.
+        entries.push({ name, data: new Uint8Array(0), intact: false });
+        continue;
+      }
+    } else
+      throw new Error(`${name} is compressed in a way this app cannot read (method ${method}).`);
+
+    entries.push({ name, data, intact: crc32(data) === expectedCrc });
   }
 
   return entries;

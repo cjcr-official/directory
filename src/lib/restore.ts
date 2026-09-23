@@ -1,5 +1,5 @@
 import { PHOTO_BUCKET, supabase } from "./supabase";
-import { readBackup, selectRows } from "./restorePlan";
+import { PHOTO_FOLDERS, readBackup, selectRows } from "./restorePlan";
 import { fetchAll, withoutAuthor } from "./queries";
 import type {
   LiveDirectory,
@@ -58,25 +58,59 @@ function fail(what: string, message: string): never {
   throw new Error(`${what}: ${message}`);
 }
 
-async function insertHouseholds(rows: HouseholdRow[]): Promise<void> {
-  for (const batch of chunked(rows.map(withoutAuthor))) {
-    const { error } = await supabase.from("households").insert(batch);
-    if (error) fail("families", error.message);
+/**
+ * PostgREST's answer to a column the database has not got - a backup taken
+ * after a later migration, restored into a project that has not run it yet.
+ */
+const UNKNOWN_COLUMN = /Could not find the '([^']+)' column/;
+
+/**
+ * Sends rows a batch at a time, leaving out any column the database has not
+ * got.
+ *
+ * The column is dropped from every row and the batch sent again, once per
+ * column, and it stays dropped for the batches after. What is lost is only
+ * what this database has nowhere to keep; failing the whole restore over it
+ * would lose everything else as well.
+ */
+async function insertRows<T extends object>(
+  what: string,
+  rows: T[],
+  send: (batch: T[]) => PromiseLike<{ error: { message: string } | null }>,
+): Promise<void> {
+  const dropped = new Set<string>();
+  const without = (row: T): T => {
+    if (!dropped.size) return row;
+    const copy = { ...row } as Record<string, unknown>;
+    for (const column of dropped) delete copy[column];
+    return copy as T;
+  };
+
+  for (const batch of chunked(rows)) {
+    for (;;) {
+      const { error } = await send(batch.map(without));
+      if (!error) break;
+      const column = UNKNOWN_COLUMN.exec(error.message)?.[1];
+      if (!column || dropped.has(column) || dropped.size >= 20) fail(what, error.message);
+      dropped.add(column);
+    }
   }
+}
+
+async function insertHouseholds(rows: HouseholdRow[]): Promise<void> {
+  await insertRows("families", rows.map(withoutAuthor), (batch) =>
+    supabase.from("households").insert(batch),
+  );
 }
 
 async function insertPeople(rows: PersonRow[]): Promise<void> {
-  for (const batch of chunked(rows.map(withoutAuthor))) {
-    const { error } = await supabase.from("people").insert(batch);
-    if (error) fail("people", error.message);
-  }
+  await insertRows("people", rows.map(withoutAuthor), (batch) =>
+    supabase.from("people").insert(batch),
+  );
 }
 
 async function insertTags(rows: TagRow[]): Promise<void> {
-  for (const batch of chunked(rows)) {
-    const { error } = await supabase.from("tags").insert(batch);
-    if (error) fail("groups", error.message);
-  }
+  await insertRows("groups", rows, (batch) => supabase.from("tags").insert(batch));
 }
 
 async function insertHouseholdTags(
@@ -96,10 +130,9 @@ async function insertPersonTags(rows: { person_id: string; tag_id: string }[]): 
 }
 
 async function insertProjects(rows: ProjectRow[]): Promise<void> {
-  for (const batch of chunked(rows.map(withoutAuthor))) {
-    const { error } = await supabase.from("projects").insert(batch);
-    if (error) fail("directories", error.message);
-  }
+  await insertRows("directories", rows.map(withoutAuthor), (batch) =>
+    supabase.from("projects").insert(batch),
+  );
 }
 
 async function insertProjectTags(rows: { project_id: string; tag_id: string }[]): Promise<void> {
@@ -137,34 +170,149 @@ async function clearAll(): Promise<void> {
   if (tags.error) fail("groups", tags.error.message);
 }
 
+/** Photographs sent at once. The same budget the backup reads them with. */
+const PHOTOS_AT_A_TIME = 6;
+
 /**
  * Puts the photographs back at the paths the records already point at.
  *
  * upsert, because a record that survived while its picture did not is exactly
  * the case worth repairing, and writing the same bytes over the same bytes
  * costs nothing. One unreadable photograph should not cost the restore of two
- * hundred families, so a failure here is counted rather than thrown.
+ * hundred families, so a failure is counted and reported rather than thrown.
  */
 async function uploadPhotos(
   paths: string[],
   photos: Map<string, Uint8Array>,
   onEach: () => void,
-): Promise<number> {
+): Promise<{ uploaded: number; failed: number }> {
   let uploaded = 0;
-  for (const path of paths) {
-    const bytes = photos.get(path);
-    onEach();
-    if (!bytes) continue;
-    const { error } = await supabase.storage
-      .from(PHOTO_BUCKET)
-      .upload(path, new Blob([bytes as BlobPart], { type: "image/jpeg" }), {
-        contentType: "image/jpeg",
-        cacheControl: "31536000",
-        upsert: true,
-      });
-    if (!error) uploaded += 1;
+  let failed = 0;
+  let next = 0;
+  const worker = async () => {
+    for (let index = next++; index < paths.length; index = next++) {
+      const path = paths[index];
+      const bytes = photos.get(path);
+      if (bytes) {
+        const { error } = await supabase.storage
+          .from(PHOTO_BUCKET)
+          .upload(path, new Blob([bytes as BlobPart], { type: "image/jpeg" }), {
+            contentType: "image/jpeg",
+            cacheControl: "31536000",
+            upsert: true,
+          });
+        if (error) failed += 1;
+        else uploaded += 1;
+      } else {
+        failed += 1;
+      }
+      onEach();
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(PHOTOS_AT_A_TIME, paths.length) }, worker));
+  return { uploaded, failed };
+}
+
+/** Objects the storage API lists in one page. */
+const LIST_PAGE = 1000;
+
+/**
+ * Every photograph in storage, by path, or null if it could not be listed.
+ *
+ * A restore is still worth running without this, so a failure here is not
+ * thrown: the restore just does not attempt the three things that need it.
+ */
+export async function listStoredPhotos(): Promise<Set<string> | null> {
+  const paths = new Set<string>();
+  try {
+    for (const folder of PHOTO_FOLDERS) {
+      for (let offset = 0; ; offset += LIST_PAGE) {
+        const { data, error } = await supabase.storage
+          .from(PHOTO_BUCKET)
+          .list(folder, { limit: LIST_PAGE, offset, sortBy: { column: "name", order: "asc" } });
+        if (error) return null;
+        for (const item of data ?? []) {
+          // Folders come back as entries with no id. The directory keeps none
+          // below these three, so they are nothing to count.
+          if (item.id) paths.add(`${folder}/${item.name}`);
+        }
+        if ((data ?? []).length < LIST_PAGE) break;
+      }
+    }
+  } catch {
+    return null;
   }
-  return uploaded;
+  return paths;
+}
+
+/**
+ * Removes photographs nothing points at any more. Counted, never thrown: the
+ * restore has already succeeded, and a file left behind costs nothing.
+ */
+async function removePhotos(paths: string[]): Promise<number> {
+  let removed = 0;
+  for (let at = 0; at < paths.length; at += 100) {
+    const batch = paths.slice(at, at + 100);
+    const { data, error } = await supabase.storage.from(PHOTO_BUCKET).remove(batch);
+    if (!error) removed += data?.length ?? 0;
+  }
+  return removed;
+}
+
+/**
+ * Puts members back into the family they were in, now that it is back.
+ *
+ * Guarded on the person still having no family, so somebody an editor put
+ * into another family in the meantime is not pulled out of it.
+ */
+async function reattachPeople(
+  rows: {
+    id: string;
+    household_id: string | null;
+    household_role: PersonRow["household_role"];
+    sort_order: number;
+  }[],
+): Promise<number> {
+  let done = 0;
+  for (const row of rows) {
+    const { data, error } = await supabase
+      .from("people")
+      .update({
+        household_id: row.household_id,
+        household_role: row.household_role,
+        sort_order: row.sort_order,
+      })
+      .eq("id", row.id)
+      .is("household_id", null)
+      .select("id");
+    if (error) fail("people back into their families", error.message);
+    done += data?.length ?? 0;
+  }
+  return done;
+}
+
+/**
+ * Replaces the directory in one transaction, through replace_directory
+ * (migration 0011). Returns false when that function is not in the database
+ * yet, so the caller can fall back to doing it a request at a time.
+ */
+async function replaceAtomically(rows: ReturnType<typeof selectRows>): Promise<boolean> {
+  const { error } = await supabase.rpc("replace_directory", {
+    p_directory: {
+      tags: rows.tags,
+      households: rows.households.map(withoutAuthor),
+      people: rows.people.map(withoutAuthor),
+      household_tags: rows.householdTags,
+      person_tags: rows.personTags,
+      projects: rows.projects.map(withoutAuthor),
+      project_tags: rows.projectTags,
+      project_entries: rows.projectEntries,
+    },
+  });
+  if (!error) return true;
+  // PGRST202: no such function. Anything else is a real refusal.
+  if (error.code === "PGRST202" || /Could not find the function/i.test(error.message)) return false;
+  fail("replacing the directory", error.message);
 }
 
 /**
@@ -203,7 +351,7 @@ export async function applyRestore(
   const existingLinks = replacing ? new Set<string>() : await currentLinkKeys();
   const rows = selectRows(plan.file, live, mode, existingLinks, plan.photos);
 
-  const steps = (replacing ? 1 : 0) + 5 + rows.photoPaths.length;
+  const steps = (replacing ? 1 : 5) + rows.photoPaths.length + (rows.photosToRemove.length ? 1 : 0);
   let done = 0;
   const step = (label: string) => {
     done += 1;
@@ -213,41 +361,63 @@ export async function applyRestore(
   onProgress?.({ done: 0, total: steps, label: "Starting" });
 
   const removed = { households: 0, people: 0, tags: 0, projects: 0 };
+  let reattached = 0;
 
   if (replacing) {
-    await clearAll();
+    // All or nothing where the database allows it. Before 0011 is run there is
+    // no function to do that, and the old way - clear, then refill a request at
+    // a time - is used instead; the backup the page takes first is what covers
+    // it failing half way.
+    if (!(await replaceAtomically(rows))) {
+      await clearAll();
+      await insertTags(rows.tags);
+      await insertHouseholds(rows.households);
+      await insertPeople(rows.people);
+      await insertHouseholdTags(rows.householdTags);
+      await insertPersonTags(rows.personTags);
+      await insertProjects(rows.projects);
+      await insertProjectTags(rows.projectTags);
+      await insertProjectEntries(rows.projectEntries);
+    }
     removed.households = live.households.length;
     removed.people = live.people.length;
     removed.tags = live.tags.length;
     removed.projects = live.projects.length;
-    step("Cleared the directory");
+    step("Replaced the directory");
+  } else {
+    await insertTags(rows.tags);
+    step(`Groups (${rows.tags.length})`);
+
+    await insertHouseholds(rows.households);
+    step(`Families (${rows.households.length})`);
+
+    await insertPeople(rows.people);
+    reattached = await reattachPeople(rows.reattach);
+    step(`People (${rows.people.length + reattached})`);
+
+    await insertHouseholdTags(rows.householdTags);
+    await insertPersonTags(rows.personTags);
+    step("Groups on records");
+
+    await insertProjects(rows.projects);
+    await insertProjectTags(rows.projectTags);
+    await insertProjectEntries(rows.projectEntries);
+    step(`Directories (${rows.projects.length})`);
   }
 
-  await insertTags(rows.tags);
-  step(`Groups (${rows.tags.length})`);
-
-  await insertHouseholds(rows.households);
-  step(`Families (${rows.households.length})`);
-
-  await insertPeople(rows.people);
-  step(`People (${rows.people.length})`);
-
-  await insertHouseholdTags(rows.householdTags);
-  await insertPersonTags(rows.personTags);
-  step("Groups on records");
-
-  await insertProjects(rows.projects);
-  await insertProjectTags(rows.projectTags);
-  await insertProjectEntries(rows.projectEntries);
-  step(`Directories (${rows.projects.length})`);
-
-  let photosUploaded = 0;
+  let photos = { uploaded: 0, failed: 0 };
   if (rows.photoPaths.length) {
     let n = 0;
-    photosUploaded = await uploadPhotos(rows.photoPaths, plan.photos, () => {
+    photos = await uploadPhotos(rows.photoPaths, plan.photos, () => {
       n += 1;
       step(`Photographs (${n} of ${rows.photoPaths.length})`);
     });
+  }
+
+  let photosRemoved = 0;
+  if (rows.photosToRemove.length) {
+    photosRemoved = await removePhotos(rows.photosToRemove);
+    step("Tidying up photographs");
   }
 
   return {
@@ -258,7 +428,10 @@ export async function applyRestore(
       projects: rows.projects.length,
     },
     removed,
-    photosUploaded,
+    photosUploaded: photos.uploaded,
+    photosFailed: photos.failed,
+    reattached,
+    photosRemoved,
     orphaned: rows.orphaned,
   };
 }

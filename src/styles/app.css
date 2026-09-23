@@ -403,6 +403,11 @@ p:last-child {
   color: var(--accent);
   font-weight: 600;
 }
+/* Something to act on, such as a backup that is due. It takes the place a
+   count would have, at the far end of the row. */
+.nav-link .pill {
+  margin-left: auto;
+}
 .nav-link .count {
   margin-left: auto;
   font-size: 0.78rem;
