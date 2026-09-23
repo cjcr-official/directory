@@ -10,6 +10,8 @@ export type AppRole = "owner" | "editor" | "viewer";
 export type HouseholdRole = "head" | "spouse" | "child" | "other";
 /** Null is a real answer: nobody has to say. See migration 0008. */
 export type Gender = "male" | "female";
+/** Cropped to fill the frame, or shown whole. See migration 0010. */
+export type PhotoFit = "fill" | "fit";
 export type ProjectKind = "directory" | "event";
 export type SelectionMode = "all" | "tags" | "manual";
 export type EntryType = "household" | "person";
@@ -37,6 +39,13 @@ export type HouseholdRow = {
   email: string | null;
   anniversary: string | null;
   photo_path: string | null;
+  /**
+   * Whether this photograph is cropped to fill its frame or shown whole, over
+   * whatever the directory says. Null follows the directory. Added by
+   * migration 0010, so absent rather than null on a database that has not run
+   * it yet.
+   */
+  photo_fit?: PhotoFit | null;
   notes: string | null;
   /**
    * A short label the office writes to tell two same-named families apart -
@@ -80,6 +89,8 @@ export type PersonRow = {
   postal_code: string | null;
   country: string | null;
   photo_path: string | null;
+  /** As on households. */
+  photo_fit?: PhotoFit | null;
   notes: string | null;
   /**
    * When the last background check was done, and when the next one is due -

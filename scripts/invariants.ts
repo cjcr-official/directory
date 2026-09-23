@@ -787,6 +787,33 @@ async function main() {
       "the family portrait stopped printing on the family's own card",
     );
 
+    // A photograph set to print whole prints whole, whatever the directory
+    // says, and the family's choice travels with its portrait onto a member's
+    // card. Everyone who has not been set follows the directory.
+    const wholeFamily = {
+      ...withPortraits,
+      households: withPortraits.households.map((h) =>
+        h.id === "h1" ? { ...h, photo_fit: "fit" as const } : h,
+      ),
+    };
+    const fitOf = (id: string, mode: "families" | "people") =>
+      photoOf(
+        id,
+        resolveEntries(buildEntries(wholeFamily), {
+          mode: "tags",
+          tagIds: ["t1"],
+          entries: [],
+          ...(mode === "people" ? { wholeFamily: false } : {}),
+        }),
+      )?.fit;
+    ok(fitOf("h1", "families") === "fit", "a family set to print whole was cropped");
+    ok(fitOf("p1", "people") === "fit", "a member printing under the family portrait lost its fit");
+    ok(fitOf("p4", "people") === "fill", "somebody's own photo took their family's fit");
+    ok(
+      photoOf("h1", asFamilies)?.fit === "fill",
+      "an unset family stopped following the directory",
+    );
+
     // And nobody who is not in the group reaches the page - the whole point.
     const printed = drawn(composeBook(people, settings, metrics)).join("\n");
     ok(printed.includes("Smith, John"), "the deacon is not in his own booklet");

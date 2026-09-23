@@ -1,7 +1,9 @@
 import { TYPEFACES, type Typeface } from "./metrics";
 
 export type PageSizeName = "letter" | "a4" | "legal";
-export type PhotoFit = "fill" | "fit";
+import type { PhotoFit } from "../database.types";
+
+export type { PhotoFit };
 export type MemberStyle = "compact" | "detailed";
 export type TextScale = "compact" | "normal" | "large";
 /**

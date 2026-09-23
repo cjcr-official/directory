@@ -1048,7 +1048,7 @@ export function ProjectEditPage() {
                 <div className="check-child">
                   <Field
                     label="Shape"
-                    hint="Cropping keeps every record the same shape."
+                    hint="Cropping keeps every record the same shape. A family or person can be set otherwise beside their own photo."
                     htmlFor="photo_fit"
                   >
                     <select

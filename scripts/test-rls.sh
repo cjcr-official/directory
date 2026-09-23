@@ -34,6 +34,7 @@ run migrations/0006_two_step_signin.sql
 run migrations/0007_account_deletion.sql
 run migrations/0008_gender.sql
 run migrations/0009_background_checks.sql
+run migrations/0010_photo_fit.sql
 run tests/01_grants.sql
 
 echo "Running row level security tests…"
