@@ -226,17 +226,22 @@ export async function listStoredPhotos(): Promise<Set<string> | null> {
   const paths = new Set<string>();
   try {
     for (const folder of PHOTO_FOLDERS) {
-      for (let offset = 0; ; offset += LIST_PAGE) {
+      // Paged by what actually came back, and stopped only by an empty page.
+      // The storage API is free to return fewer than it was asked for; taking
+      // a short page as the last one would miss everything after it.
+      for (let offset = 0; ;) {
         const { data, error } = await supabase.storage
           .from(PHOTO_BUCKET)
           .list(folder, { limit: LIST_PAGE, offset, sortBy: { column: "name", order: "asc" } });
         if (error) return null;
-        for (const item of data ?? []) {
+        const page = data ?? [];
+        if (!page.length) break;
+        for (const item of page) {
           // Folders come back as entries with no id. The directory keeps none
           // below these three, so they are nothing to count.
           if (item.id) paths.add(`${folder}/${item.name}`);
         }
-        if ((data ?? []).length < LIST_PAGE) break;
+        offset += page.length;
       }
     }
   } catch {

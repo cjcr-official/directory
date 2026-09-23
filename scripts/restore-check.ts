@@ -776,3 +776,49 @@ console.log("\nthe spreadsheets in a backup");
   same("ordinary text and numbers are untouched", lines[3], "Plain,42");
   same("a negative number stays a number", lines[4], "-3,ok");
 }
+
+// ---------------------------------------------------------------------------
+// A group deleted and made again under the same name. Group names are unique,
+// so writing the old one back would be refused, and groups go in first - the
+// whole restore would stop there, every time.
+// ---------------------------------------------------------------------------
+
+console.log("\na group made again under the same name");
+{
+  const choir = { ...tag("t-old"), name: "Choir" };
+  const file = backup({
+    tags: [choir],
+    householdTags: [{ household_id: "h1", tag_id: "t-old" }],
+    personTags: [{ person_id: "p3", tag_id: "t-old" }],
+    projects: [{ project: project("pr1"), tagIds: ["t-old"], entries: [] }],
+  });
+  const live: LiveDirectory = {
+    ...EMPTY,
+    households: [household("h2", "Jones")],
+    people: [person("p3", "h2")],
+    tags: [{ ...tag("t-new"), name: "Choir" }],
+  };
+  const rows = selectRows(file, live, "missing");
+  same("the old group is not written again", rows.tags.length, 0);
+  same("the restored family goes into the group that is here", rows.householdTags, [
+    { household_id: "h1", tag_id: "t-new" },
+  ]);
+  same("and so does a person who is still here", rows.personTags, [
+    { person_id: "p3", tag_id: "t-new" },
+  ]);
+  same("and a restored directory", rows.projectTags, [{ project_id: "pr1", tag_id: "t-new" }]);
+
+  const plan = await readBackup(archive(file), live);
+  same("the preview does not call the group missing", plan.missing.tags, 0);
+
+  same(
+    "a link already there under the new id is not written twice",
+    selectRows(file, live, "missing", new Set(["p:p3:t-new"])).personTags.length,
+    0,
+  );
+  same(
+    "replacing writes the file's own group, as the directory is emptied first",
+    selectRows(file, live, "replace").tags.map((row) => row.id),
+    ["t-old"],
+  );
+}

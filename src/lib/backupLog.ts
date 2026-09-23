@@ -78,8 +78,8 @@ export function isBackupDue(iso: string | null, now = Date.now()): boolean {
 }
 
 /**
- * The last backup, kept current: read once, and again whenever this browser
- * takes one. `loaded` is false until the first answer, so nothing claims a
+ * The last backup, kept current: read once, again whenever this browser
+ * takes one, and again when the app is brought back to the front. `loaded` is false until the first answer, so nothing claims a
  * backup is overdue before it knows.
  */
 export function useLastBackup(enabled = true): { takenAt: string | null; loaded: boolean } {
@@ -96,11 +96,19 @@ export function useLastBackup(enabled = true): { takenAt: string | null; loaded:
         (takenAt) => live && setState({ takenAt, loaded: true }),
         () => live && setState({ takenAt: localLast(), loaded: true }),
       );
+    // And whenever the app comes back to the front, so a backup taken on
+    // another device clears the reminder here without a reload - a Home Screen
+    // app is otherwise open for days.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") look();
+    };
     look();
     window.addEventListener(TAKEN_EVENT, look);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       live = false;
       window.removeEventListener(TAKEN_EVENT, look);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [enabled]);
 

@@ -263,7 +263,6 @@ export async function readBackup(bytes: Uint8Array, live: LiveDirectory): Promis
 
   const liveHouseholds = new Set(live.households.map((row) => row.id));
   const livePeople = new Set(live.people.map((row) => row.id));
-  const liveTags = new Set(live.tags.map((row) => row.id));
   const liveProjects = new Set(live.projects.map((row) => row.id));
 
   const backupHouseholds = new Set(backup.households.map((row) => row.id));
@@ -294,14 +293,11 @@ export async function readBackup(bytes: Uint8Array, live: LiveDirectory): Promis
     missing: {
       households: backup.households.filter((row) => !liveHouseholds.has(row.id)).length,
       people: backup.people.filter((row) => !livePeople.has(row.id)).length,
-      tags: backup.tags.filter((row) => !liveTags.has(row.id)).length,
+      // Groups and links from the same decision the restore makes, so a group
+      // that is here under a new id is not promised as "missing".
+      tags: adding.tags.length,
       projects: backup.projects.filter((row) => !liveProjects.has(row.project.id)).length,
-      links:
-        backup.householdTags.filter(
-          (link) => !liveLinks.has(`h:${link.household_id}:${link.tag_id}`),
-        ).length +
-        backup.personTags.filter((link) => !liveLinks.has(`p:${link.person_id}:${link.tag_id}`))
-          .length,
+      links: adding.householdTags.length + adding.personTags.length,
       reattach: adding.reattach.length,
       photos: adding.repairedPhotos,
     },
@@ -370,7 +366,22 @@ export function selectRows(
   const replacing = mode === "replace";
   const keep = <T>(rows: T[], has: (row: T) => boolean) => (replacing ? rows : rows.filter(has));
 
-  const tags = keep(file.tags, (row) => !liveTags.has(row.id));
+  // A group deleted and then made again under the same name has a new id. The
+  // name is unique, so writing the old one back would be refused - and groups
+  // go in first, so that refusal would stop the whole restore, every time it
+  // was tried. The group that is here already is the same group as far as
+  // anybody can tell, so the file's links are pointed at it instead.
+  const liveTagByName = new Map(live.tags.map((row) => [row.name, row.id]));
+  const sameGroup = new Map<string, string>();
+  if (!replacing) {
+    for (const row of file.tags) {
+      const here = liveTagByName.get(row.name);
+      if (!liveTags.has(row.id) && here) sameGroup.set(row.id, here);
+    }
+  }
+  const tagId = (id: string) => sameGroup.get(id) ?? id;
+
+  const tags = keep(file.tags, (row) => !liveTags.has(row.id) && !sameGroup.has(row.id));
   const households = keep(file.households, (row) => !liveHouseholds.has(row.id));
   const people = keep(file.people, (row) => !livePeople.has(row.id));
   const projects = keep(file.projects, (row) => !liveProjects.has(row.project.id));
@@ -402,18 +413,22 @@ export function selectRows(
   // nothing is already recorded however the caller filled `existingLinks` -
   // honouring it there would drop links that have to go back in.
   const already = replacing ? new Set<string>() : existingLinks;
-  const householdTags = file.householdTags.filter(
-    (link) =>
-      willHaveHousehold.has(link.household_id) &&
-      willHaveTag.has(link.tag_id) &&
-      !already.has(`h:${link.household_id}:${link.tag_id}`),
-  );
-  const personTags = file.personTags.filter(
-    (link) =>
-      willHavePerson.has(link.person_id) &&
-      willHaveTag.has(link.tag_id) &&
-      !already.has(`p:${link.person_id}:${link.tag_id}`),
-  );
+  const householdTags = file.householdTags
+    .map((link) => ({ ...link, tag_id: tagId(link.tag_id) }))
+    .filter(
+      (link) =>
+        willHaveHousehold.has(link.household_id) &&
+        willHaveTag.has(link.tag_id) &&
+        !already.has(`h:${link.household_id}:${link.tag_id}`),
+    );
+  const personTags = file.personTags
+    .map((link) => ({ ...link, tag_id: tagId(link.tag_id) }))
+    .filter(
+      (link) =>
+        willHavePerson.has(link.person_id) &&
+        willHaveTag.has(link.tag_id) &&
+        !already.has(`p:${link.person_id}:${link.tag_id}`),
+    );
 
   // Members left behind when their family was deleted. Only people who have
   // no family now, and who were in that family in the file, and only into a
@@ -502,8 +517,9 @@ export function selectRows(
     projects: projects.map((row) => row.project),
     projectTags: projects.flatMap((row) =>
       row.tagIds
-        .filter((tagId) => willHaveTag.has(tagId))
-        .map((tagId) => ({ project_id: row.project.id, tag_id: tagId })),
+        .map(tagId)
+        .filter((id) => willHaveTag.has(id))
+        .map((id) => ({ project_id: row.project.id, tag_id: id })),
     ),
     projectEntries: projects.flatMap((row) =>
       row.entries.filter((entry) =>
