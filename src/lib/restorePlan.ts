@@ -324,8 +324,8 @@ export interface RestoreRows {
   projectTags: { project_id: string; tag_id: string }[];
   projectEntries: ProjectEntryRow[];
   /**
-   * People still in the directory whose family is being restored, and who
-   * were in it when the backup was taken. Deleting a family does not delete
+   * People still in the directory whose family is being restored, or is
+   * already back but empty, and who were in it when the backup was taken. Deleting a family does not delete
    * its members - the database only clears their link to it - so without this
    * a restored family comes back empty, with its members beside it.
    */
@@ -415,17 +415,27 @@ export function selectRows(
       !already.has(`p:${link.person_id}:${link.tag_id}`),
   );
 
-  // Members left behind when their family was deleted. Only people whose
-  // family is one being put back, who have no family now, and who were in that
-  // family in the file: somebody an editor has since moved into another
-  // family, or out of this one on purpose, is left where they are.
-  const restoredHouseholds = new Set(households.map((row) => row.id));
+  // Members left behind when their family was deleted. Only people who have
+  // no family now, and who were in that family in the file, and only into a
+  // family that is either being put back now or is already back but empty.
+  //
+  // The second kind is a family an earlier restore brought back without its
+  // people: one that stopped part way, after the families went in and before
+  // anybody was put back into them, or one run before this existed. Running
+  // the restore again has to finish that job. A family that still has members
+  // is left alone, so somebody an editor took out of it on purpose, or has
+  // since moved into another family, stays where they are.
+  const occupied = new Set(live.people.map((row) => row.household_id).filter(Boolean));
+  const reattachable = new Set([
+    ...households.map((row) => row.id),
+    ...live.households.filter((row) => !occupied.has(row.id)).map((row) => row.id),
+  ]);
   const livePeopleById = new Map(live.people.map((row) => [row.id, row]));
   const reattach = replacing
     ? []
     : file.people
         .filter((person) => {
-          if (!person.household_id || !restoredHouseholds.has(person.household_id)) return false;
+          if (!person.household_id || !reattachable.has(person.household_id)) return false;
           const now = livePeopleById.get(person.id);
           return now !== undefined && !now.household_id;
         })
