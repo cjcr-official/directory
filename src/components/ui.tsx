@@ -247,6 +247,7 @@ export function Avatar({
   size = "sm",
   alt = "",
   fit,
+  zoom,
 }: {
   path: string | null | undefined;
   initials: string;
@@ -254,6 +255,8 @@ export function Avatar({
   alt?: string;
   /** "fit" shows the whole photograph, as the book will print it. */
   fit?: PhotoFit | null;
+  /** Tapping the photo opens it full screen; this is what it is of. */
+  zoom?: string;
 }) {
   const [url, setUrl] = useState<string | null>(null);
 
@@ -276,8 +279,9 @@ export function Avatar({
   }, [path]);
 
   const className = `avatar${size === "lg" ? " lg" : ""}`;
-  if (url)
-    return <img className={`${className}${fit === "fit" ? " whole" : ""}`} src={url} alt={alt} />;
+  const photoClass = `${className}${fit === "fit" ? " whole" : ""}`;
+  if (url && zoom) return <ZoomablePhoto src={url} className={photoClass} label={zoom} />;
+  if (url) return <img className={photoClass} src={url} alt={alt} />;
   return (
     <span className={className} aria-hidden={!alt}>
       {initials.slice(0, 2).toUpperCase()}
@@ -428,5 +432,74 @@ export function TagDots({ tags }: { tags: { id: string; name: string; color: str
         ),
       )}
     </span>
+  );
+}
+
+/**
+ * A photograph filling the screen, to see who is in it.
+ *
+ * The slots a photo sits in on a form are a thumbnail's size, which is enough
+ * to recognise a family and not enough to tell the twins apart. A native
+ * dialog, so Escape closes it, focus stays inside it while it is open and goes
+ * back to whatever opened it. A tap anywhere closes it too - on a phone there
+ * is no Escape key, and the photo is the whole of what is on screen.
+ */
+export function PhotoViewer({
+  src,
+  alt,
+  onClose,
+}: {
+  src: string;
+  alt: string;
+  onClose: () => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const node = dialog.current;
+    if (node && !node.open) node.showModal();
+    return () => node?.close();
+  }, []);
+
+  return (
+    <dialog
+      ref={dialog}
+      className="photo-viewer"
+      aria-label={alt || "Photo"}
+      onClose={onClose}
+      onClick={() => dialog.current?.close()}
+    >
+      <img src={src} alt={alt} />
+      <button type="button" className="photo-viewer-close" aria-label="Close" autoFocus>
+        ✕
+      </button>
+    </dialog>
+  );
+}
+
+/** A photo that opens full screen when tapped. */
+export function ZoomablePhoto({
+  src,
+  className,
+  label,
+}: {
+  src: string;
+  className: string;
+  /** What the photo is of, said to a screen reader and on the viewer. */
+  label: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        className="photo-zoom"
+        aria-label={`View ${label} full screen`}
+        onClick={() => setOpen(true)}
+      >
+        <img className={className} src={src} alt="" />
+      </button>
+      {open ? <PhotoViewer src={src} alt={label} onClose={() => setOpen(false)} /> : null}
+    </>
   );
 }

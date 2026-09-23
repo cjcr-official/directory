@@ -335,6 +335,7 @@ export function PersonEditPage() {
                       initials={household.sort_name}
                       size="lg"
                       alt=""
+                      zoom="the family photo"
                     />
                     <div>
                       <div style={{ fontWeight: 600 }}>

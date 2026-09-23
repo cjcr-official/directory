@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getPhotoUrl, preparePhoto, type PreparedPhoto } from "@/lib/photos";
 import { message } from "@/lib/format";
+import { ZoomablePhoto } from "@/components/ui";
 import type { PhotoFit } from "@/lib/database.types";
 
 interface Props {
@@ -119,7 +120,11 @@ export function PhotoInput({
   return (
     <div className="row" style={{ alignItems: "flex-start", gap: 14 }}>
       {shown ? (
-        <img className={`avatar lg ${shape}${whole ? " whole" : ""}`} src={shown} alt="" />
+        <ZoomablePhoto
+          src={shown}
+          className={`avatar lg ${shape}${whole ? " whole" : ""}`}
+          label="the photo"
+        />
       ) : (
         <span className={`avatar lg ${shape}`} aria-hidden>
           {initials.slice(0, 2).toUpperCase()}
