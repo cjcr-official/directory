@@ -21,6 +21,53 @@ const PALETTE = [
 ];
 
 /**
+ * The colours a group is usually given, and a well for any other.
+ *
+ * The same row the name tags' accent uses, so choosing a colour looks and
+ * works the same wherever it is done. The well is ringed when the colour in
+ * use is none of the presets, or the row would show nothing as chosen.
+ */
+function ColourChoice({
+  id,
+  value,
+  disabled,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  disabled?: boolean;
+  onChange: (color: string) => void;
+}) {
+  const own = !PALETTE.includes(value.toLowerCase());
+  return (
+    <div className="colour-field">
+      {PALETTE.map((option) => (
+        <button
+          key={option}
+          type="button"
+          className={`swatch${value.toLowerCase() === option ? " on" : ""}`}
+          style={{ background: option }}
+          aria-label={option}
+          aria-pressed={value.toLowerCase() === option}
+          disabled={disabled}
+          onClick={() => onChange(option)}
+        />
+      ))}
+      <span className={`any-colour${own ? " on" : ""}`} title="Any colour">
+        <input
+          id={id}
+          type="color"
+          aria-label="Any colour"
+          value={value}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </span>
+    </div>
+  );
+}
+
+/**
  * Groups are plain labels, but they are the mechanism behind event booklets:
  * tag once here, then a project can select "everyone in the choir" without
  * anybody re-picking names.
@@ -35,6 +82,7 @@ export function GroupsPage() {
   /** The one group whose people are on show, if any. */
   const [openId, setOpenId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [draftColor, setDraftColor] = useState(PALETTE[0]);
   const [renaming, setRenaming] = useState(false);
 
   /** How many printable records each group would pull in. */
@@ -71,7 +119,7 @@ export function GroupsPage() {
 
   if (loading && !tags.length) return <LoadingScreen label="Loading groups…" />;
 
-  /** Opening a group also arms its name for renaming, which is the one edit it has. */
+  /** Opening a group also arms its name and colour for editing. */
   function toggle(tag: TagRow) {
     setFormError(null);
     if (openId === tag.id) {
@@ -80,11 +128,16 @@ export function GroupsPage() {
     }
     setOpenId(tag.id);
     setDraft(tag.name);
+    setDraftColor(tag.color);
   }
 
   async function rename(tag: TagRow) {
     const next = draft.trim();
-    if (!next || next === tag.name) return;
+    if (!next) return;
+    const patch: Partial<TagRow> = {};
+    if (next !== tag.name) patch.name = next;
+    if (draftColor.toLowerCase() !== tag.color.toLowerCase()) patch.color = draftColor;
+    if (!Object.keys(patch).length) return;
 
     // Caught here rather than by the unique index, for the same reason the add
     // form catches it: the answer names the group, and a group that differs
@@ -100,12 +153,13 @@ export function GroupsPage() {
     setRenaming(true);
     setFormError(null);
     try {
-      await updateTag(tag.id, { name: next });
+      await updateTag(tag.id, patch);
       await reload();
     } catch (cause) {
-      // The stored name is still the old one, so the field goes back to saying
-      // so rather than showing a name nothing was saved under.
+      // The stored name and colour are still the old ones, so the fields go
+      // back to saying so rather than showing what nothing was saved under.
       setDraft(tag.name);
+      setDraftColor(tag.color);
       setFormError(message(cause));
     } finally {
       setRenaming(false);
@@ -131,6 +185,8 @@ export function GroupsPage() {
     try {
       await createTag(trimmed, color, null);
       setName("");
+      // The next preset along, so a run of new groups do not all come out
+      // one colour; from a colour of their own, back to the first.
       setColor(PALETTE[(PALETTE.indexOf(color) + 1) % PALETTE.length]);
       await reload();
     } catch (cause) {
@@ -280,12 +336,25 @@ export function GroupsPage() {
                                 onChange={(event) => setDraft(event.target.value)}
                               />
                             </Field>
+                            <Field label="Colour" htmlFor={`group-colour-${tag.id}`}>
+                              <ColourChoice
+                                id={`group-colour-${tag.id}`}
+                                value={draftColor}
+                                disabled={renaming}
+                                onChange={setDraftColor}
+                              />
+                            </Field>
                             <button
                               type="submit"
                               className="btn"
-                              disabled={renaming || !draft.trim() || draft.trim() === tag.name}
+                              disabled={
+                                renaming ||
+                                !draft.trim() ||
+                                (draft.trim() === tag.name &&
+                                  draftColor.toLowerCase() === tag.color.toLowerCase())
+                              }
                             >
-                              {renaming ? "Renaming…" : "Rename"}
+                              {renaming ? "Saving…" : "Save changes"}
                             </button>
                           </form>
                         ) : null}
@@ -320,26 +389,8 @@ export function GroupsPage() {
                   />
                 </Field>
 
-                <Field label="Colour">
-                  <div className="row tight">
-                    {PALETTE.map((option) => (
-                      <button
-                        key={option}
-                        type="button"
-                        aria-label={option}
-                        onClick={() => setColor(option)}
-                        style={{
-                          width: 26,
-                          height: 26,
-                          borderRadius: 7,
-                          background: option,
-                          border:
-                            color === option ? "2px solid var(--ink)" : "2px solid transparent",
-                          cursor: "pointer",
-                        }}
-                      />
-                    ))}
-                  </div>
+                <Field label="Colour" htmlFor="group_colour">
+                  <ColourChoice id="group_colour" value={color} onChange={setColor} />
                 </Field>
 
                 <button

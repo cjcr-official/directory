@@ -1808,16 +1808,19 @@ td {
 
 /* Renaming, kept below the people and behind a rule, because it is the thing
    you came here to do least often. */
+/* Name, then colour, then the button: stacked, because a row of swatches
+   beside a text box leaves neither room on a phone. */
 .group-rename {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
-  gap: 8px;
+  gap: 10px 8px;
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }
 .group-rename .field {
-  flex: 1 1 auto;
+  flex: 1 1 100%;
   margin-bottom: 0;
 }
 .group-rename .btn {
