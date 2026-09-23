@@ -891,5 +891,50 @@ select assert(
   rows_written(:'owner_id', 'delete from public.backup_log') <= 0,
   'nobody can erase the record, owners included');
 
+-- --------------------------------------------------------------------------
+-- Directory kinds (0012): main, group or event, and only one main.
+-- --------------------------------------------------------------------------
+
+select assert(
+  outcome_as(:'editor_id',
+    $q$insert into public.projects (name, kind) values ('The Directory', 'main')$q$) = 'ok',
+  'an editor can make a directory the main one');
+
+select assert(
+  outcome_as(:'editor_id',
+    $q$insert into public.projects (name, kind) values ('Another', 'main')$q$) = '23505',
+  'but there is only ever one main directory');
+
+select assert(
+  outcome_as(:'editor_id',
+    $q$insert into public.projects (name, kind) values ('Choir', 'group')$q$) = 'ok'
+  and outcome_as(:'editor_id',
+    $q$insert into public.projects (name, kind) values ('Picnic', 'event')$q$) = 'ok',
+  'as many group and event directories as are wanted');
+
+select assert(
+  outcome_as(:'editor_id',
+    $q$insert into public.projects (name, kind) values ('Old', 'directory')$q$) = 'ok',
+  'a directory saved before 0012 keeps its old kind');
+
+select assert(
+  outcome_as(:'editor_id',
+    $q$insert into public.projects (name, kind) values ('Bad', 'booklet')$q$) = '23514',
+  'and nothing else is a kind');
+
+select assert(
+  outcome_as(:'editor_id', $q$insert into public.projects (name) values ('Plain')$q$) = 'ok',
+  'a directory can be made without saying its kind');
+
+select assert(
+  (select kind from public.projects where name = 'Plain') = 'group',
+  'and is a group one');
+
+select assert(
+  outcome_as(:'editor_id', $q$update public.projects set kind = 'group' where kind = 'main'$q$) = 'ok'
+  and outcome_as(:'editor_id',
+    $q$update public.projects set kind = 'main' where name = 'Choir'$q$) = 'ok',
+  'the main directory can be handed to another');
+
 \echo ''
 \echo 'All row level security checks passed.'

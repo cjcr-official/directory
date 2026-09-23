@@ -97,6 +97,8 @@ addresses. What follows is the short form.
    - `0010_photo_fit.sql` — showing one photograph whole instead of cropped
    - `0011_backup_safety.sql` — a shared record of backups taken, and a
      "Replace everything" restore that lands whole or not at all
+   - `0012_directory_kinds.sql` — main, group and event directories, and only
+     one main
 3. From **Project Settings → API**, copy the **Project URL** and the
    **anon public** key.
 

@@ -12,7 +12,8 @@ export type HouseholdRole = "head" | "spouse" | "child" | "other";
 export type Gender = "male" | "female";
 /** Cropped to fill the frame, or shown whole. See migration 0010. */
 export type PhotoFit = "fill" | "fit";
-export type ProjectKind = "directory" | "event";
+/** "directory" is the kind every directory had before 0012; see directoryKind.ts. */
+export type ProjectKind = "main" | "group" | "event" | "directory";
 export type SelectionMode = "all" | "tags" | "manual";
 export type EntryType = "household" | "person";
 

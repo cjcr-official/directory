@@ -139,7 +139,7 @@ async function run() {
   console.log("creating a main directory and one event booklet…");
   const { error: mainError } = await supabase.from("projects").insert({
     name: "Main Directory",
-    kind: "directory",
+    kind: "main",
     description: "Everyone, alphabetically, six records to a sheet.",
     selection_mode: "all",
     settings: {
@@ -156,7 +156,7 @@ async function run() {
     .from("projects")
     .insert({
       name: "Choir Booklet",
-      kind: "event",
+      kind: "group",
       description: "Just the choir — a handout for rehearsals.",
       selection_mode: "tags",
       settings: {
