@@ -24,7 +24,7 @@ import {
   setProjectTags,
   updateProject,
 } from "@/lib/queries";
-import type { ProjectRow, SelectionMode } from "@/lib/database.types";
+import type { ProjectKind, ProjectRow, SelectionMode } from "@/lib/database.types";
 import { directoryKinds, mainDirectoryId, type DirectoryKind } from "@/lib/directoryKind";
 import {
   COVER_PARTS,
@@ -589,7 +589,7 @@ export function ProjectEditPage() {
 
       const payload = {
         name: name.trim() || "Untitled directory",
-        kind,
+        kind: kind as ProjectKind,
         description: description.trim() || null,
         selection_mode: mode,
         settings: saved as unknown as Record<string, unknown>,
@@ -600,13 +600,31 @@ export function ProjectEditPage() {
       // database refuses two at once. If this save then fails - somebody else
       // saved this directory meanwhile - the role goes back where it was, so
       // the church is never left without a main directory by a failed save.
-      const handingOver = kind === "main" && currentMain && currentMain !== id ? currentMain : null;
-      if (handingOver) await demoteMainDirectory(handingOver);
+      //
+      // A database that has not run 0012 knows only "directory" and "event",
+      // refuses the new kinds by name, and has no main directory to hand
+      // over. There the directory is saved with the old kind it does accept,
+      // so saving keeps working until the migration is run.
+      const beforeKinds = (cause: unknown) => /projects_kind_check/.test(message(cause));
+      let handingOver = kind === "main" && currentMain && currentMain !== id ? currentMain : null;
+      if (handingOver) {
+        try {
+          await demoteMainDirectory(handingOver);
+        } catch (cause) {
+          if (!beforeKinds(cause)) throw cause;
+          handingOver = null;
+        }
+      }
+      const save = (body: typeof payload) =>
+        id ? updateProject(id, body, force ? null : openedAt) : createProject(body);
       let project: ProjectRow;
       try {
-        project = id
-          ? await updateProject(id, payload, force ? null : openedAt)
-          : await createProject(payload);
+        try {
+          project = await save(payload);
+        } catch (cause) {
+          if (!beforeKinds(cause)) throw cause;
+          project = await save({ ...payload, kind: kind === "event" ? "event" : "directory" });
+        }
       } catch (cause) {
         if (handingOver) await restoreMainDirectory(handingOver).catch(() => undefined);
         throw cause;
