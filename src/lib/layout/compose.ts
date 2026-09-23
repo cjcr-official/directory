@@ -339,6 +339,24 @@ function personCardPhoto(person: PersonWithContext): string | null {
   return person.photo_path ?? person.household?.photo_path ?? null;
 }
 
+/**
+ * Whether a card's picture is cropped or shown whole.
+ *
+ * The directory decides, unless somebody has decided for this one photograph -
+ * the family of five stood side by side, who lose one at each end to a
+ * portrait crop. The choice belongs to the picture, not the card: a person
+ * printing under their family's portrait takes the family's choice with it.
+ */
+function cardPhotoFit(entry: DirectoryEntry, settings: ProjectSettings): PhotoFit {
+  const own =
+    entry.type === "household"
+      ? entry.household.photo_fit
+      : entry.person.photo_path
+        ? entry.person.photo_fit
+        : entry.person.household?.photo_fit;
+  return own ?? settings.photoFit;
+}
+
 function personDates(person: PersonRow, settings: ProjectSettings): string[] {
   const parts: string[] = [];
   if (settings.showBirthdays && person.date_of_birth) {
@@ -622,7 +640,7 @@ function composeCard(
     photo = {
       box: { x: innerX, y: innerY + (innerH - photoH) / 2, w: photoW, h: photoH },
       path: photoPath,
-      fit: settings.photoFit,
+      fit: cardPhotoFit(entry, settings),
       initials: initialsFor(entry),
     };
     textX = innerX + photoW + PHOTO_GAP;

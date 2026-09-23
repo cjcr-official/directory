@@ -356,6 +356,8 @@ export function PersonEditPage() {
                       setPhotoBlob(blob);
                       setPhotoRemoved(removed);
                     }}
+                    fit={form.photo_fit ?? null}
+                    onFitChange={(fit) => patch({ photo_fit: fit })}
                   />
                 )}
               </div>

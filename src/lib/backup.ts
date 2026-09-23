@@ -73,6 +73,7 @@ function familiesCsv(data: DirectoryData): string {
     household.office_label ?? "",
     household.is_active,
     household.photo_path ? `photos/${household.photo_path}` : "",
+    household.photo_fit ?? "",
     household.id,
   ]);
 
@@ -94,6 +95,7 @@ function familiesCsv(data: DirectoryData): string {
       "Which one (office only)",
       "In printed directories",
       "Photo file",
+      "Photo shape",
       "Id",
     ],
     rows,
@@ -135,6 +137,7 @@ function peopleCsv(data: DirectoryData): string {
     person.background_check_due,
     person.is_active,
     person.photo_path ? `photos/${person.photo_path}` : "",
+    person.photo_fit ?? "",
     person.id,
   ]);
 
@@ -163,6 +166,7 @@ function peopleCsv(data: DirectoryData): string {
       "Background check due",
       "In printed directories",
       "Photo file",
+      "Photo shape",
       "Id",
     ],
     rows,

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getPhotoUrl, preparePhoto, type PreparedPhoto } from "@/lib/photos";
 import { message } from "@/lib/format";
+import type { PhotoFit } from "@/lib/database.types";
 
 interface Props {
   /** Storage path of the photo already saved, if any. */
@@ -26,6 +27,13 @@ interface Props {
    * to storage until the form is submitted.
    */
   onChange: (blob: Blob | null, removed: boolean) => void;
+  /**
+   * How this one picture sits in its frame in the book, over the directory's
+   * own setting; null follows the directory. Left out along with onFitChange,
+   * no choice is offered - a logo or a cover has its own rules.
+   */
+  fit?: PhotoFit | null;
+  onFitChange?: (fit: PhotoFit | null) => void;
 }
 
 /**
@@ -40,6 +48,8 @@ export function PhotoInput({
   initials,
   disabled,
   onChange,
+  fit,
+  onFitChange,
   shape = "portrait",
   hint = "Portrait orientation prints best. Large photos are shrunk automatically",
 }: Props) {
@@ -80,6 +90,8 @@ export function PhotoInput({
   }, [pending]);
 
   const shown = pending?.previewUrl ?? (removed ? null : savedUrl);
+  // The slot on screen shows what the page will: cropped, or whole inside it.
+  const whole = fit === "fit";
 
   async function choose(file: File | undefined) {
     if (!file) return;
@@ -107,7 +119,7 @@ export function PhotoInput({
   return (
     <div className="row" style={{ alignItems: "flex-start", gap: 14 }}>
       {shown ? (
-        <img className={`avatar lg ${shape}`} src={shown} alt="" />
+        <img className={`avatar lg ${shape}${whole ? " whole" : ""}`} src={shown} alt="" />
       ) : (
         <span className={`avatar lg ${shape}`} aria-hidden>
           {initials.slice(0, 2).toUpperCase()}
@@ -145,6 +157,20 @@ export function PhotoInput({
             : ""}
           .
         </p>
+        {shown && onFitChange ? (
+          <label className="photo-fit">
+            <span>In the book</span>
+            <select
+              value={fit ?? ""}
+              disabled={disabled}
+              onChange={(event) => onFitChange((event.target.value || null) as PhotoFit | null)}
+            >
+              <option value="">Directory default</option>
+              <option value="fill">Crop to fill</option>
+              <option value="fit">Whole photo</option>
+            </select>
+          </label>
+        ) : null}
         {error ? (
           <p className="hint" style={{ color: "var(--danger)" }}>
             {error}

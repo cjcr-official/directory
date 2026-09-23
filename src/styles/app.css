@@ -1962,6 +1962,21 @@ th.num {
   width: 150px;
   height: 99px;
 }
+/* A photograph set to print whole, letterboxed the way the page will have it. */
+.avatar.lg.whole {
+  object-fit: contain;
+}
+.photo-fit {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.photo-fit select {
+  max-width: 100%;
+}
 .avatar.lg.square {
   width: 108px;
   height: 108px;
