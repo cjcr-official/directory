@@ -71,24 +71,25 @@ export function sortByKey<T>(items: readonly T[], keyOf: (item: T) => string): T
 /**
  * The photograph that stands for a person.
  *
- * Someone in a family is represented by the family portrait - that is what
- * their card in the book carries, because a family prints once. Any individual
- * photo taken before they joined is kept on the record but not shown, so the
- * app and the printed page never disagree about whose face appears.
+ * Their own where there is one, and their family's where there is not - the
+ * same choice a directory of people makes when it prints their card, so the
+ * app and the printed page agree about whose face appears. See
+ * personCardPhoto. A directory of families prints the family portrait on the
+ * family card either way.
  */
 export function personPhotoPath(
   person: Pick<PersonRow, "photo_path">,
   household: Pick<HouseholdRow, "photo_path"> | null | undefined,
 ): string | null {
-  return household ? household.photo_path : person.photo_path;
+  return person.photo_path ?? household?.photo_path ?? null;
 }
 
 /** How the photo personPhotoPath picked is set to sit: its owner's choice. */
 export function personPhotoFit(
-  person: Pick<PersonRow, "photo_fit">,
+  person: Pick<PersonRow, "photo_path" | "photo_fit">,
   household: Pick<HouseholdRow, "photo_fit"> | null | undefined,
 ): PhotoFit | null {
-  return (household ? household.photo_fit : person.photo_fit) ?? null;
+  return (person.photo_path ? person.photo_fit : household?.photo_fit) ?? null;
 }
 
 /** The letter a record files under in an A-Z book. Anything else lands in "#". */
