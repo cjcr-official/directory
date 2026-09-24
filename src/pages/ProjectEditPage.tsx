@@ -817,41 +817,12 @@ export function ProjectEditPage() {
                 </Field>
 
                 {mode === "tags" ? (
-                  <>
-                    <TagPicker
-                      tags={tags}
-                      selected={tagIds}
-                      disabled={!canEdit}
-                      onChange={setTagIds}
-                    />
-
-                    {/* The pills above run right up to this label without it.
-
-                        What each choice does is said in the option itself
-                        rather than in a paragraph under the box: the answer is
-                        the part worth reading, and it was three sentences. */}
-                    <div style={{ marginTop: 14 }}>
-                      <Field
-                        label="Who prints"
-                        htmlFor="group_scope"
-                        hint="Groups stay live: anyone added to one prints next time."
-                      >
-                        <select
-                          id="group_scope"
-                          value={settings.groupWholeFamily ? "family" : "person"}
-                          disabled={!canEdit}
-                          onChange={(event) =>
-                            set({ groupWholeFamily: event.target.value === "family" })
-                          }
-                        >
-                          <option value="family">The whole family of anyone in a group</option>
-                          <option value="person">
-                            Only the people in the groups, one record each
-                          </option>
-                        </select>
-                      </Field>
-                    </div>
-                  </>
+                  <TagPicker
+                    tags={tags}
+                    selected={tagIds}
+                    disabled={!canEdit}
+                    onChange={setTagIds}
+                  />
                 ) : null}
 
                 {mode === "manual" ? (
@@ -868,6 +839,40 @@ export function ProjectEditPage() {
                     Everyone marked “include in printed directories” prints, in alphabetical order.
                   </p>
                 ) : null}
+
+                {/* Families or individuals, whoever is included. The options
+                    stay one word so they fit a phone's select box; what the
+                    chosen one does is said underneath. */}
+                <div style={{ marginTop: 14 }}>
+                  <Field
+                    label="Print as"
+                    htmlFor="print_as"
+                    hint={[
+                      settings.groupWholeFamily
+                        ? "One card per family, with the family's details. Someone with no family gets a card of their own."
+                        : "One card per person, with only their own details. Without a photo of their own, the family photo is used.",
+                      mode === "tags"
+                        ? settings.groupWholeFamily
+                          ? "Anyone in a group brings their whole family. Groups stay live: anyone added to one prints next time."
+                          : "Only the people in the groups print. Groups stay live: anyone added to one prints next time."
+                        : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    <select
+                      id="print_as"
+                      value={settings.groupWholeFamily ? "family" : "person"}
+                      disabled={!canEdit}
+                      onChange={(event) =>
+                        set({ groupWholeFamily: event.target.value === "family" })
+                      }
+                    >
+                      <option value="family">Families</option>
+                      <option value="person">Individuals</option>
+                    </select>
+                  </Field>
+                </div>
               </div>
             </section>
 
