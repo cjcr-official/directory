@@ -4,13 +4,15 @@ import { useDirectory } from "@/data/DirectoryContext";
 import { BookPreview } from "@/components/BookPreview";
 import { PreviewZoom, usePreviewZoom } from "@/components/PreviewZoom";
 import { LoadingScreen, Notice } from "@/components/ui";
+import { PrintAs, PrintAsNotice, SheetCount, usePrintAs } from "@/components/PrintAs";
 import { fetchProject } from "@/lib/queries";
 import { downloadPhoto, getPhotoUrls } from "@/lib/photos";
 import { composeBook, type BookModel } from "@/lib/layout/compose";
-import { loadMetrics } from "@/lib/layout/metrics";
-import { normalizeSettings, recordsPerSheet } from "@/lib/layout/settings";
+import { loadMetrics, type Metrics } from "@/lib/layout/metrics";
+import { normalizeSettings, recordsPerSheet, type ProjectSettings } from "@/lib/layout/settings";
 import { composeTags, tagsPerSheet } from "@/lib/layout/tags";
 import { resolveEntries } from "@/lib/projectEntries";
+import type { DirectoryEntry } from "@/lib/entries";
 import type { ProjectRow } from "@/lib/database.types";
 import { failureMessage } from "@/lib/staleBuild";
 
@@ -23,17 +25,36 @@ export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
 
   const [project, setProject] = useState<ProjectRow | null>(null);
   /**
-   * The composed document, together with which of the two views composed it.
+   * What the document is composed from, together with which of the two views
+   * loaded it.
    *
    * Both views are this one component - /projects/:id/preview and
    * /projects/:id/tags differ only by a prop - and React Router reuses the
-   * instance when one replaces the other. So the model is stored with the
-   * answer to "which was this composed as", and `book` below is derived from
-   * the pair. A sheet composed for the other view cannot reach the screen,
-   * rather than reaching it until the effect happens to run again.
+   * instance when one replaces the other. So the inputs are stored with the
+   * answer to "which was this loaded as", and `book` below is derived from
+   * them. A sheet composed for the other view cannot reach the screen, rather
+   * than reaching it until the effect happens to run again.
+   *
+   * The inputs rather than the finished model, because whether the book is
+   * imposed as a booklet is chosen here, at print time, and flipping it lays
+   * the book out again without going back to the database.
    */
-  const [composed, setComposed] = useState<{ tags: boolean; model: BookModel } | null>(null);
-  const book = composed && composed.tags === tags ? composed.model : null;
+  const [loaded, setLoaded] = useState<{
+    tags: boolean;
+    included: DirectoryEntry[];
+    settings: ProjectSettings;
+    metrics: Metrics;
+  } | null>(null);
+  const { booklet, setBooklet, canFold } = usePrintAs(loaded?.settings ?? null);
+  const book = useMemo<BookModel | null>(() => {
+    if (!loaded || loaded.tags !== tags) return null;
+    // Both composers hand back the same model, so the preview, the photo
+    // fetch, the download and the progress bar below need no opinion about
+    // which one made it.
+    return tags
+      ? composeTags(loaded.included, loaded.settings, loaded.metrics)
+      : composeBook(loaded.included, { ...loaded.settings, bookletOrder: booklet }, loaded.metrics);
+  }, [loaded, tags, booklet]);
   const [photoUrls, setPhotoUrls] = useState<Map<string, string>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [building, setBuilding] = useState(false);
@@ -55,15 +76,15 @@ export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
         // otherwise the error screen outlives the thing that went wrong and
         // there is no way back to a working page but a reload.
         setError(null);
-        const loaded = await fetchProject(id);
+        const fetched = await fetchProject(id);
         if (!active) return;
-        setProject(loaded.project);
+        setProject(fetched.project);
 
-        const settings = normalizeSettings(loaded.project.settings);
+        const settings = normalizeSettings(fetched.project.settings);
         const included = resolveEntries(entries, {
-          mode: loaded.project.selection_mode,
-          tagIds: loaded.tagIds,
-          entries: loaded.entries,
+          mode: fetched.project.selection_mode,
+          tagIds: fetched.tagIds,
+          entries: fetched.entries,
           wholeFamily: settings.groupWholeFamily,
         });
 
@@ -73,13 +94,13 @@ export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
         const metrics = await loadMetrics(tags ? settings.tagNameFont : settings.typeface);
         if (!active) return;
 
-        // Both composers hand back the same model, so the preview, the photo
-        // fetch, the download and the progress bar below need no opinion about
-        // which one made it.
+        setLoaded({ tags, included, settings, metrics });
+
+        // The same photographs whichever order the pages are printed in, so
+        // they are fetched once for the book as it was loaded.
         const model = tags
           ? composeTags(included, settings, metrics)
           : composeBook(included, settings, metrics);
-        setComposed({ tags, model });
 
         if (model.photoPaths.length) {
           const urls = await getPhotoUrls(model.photoPaths);
@@ -199,16 +220,18 @@ export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
                   <strong>{book.pageCount}</strong> {book.pageCount === 1 ? "page" : "pages"}
                 </span>
               )}
+              <SheetCount book={book} booklet={!tags && booklet && canFold} />
               <span>
-                <strong>{book.sheets.length}</strong>{" "}
-                {book.sheets.length === 1 ? "sheet" : "sheets"}
+                {tags ? tagsPerSheet(settings) : recordsPerSheet(settings)} to a{" "}
+                {!tags && booklet && canFold ? "side" : "sheet"}
               </span>
-              <span>{tags ? tagsPerSheet(settings) : recordsPerSheet(settings)} to a sheet</span>
             </div>
           </div>
         </div>
 
         <div className="preview-tools">
+          {tags || !canFold ? null : <PrintAs booklet={booklet} onChange={setBooklet} />}
+
           {/* Tags are cut apart, not folded, so there is no fold to guide. */}
           {tags ? null : (
             <label className="preview-check">
@@ -250,16 +273,7 @@ export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
       </header>
 
       <main className="preview-canvas" ref={canvasRef}>
-        {settings.bookletOrder ? (
-          <div className="preview-notice screen-only">
-            <Notice>
-              <strong>Booklet order is on.</strong> The pages below are arranged for printing
-              double-sided, folding the whole stack down the middle and stapling the spine — so they
-              will look shuffled here and read correctly once folded. Print double-sided, flipping
-              on the <em>short</em> edge.
-            </Notice>
-          </div>
-        ) : null}
+        {!tags && canFold ? <PrintAsNotice booklet={booklet} /> : null}
 
         {truncated ? (
           <div className="preview-notice screen-only">

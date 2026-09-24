@@ -184,6 +184,28 @@ async function main() {
       `booklet n=${n}: ${uniq.size} of ${book.pageCount} pages imposed`,
     );
     ok(numbers.length % 4 === 0, `booklet n=${n}: ${numbers.length} slots, not a multiple of 4`);
+
+    // The caption the preview puts over each side: fronts and backs alternate,
+    // and each side names the pages of the folded booklet it carries - the
+    // outermost sheet's front is the last page beside the first.
+    const captions = book.sheets.map((s) => s.booklet);
+    ok(
+      captions.every((c, i) => c?.side === (i % 2 === 0 ? "front" : "back")),
+      `booklet n=${n}: a side is not captioned front, back, front...`,
+    );
+    const captioned = captions.flatMap((c) => c?.pages ?? []);
+    ok(
+      captioned.length === numbers.length &&
+        new Set(captioned).size === captioned.length &&
+        captioned[0] === captioned.length &&
+        captioned[1] === 1,
+      `booklet n=${n}: sides captioned with pages ${captioned.join(",")}`,
+    );
+    const flat = composeBook(entries, { ...settings, bookletOrder: false }, metrics);
+    ok(
+      flat.sheets.every((s) => s.booklet === undefined),
+      `booklet n=${n}: a flat book is captioned as a booklet`,
+    );
   }
 
   // ---- 4. index page numbers match where the record actually landed --------

@@ -765,6 +765,16 @@ const Page = memo(function Page({
 });
 
 /**
+ * "pages 18 and 3", or "blank and page 1" where a half is one of the blank
+ * pages that make a booklet up to a multiple of four.
+ */
+function bookletPages(positions: number[], pages: BookPage[]): string {
+  const blank = pages.map((page) => page.kind === "blank");
+  if (!blank.some(Boolean)) return `pages ${positions.join(" and ")}`;
+  return positions.map((n, i) => (blank[i] ? "blank" : `page ${n}`)).join(" and ");
+}
+
+/**
  * Draws the composed book as HTML, from the very same page model the PDF
  * writer consumes. Nothing here decides a position or breaks a line - it only
  * paints what the composer already worked out, which is what lets the screen
@@ -786,7 +796,19 @@ export function BookPreview({
       {sheets.map((sheet) => (
         <div key={sheet.index} className="sheet-holder">
           <div className="sheet-caption screen-only">
-            Sheet {sheet.index + 1} of {book.sheets.length}
+            {sheet.booklet ? (
+              // Two sides to a piece of paper, so the count is of paper - the
+              // thing that is folded - and each side says which pages of the
+              // finished booklet it carries.
+              <>
+                Sheet {Math.floor(sheet.index / 2) + 1} of {Math.ceil(book.sheets.length / 2)},{" "}
+                {sheet.booklet.side} · {bookletPages(sheet.booklet.pages, sheet.pages)}
+              </>
+            ) : (
+              <>
+                Sheet {sheet.index + 1} of {book.sheets.length}
+              </>
+            )}
           </div>
           {/* At page size the paper is wider than the screen, so the frame
               scrolls between the two halves rather than the page doing it. */}

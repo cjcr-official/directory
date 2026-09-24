@@ -103,7 +103,6 @@ export function ProjectsPage({ tags = false }: { tags?: boolean }) {
                       <>
                         {paperName(settings.pageSize)} landscape · {recordsPerSheet(settings)} to a
                         sheet
-                        {settings.bookletOrder ? " · booklet order" : ""}
                       </>
                     )}
                   </p>

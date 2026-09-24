@@ -462,7 +462,6 @@ export function ProjectEditPage() {
       `${recordsPerSheet(safeSettings)} to a sheet`,
       TYPEFACE_LABELS[safeSettings.typeface].toLowerCase(),
       safeSettings.textScale === "large" ? "large text" : "normal text",
-      safeSettings.bookletOrder && "booklet order",
     ],
     "",
   );
@@ -1081,7 +1080,10 @@ export function ProjectEditPage() {
               <Notice>
                 <strong>{recordsPerSheet(safeSettings)} to a sheet</strong> — {safeSettings.rows}{" "}
                 down each half, {safeSettings.columns} across. Folded down the middle, that is a{" "}
-                {safeSettings.pageSize === "a4" ? "A5" : "half-letter"} booklet.
+                {safeSettings.pageSize === "a4" ? "A5" : "half-letter"} booklet
+                {safeSettings.columns === 2
+                  ? " — and it prints as one: the pages are put in folding order when you print, with Flat there beside it for a PDF to email."
+                  : "."}
               </Notice>
 
               <Field label="Typeface" htmlFor="typeface">
@@ -1109,14 +1111,6 @@ export function ProjectEditPage() {
                   <option value="large">Large — easier to read</option>
                 </select>
               </Field>
-
-              <Checkbox
-                label="Booklet page order"
-                hint="Reorders the pages to fold and staple. Off prints straight through."
-                checked={settings.bookletOrder}
-                disabled={!canEdit || settings.columns !== 2}
-                onChange={(value) => set({ bookletOrder: value })}
-              />
             </Disclosure>
 
             <Disclosure title="Each record" summary={cardSummary}>

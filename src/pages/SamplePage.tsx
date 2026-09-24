@@ -1,15 +1,21 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { BookPreview } from "@/components/BookPreview";
 import { PreviewZoom, usePreviewZoom } from "@/components/PreviewZoom";
+import { PrintAs, PrintAsNotice, SheetCount, usePrintAs } from "@/components/PrintAs";
 import { LoadingScreen, Notice } from "@/components/ui";
 import { buildDemoData } from "@/lib/demo";
 import { makeDemoPortrait } from "@/lib/demoPortraits";
-import { buildEntries } from "@/lib/entries";
+import { buildEntries, type DirectoryEntry } from "@/lib/entries";
 import { failureMessage } from "@/lib/staleBuild";
 import { composeBook, type BookModel } from "@/lib/layout/compose";
-import { loadMetrics } from "@/lib/layout/metrics";
-import { DEFAULT_SETTINGS, normalizeSettings, recordsPerSheet } from "@/lib/layout/settings";
+import { loadMetrics, type Metrics } from "@/lib/layout/metrics";
+import {
+  DEFAULT_SETTINGS,
+  normalizeSettings,
+  recordsPerSheet,
+  type ProjectSettings,
+} from "@/lib/layout/settings";
 import { composeTags, tagsPerSheet } from "@/lib/layout/tags";
 
 /**
@@ -24,7 +30,20 @@ import { composeTags, tagsPerSheet } from "@/lib/layout/tags";
  * before they have typed in anybody at all.
  */
 export function SamplePage({ tags = false }: { tags?: boolean }) {
-  const [book, setBook] = useState<BookModel | null>(null);
+  /** What the sample is composed from, and which of the two views it is for. */
+  const [loaded, setLoaded] = useState<{
+    tags: boolean;
+    entries: DirectoryEntry[];
+    settings: ProjectSettings;
+    metrics: Metrics;
+  } | null>(null);
+  const { booklet, setBooklet, canFold } = usePrintAs(loaded?.settings ?? null);
+  const book = useMemo<BookModel | null>(() => {
+    if (!loaded || loaded.tags !== tags) return null;
+    return tags
+      ? composeTags(loaded.entries, loaded.settings, loaded.metrics)
+      : composeBook(loaded.entries, { ...loaded.settings, bookletOrder: booklet }, loaded.metrics);
+  }, [loaded, tags, booklet]);
   const [photoUrls, setPhotoUrls] = useState<Map<string, string>>(new Map());
   const [photoBlobs, setPhotoBlobs] = useState<Map<string, Blob>>(new Map());
   const [building, setBuilding] = useState(false);
@@ -67,7 +86,7 @@ export function SamplePage({ tags = false }: { tags?: boolean }) {
         const composed = tags
           ? composeTags(entries, settings, metrics)
           : composeBook(entries, settings, metrics);
-        setBook(composed);
+        setLoaded({ tags, entries, settings, metrics });
 
         const urls = new Map<string, string>();
         const blobs = new Map<string, Blob>();
@@ -148,11 +167,10 @@ export function SamplePage({ tags = false }: { tags?: boolean }) {
                   <strong>{book.pageCount}</strong> pages
                 </span>
               )}
+              <SheetCount book={book} booklet={!tags && booklet && canFold} />
               <span>
-                <strong>{book.sheets.length}</strong> sheets
-              </span>
-              <span>
-                {tags ? tagsPerSheet(book.settings) : recordsPerSheet(book.settings)} to a sheet
+                {tags ? tagsPerSheet(book.settings) : recordsPerSheet(book.settings)} to a{" "}
+                {!tags && booklet && canFold ? "side" : "sheet"}
               </span>
             </div>
           </div>
@@ -162,6 +180,8 @@ export function SamplePage({ tags = false }: { tags?: boolean }) {
           <Link className="btn on-dark" to={tags ? "/sample" : "/sample/tags"}>
             {tags ? "The book" : "Name tags"}
           </Link>
+
+          {tags || !canFold ? null : <PrintAs booklet={booklet} onChange={setBooklet} />}
 
           <PreviewZoom value={level} onChange={setLevel} />
 
@@ -198,6 +218,8 @@ export function SamplePage({ tags = false }: { tags?: boolean }) {
             )}
           </Notice>
         </div>
+
+        {!tags && canFold ? <PrintAsNotice booklet={booklet} /> : null}
 
         <BookPreview
           book={book}
