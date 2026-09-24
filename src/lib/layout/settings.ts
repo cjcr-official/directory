@@ -165,14 +165,17 @@ export type ProjectSettings = {
 
   // --- who is in it --------------------------------------------------------
   /**
-   * Whether a group brings in the whole family of everyone in it.
+   * Whether the book prints families or individuals.
    *
-   * True for the main directory, where the family is the record and tagging
-   * one chorister should print the household they belong to. False for the
-   * booklet that is a list of people - the deacons, the elders - where
-   * printing families would print their wives and children alongside them.
-   * Only groups are affected: hand-picked records are already picked one by
-   * one, and "everyone" means everyone either way.
+   * True prints a card per family, with everyone in it and the family's
+   * details - the main directory. False prints a card per person, with only
+   * their own details - the booklet that is a list of people, the deacons, the
+   * elders, where printing families would print their wives and children
+   * alongside them. In a group only the people in it print; a family someone
+   * was hand-picked as comes apart into everyone in it.
+   *
+   * Named for when it only applied to groups; the name is what saved
+   * directories already carry.
    */
   groupWholeFamily: boolean;
 

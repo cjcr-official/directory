@@ -7,8 +7,10 @@ export interface Selection {
   /** Explicit picks, in the order they should print. */
   entries: ProjectEntryRow[];
   /**
-   * Whether a group pulls in the whole family of everyone in it. Defaults to
-   * true, which is the main directory's answer and was the only one there was.
+   * Whether the book prints families or individuals. Defaults to true, one
+   * card per family, which is the main directory's answer and was the only
+   * one there was. False prints one card per person, carrying only their own
+   * details.
    */
   wholeFamily?: boolean;
 }
@@ -36,6 +38,14 @@ function membersInGroups(
   return entries;
 }
 
+/** Everybody in one family, each as a record of their own. */
+function everyMember(entry: Extract<DirectoryEntry, { type: "household" }>): DirectoryEntry[] {
+  const household = entry.household;
+  return household.members.map((member) =>
+    personEntry(member, household, household.memberTags[member.id] ?? []),
+  );
+}
+
 /**
  * Works out which records a project prints.
  *
@@ -46,11 +56,31 @@ function membersInGroups(
  * a one-off handout, and it filters the alphabetical list rather than following
  * the order the boxes happened to be ticked in.
  *
- * "tags" comes two ways: the families of everyone in the group, which is the
- * main directory's habit, or the people in it and nobody else, which is what a
- * list of deacons or elders is.
+ * Any of them prints as families or as individuals. As families, a family is
+ * one card with everyone in it and somebody on their own is a card of their
+ * own. As individuals, every family comes apart into one card per person -
+ * in a group, only the members who are in the group, since a list of the
+ * deacons is not a list of their wives and children.
  */
 export function resolveEntries(all: DirectoryEntry[], selection: Selection): DirectoryEntry[] {
+  const chosen = chooseEntries(all, selection);
+  if (selection.wholeFamily !== false) return chosen;
+
+  const wanted = selection.mode === "tags" ? new Set(selection.tagIds) : null;
+  const split = chosen.flatMap((entry) =>
+    entry.type === "person"
+      ? [entry]
+      : wanted
+        ? membersInGroups(entry, wanted)
+        : everyMember(entry),
+  );
+  // Sorted again rather than filtered in place: a wife keeping her own
+  // surname, or a family filed under a name none of its members carry, files
+  // somewhere else entirely once it is her record rather than the family's.
+  return split.sort(byEntryOrder);
+}
+
+function chooseEntries(all: DirectoryEntry[], selection: Selection): DirectoryEntry[] {
   if (selection.mode === "manual") {
     const picked = new Set(selection.entries.map((row) => `${row.entry_type}:${row.ref_id}`));
     return all.filter((entry) => picked.has(`${entry.type}:${entry.id}`));
@@ -59,19 +89,7 @@ export function resolveEntries(all: DirectoryEntry[], selection: Selection): Dir
   if (selection.mode === "tags") {
     if (!selection.tagIds.length) return [];
     const wanted = new Set(selection.tagIds);
-    const matched = all.filter((entry) => entry.tagIds.some((tagId) => wanted.has(tagId)));
-    if (selection.wholeFamily !== false) return matched;
-
-    // Asked for the people in the group rather than their families. Groups
-    // belong to people, so every family here is here on a member's behalf,
-    // and comes apart into the members who are in the group.
-    const split = matched.flatMap((entry) =>
-      entry.type === "person" ? [entry] : membersInGroups(entry, wanted),
-    );
-    // Sorted again rather than filtered in place: a wife keeping her own
-    // surname, or a family filed under a name none of its members carry, files
-    // somewhere else entirely once it is her record rather than the family's.
-    return split.sort(byEntryOrder);
+    return all.filter((entry) => entry.tagIds.some((tagId) => wanted.has(tagId)));
   }
 
   return all;

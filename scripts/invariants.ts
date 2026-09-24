@@ -761,10 +761,9 @@ async function main() {
       `people only: got ${ids(people).join(", ")}`,
     );
 
-    // The picture on a card of one person's own. A member of a family cannot
-    // upload one - the person form offers the family portrait instead - so
-    // insisting on their own would print a booklet of initials and ask the
-    // office to photograph half the congregation again.
+    // The picture on a card of one person's own: theirs where they have one,
+    // their family's where they do not, so a booklet of people does not print
+    // a page of initials for want of photographing everyone twice.
     const settings = normalizeSettings({ ...DEFAULT_SETTINGS, includeIndex: true });
     const photoOf = (id: string, list: ReturnType<typeof resolveEntries>) => {
       for (const sheet of composeBook(list, settings, metrics).sheets)
@@ -853,12 +852,26 @@ async function main() {
       "a wife stopped printing on the family card, which is the other setting",
     );
 
-    // The other two modes have nothing to do with groups.
+    // The other two modes print as families or individuals just the same.
+    // Everyone as individuals is every person once, filed under their own
+    // name, and no family card among them.
     const everyone = (wholeFamily: boolean) =>
       ids(resolveEntries(entries, { mode: "all", tagIds: [], entries: [], wholeFamily }));
     ok(
-      JSON.stringify(everyone(false)) === JSON.stringify(everyone(true)),
-      "the group setting changed a directory of everyone",
+      JSON.stringify(everyone(true)) === JSON.stringify(ids(entries)),
+      "a directory of everyone as families stopped printing the families",
+    );
+    ok(
+      JSON.stringify(everyone(false)) ===
+        JSON.stringify([
+          "person:p5",
+          "person:p3",
+          "person:p6",
+          "person:p1",
+          "person:p2",
+          "person:p4",
+        ]),
+      `everyone as individuals: got ${everyone(false).join(", ")}`,
     );
     const byHand = (wholeFamily: boolean) =>
       ids(
@@ -872,8 +885,13 @@ async function main() {
         }),
       );
     ok(
-      JSON.stringify(byHand(false)) === JSON.stringify(["household:h1"]),
-      "the group setting changed a hand-picked directory",
+      JSON.stringify(byHand(true)) === JSON.stringify(["household:h1"]),
+      "a hand-picked family stopped printing as a family",
+    );
+    // A family picked by hand, printed as individuals, is everyone in it.
+    ok(
+      JSON.stringify(byHand(false)) === JSON.stringify(["person:p1", "person:p2"]),
+      `a hand-picked family as individuals: got ${byHand(false).join(", ")}`,
     );
     ok(
       pick({ wholeFamily: false, tagIds: [] }).length === 0,
