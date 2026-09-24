@@ -62,6 +62,11 @@ print shop, keep a copy, or print later.
 and fine for a handful of copies. Set the same options as above, and turn off
 "Headers and footers" so the browser does not stamp a URL across your directory.
 
+Use the **Print** button rather than the browser's menu when you can. Both
+print every sheet, but the button first renews the photo links and waits for
+every photograph to arrive, so a long directory or a preview left open for a
+while does not print initials where the faces should be.
+
 ---
 
 ## How much paper?

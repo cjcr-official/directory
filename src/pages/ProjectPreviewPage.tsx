@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Link, useParams } from "react-router-dom";
 import { useDirectory } from "@/data/DirectoryContext";
 import { BookPreview } from "@/components/BookPreview";
 import { PreviewZoom, usePreviewZoom } from "@/components/PreviewZoom";
 import { LoadingScreen, Notice } from "@/components/ui";
-import { PrintAs, PrintAsNotice, SheetCount, usePrintAs } from "@/components/PrintAs";
+import { PrintAs, PrintAsNotice, SheetCount, usePrintAll, usePrintAs } from "@/components/PrintAs";
 import { fetchProject } from "@/lib/queries";
 import { downloadPhoto, getPhotoUrls } from "@/lib/photos";
 import { composeBook, type BookModel } from "@/lib/layout/compose";
@@ -56,12 +57,19 @@ export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
       : composeBook(loaded.included, { ...loaded.settings, bookletOrder: booklet }, loaded.metrics);
   }, [loaded, tags, booklet]);
   const [photoUrls, setPhotoUrls] = useState<Map<string, string>>(new Map());
+  /** Printing before the photo links arrive would print every face as initials. */
+  const [photosReady, setPhotosReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [building, setBuilding] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [showGuides, setShowGuides] = useState(true);
-  /** Set while printing so every sheet is in the DOM, not just the preview's. */
-  const [printingAll, setPrintingAll] = useState(false);
+  const printAll = usePrintAll(async () => {
+    if (!book?.photoPaths.length) return;
+    // Signed for an hour: fetched again here, so a preview left open that long
+    // does not print its later sheets with pictures that no longer load.
+    const urls = await getPhotoUrls(book.photoPaths);
+    flushSync(() => setPhotoUrls(urls));
+  });
   const canvasRef = useRef<HTMLDivElement>(null);
   const { level, setLevel, scale } = usePreviewZoom(book, canvasRef);
 
@@ -76,6 +84,7 @@ export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
         // otherwise the error screen outlives the thing that went wrong and
         // there is no way back to a working page but a reload.
         setError(null);
+        setPhotosReady(false);
         const fetched = await fetchProject(id);
         if (!active) return;
         setProject(fetched.project);
@@ -106,6 +115,7 @@ export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
           const urls = await getPhotoUrls(model.photoPaths);
           if (active) setPhotoUrls(urls);
         }
+        if (active) setPhotosReady(true);
       } catch (cause) {
         if (active) setError(failureMessage(cause));
       }
@@ -117,23 +127,6 @@ export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
   }, [id, entries, tags]);
 
   const settings = useMemo(() => (project ? normalizeSettings(project.settings) : null), [project]);
-
-  /**
-   * The preview caps how many sheets it draws to stay responsive, but the
-   * browser prints the DOM - so a long book has to be fully rendered first, or
-   * the printout silently stops at the cap.
-   */
-  useEffect(() => {
-    if (!printingAll) return;
-    // One frame for React to commit the remaining sheets, one for layout.
-    const frame = requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
-        window.print();
-        setPrintingAll(false);
-      }),
-    );
-    return () => cancelAnimationFrame(frame);
-  }, [printingAll]);
 
   async function generatePdf() {
     if (!book || !project) return;
@@ -248,8 +241,13 @@ export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
 
           <span className="preview-tools-spacer" />
 
-          <button type="button" className="btn on-dark" onClick={() => setPrintingAll(true)}>
-            {printingAll ? "Preparing…" : "Print"}
+          <button
+            type="button"
+            className="btn on-dark"
+            disabled={!photosReady || printAll.preparing}
+            onClick={() => void printAll.print()}
+          >
+            {!photosReady ? "Loading photos…" : printAll.preparing ? "Preparing…" : "Print"}
           </button>
           <button
             type="button"
@@ -279,7 +277,9 @@ export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
           <div className="preview-notice screen-only">
             <Notice kind="warn">
               Showing the first {PREVIEW_SHEET_LIMIT} of {book.sheets.length} sheets to keep this
-              screen quick. Printing and the downloaded PDF both use all of them.
+              screen quick. Printing and the downloaded PDF both use all of them — print with the{" "}
+              <strong>Print</strong> button above, which waits for every photograph, rather than the
+              browser's menu.
             </Notice>
           </div>
         ) : null}
@@ -290,7 +290,7 @@ export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
           zoom={scale}
           level={level}
           guides={showGuides}
-          limit={printingAll ? undefined : PREVIEW_SHEET_LIMIT}
+          limit={printAll.allDrawn ? undefined : PREVIEW_SHEET_LIMIT}
         />
       </main>
     </div>
