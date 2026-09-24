@@ -149,6 +149,13 @@ export interface SheetModel {
   pages: BookPage[];
   /** The fold line, drawn faintly as a trim guide. */
   foldX: number[];
+  /**
+   * Set only when the book is imposed as a booklet: which side of the piece of
+   * paper this is, and the page of the folded booklet each half becomes,
+   * counting the cover as 1. The preview captions a shuffled sheet with these
+   * so "12 beside 1" reads as the imposition it is rather than as a mistake.
+   */
+  booklet?: { side: "front" | "back"; pages: number[] };
 }
 
 export interface IndexRecord {
@@ -1410,9 +1417,8 @@ function assembleSheets(pages: BookPage[], settings: ProjectSettings, geo: Geome
   const multiple = useBooklet ? 4 : perSheet;
   while (padded.length % multiple !== 0) padded.push(blankPage(geo));
 
-  const ordered = useBooklet
-    ? bookletOrder(padded.length).map((position) => padded[position - 1])
-    : padded;
+  const positions = useBooklet ? bookletOrder(padded.length) : padded.map((_, i) => i + 1);
+  const ordered = positions.map((position) => padded[position - 1]);
 
   const foldX: number[] = [];
   for (let i = 0; i < geo.columns - 1; i += 1) {
@@ -1425,6 +1431,14 @@ function assembleSheets(pages: BookPage[], settings: ProjectSettings, geo: Geome
     sheets.push({
       index: sheets.length,
       foldX,
+      ...(useBooklet
+        ? {
+            booklet: {
+              side: sheets.length % 2 === 0 ? "front" : "back",
+              pages: positions.slice(i, i + perSheet),
+            },
+          }
+        : {}),
       pages: slots.map((page, column) =>
         translate(page, geo.margin + column * (geo.pageWidth + geo.gutter), geo.margin),
       ),

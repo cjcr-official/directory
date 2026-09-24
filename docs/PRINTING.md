@@ -5,9 +5,25 @@ each half, six to a sheet**. What changes is how you fold and bind it.
 
 ---
 
-## Decide this first: booklet or flat?
+## Booklet or flat? Chosen when you print
 
-### Flat (leave booklet order off)
+It works the way Microsoft Publisher does. The directory is laid out in reading
+order, and the choice of how it comes out of the printer is made on the print
+screen — **Preview & print** — with **Booklet** and **Flat** side by side in the
+bar at the top. It starts on **Booklet** every time.
+
+### Booklet (the default)
+
+Pages are shuffled so that when the whole stack is printed double-sided, folded
+in half and stapled through the spine, they read 1, 2, 3, 4… in your hand. This
+is the real church directory: a 5½ × 8½ inch booklet that sits in a glovebox.
+
+The preview will look scrambled. That is correct — page 1 sits next to the last
+page on the same sheet, because that is where they land once folded. Each side
+is captioned with the booklet pages it carries ("Sheet 1 of 3, front · pages
+12 and 1"), and the count at the top is of paper, printed on both sides.
+
+### Flat
 
 Pages run 1, 2, 3, 4… straight through. Print single- or double-sided, staple
 the corner, done. Choose this for:
@@ -16,14 +32,8 @@ the corner, done. Choose this for:
 - a quick handout for an event
 - anything you are not going to fold
 
-### Booklet (turn booklet order on)
-
-Pages are shuffled so that when the whole stack is printed double-sided, folded
-in half and stapled through the spine, they read 1, 2, 3, 4… in your hand. This
-is the real church directory: a 5½ × 8½ inch booklet that sits in a glovebox.
-
-The preview will look scrambled. That is correct — page 1 sits next to the last
-page on the same sheet, because that is where they land once folded.
+Only a layout with two halves to a sheet folds. With one or three across, the
+choice is not offered and the pages print flat.
 
 **Printer settings that matter**
 
@@ -68,8 +78,9 @@ Six records to a sheet, plus a cover and an index.
 The preview bar tells you the real number for your directory.
 
 If you are having it printed commercially, ask for **saddle-stitched, folded to
-half letter**, and send the booklet-ordered PDF. If the shop would rather impose
-it themselves, send the flat version instead and tell them so.
+half letter**, and send the PDF downloaded with **Booklet** chosen. If the shop
+would rather impose it themselves, download it with **Flat** instead and tell
+them so.
 
 ---
 

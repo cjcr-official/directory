@@ -231,6 +231,12 @@ export type ProjectSettings = {
    * Reorder half-pages for duplex printing, folding down the middle, and
    * stapling the spine. Off means straight reading order, which is what you
    * want for a screen PDF or a corner-stapled handout.
+   *
+   * No longer a setting anybody picks on the form. It is chosen on the print
+   * screen, the way Publisher asks "Booklet, side-fold" in its print dialog,
+   * and starts on booklet there; the preview composes with it overridden. The
+   * key stays so the composer can be asked for either order and so stored
+   * settings that carry it still read back cleanly.
    */
   bookletOrder: boolean;
 };
