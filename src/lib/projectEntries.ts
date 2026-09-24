@@ -20,8 +20,8 @@ export interface Selection {
  * For the booklet that is a list of people rather than of families - the
  * deacons, the elders, the choristers - where printing the family card would
  * print everyone who lives with them. They keep the address they share with
- * the house, and the family's portrait stands in where they have no picture
- * of their own, which is nearly always - see personCardPhoto.
+ * the house, and print their own photo, with the family's portrait standing
+ * in where they have none - see personCardPhoto.
  */
 function membersInGroups(
   entry: Extract<DirectoryEntry, { type: "household" }>,

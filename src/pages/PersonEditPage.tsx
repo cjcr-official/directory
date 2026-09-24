@@ -323,17 +323,31 @@ export function PersonEditPage() {
             </div>
             <div className="card-body">
               <div className="field">
+                <PhotoInput
+                  path={photoRemoved ? null : form.photo_path}
+                  initials={`${form.first_name[0] ?? ""}${form.last_name[0] ?? ""}`}
+                  disabled={!canEdit}
+                  hint={
+                    household
+                      ? "Prints on their own card in a directory of people. Without one, the family photo is used"
+                      : undefined
+                  }
+                  onChange={(blob, removed) => {
+                    setPhotoBlob(blob);
+                    setPhotoRemoved(removed);
+                  }}
+                  fit={form.photo_fit ?? null}
+                  onFitChange={(fit) => patch({ photo_fit: fit })}
+                />
                 {household ? (
-                  // In a family, the family portrait is the picture - it is
-                  // what their card in the book carries, because the family
-                  // prints once, together. Offering an individual upload here
-                  // would collect a photo that never appears anywhere.
+                  // The family portrait is what their family card carries, and
+                  // what a directory of people falls back to when they have no
+                  // photo of their own - see personCardPhoto.
                   <div className="photo-inherited">
                     <Avatar
                       path={household.photo_path}
                       fit={household.photo_fit}
                       initials={household.sort_name}
-                      size="lg"
                       alt=""
                       zoom="the family photo"
                     />
@@ -342,26 +356,15 @@ export function PersonEditPage() {
                         {household.photo_path ? "Family photo" : "No family photo yet"}
                       </div>
                       <p className="muted small" style={{ margin: "3px 0 8px" }}>
-                        People in a family share one picture, and it prints on the family card.
+                        It prints on the family card, and stands in for them where they have no
+                        photo of their own.
                       </p>
                       <Link className="btn small" to={`/families/${household.id}`}>
                         {household.photo_path ? "Change it" : "Add one"} on {household.display_name}
                       </Link>
                     </div>
                   </div>
-                ) : (
-                  <PhotoInput
-                    path={photoRemoved ? null : form.photo_path}
-                    initials={`${form.first_name[0] ?? ""}${form.last_name[0] ?? ""}`}
-                    disabled={!canEdit}
-                    onChange={(blob, removed) => {
-                      setPhotoBlob(blob);
-                      setPhotoRemoved(removed);
-                    }}
-                    fit={form.photo_fit ?? null}
-                    onFitChange={(fit) => patch({ photo_fit: fit })}
-                  />
-                )}
+                ) : null}
               </div>
 
               <Field
