@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { BookPreview } from "@/components/BookPreview";
 import { PreviewZoom, usePreviewZoom } from "@/components/PreviewZoom";
-import { PrintAs, PrintAsNotice, SheetCount, usePrintAs } from "@/components/PrintAs";
+import { PrintAs, PrintAsNotice, SheetCount, usePrintAll, usePrintAs } from "@/components/PrintAs";
 import { LoadingScreen, Notice } from "@/components/ui";
 import { buildDemoData } from "@/lib/demo";
 import { makeDemoPortrait } from "@/lib/demoPortraits";
@@ -29,6 +29,9 @@ import { composeTags, tagsPerSheet } from "@/lib/layout/tags";
  * tags are the half of this app somebody is most likely to want to look at
  * before they have typed in anybody at all.
  */
+/** Sheets drawn on screen; printing draws them all. */
+const SAMPLE_SHEET_LIMIT = 12;
+
 export function SamplePage({ tags = false }: { tags?: boolean }) {
   /** What the sample is composed from, and which of the two views it is for. */
   const [loaded, setLoaded] = useState<{
@@ -48,6 +51,7 @@ export function SamplePage({ tags = false }: { tags?: boolean }) {
   const [photoBlobs, setPhotoBlobs] = useState<Map<string, Blob>>(new Map());
   const [building, setBuilding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const printAll = usePrintAll();
   const canvasRef = useRef<HTMLDivElement>(null);
   const { level, setLevel, scale } = usePreviewZoom(book, canvasRef);
 
@@ -189,6 +193,14 @@ export function SamplePage({ tags = false }: { tags?: boolean }) {
 
           <button
             type="button"
+            className="btn on-dark"
+            disabled={printAll.preparing}
+            onClick={() => void printAll.print()}
+          >
+            {printAll.preparing ? "Preparing…" : "Print"}
+          </button>
+          <button
+            type="button"
             className="btn primary"
             disabled={building}
             onClick={() => void download()}
@@ -227,7 +239,7 @@ export function SamplePage({ tags = false }: { tags?: boolean }) {
           zoom={scale}
           level={level}
           guides={!tags}
-          limit={12}
+          limit={printAll.allDrawn ? undefined : SAMPLE_SHEET_LIMIT}
         />
       </main>
     </div>

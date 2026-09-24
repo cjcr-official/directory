@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 import { Notice } from "@/components/ui";
 import type { BookModel } from "@/lib/layout/compose";
 import type { ProjectSettings } from "@/lib/layout/settings";
@@ -90,4 +91,69 @@ export function SheetCount({ book, booklet }: { book: BookModel; booklet: boolea
       {booklet ? ", both sides" : ""}
     </span>
   );
+}
+
+/** How long Print waits for photographs before printing what it has. */
+const PHOTO_WAIT_MS = 20_000;
+
+/**
+ * Printing the whole book, however it is asked for.
+ *
+ * The preview draws only its first few dozen sheets, to stay quick, but the
+ * browser prints the page as it is drawn. So every sheet has to be on the page
+ * before the print dialog looks at it - and that has to hold whether it is
+ * opened from the Print button or from the browser's own menu, Ctrl+P, or a
+ * phone's share sheet, none of which pass through the button. `beforeprint`
+ * is the one moment all of them share, and it draws the rest synchronously.
+ *
+ * The button can do better than that moment can: it gets the photo links
+ * again first, since they are signed for an hour and a preview left open over
+ * lunch would print the later sheets with broken pictures, and it waits for
+ * every photograph to arrive rather than printing initials where a slow one
+ * has not yet.
+ *
+ * Put back to the preview's own few dozen on `afterprint` rather than when
+ * print() returns: on a phone print() returns while the dialog is still open,
+ * and taking the sheets away then would print a book that stops part way.
+ */
+export function usePrintAll(refreshPhotos?: () => Promise<void>) {
+  const [allDrawn, setAllDrawn] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+
+  useEffect(() => {
+    const before = () => flushSync(() => setAllDrawn(true));
+    const after = () => setAllDrawn(false);
+    window.addEventListener("beforeprint", before);
+    window.addEventListener("afterprint", after);
+    return () => {
+      window.removeEventListener("beforeprint", before);
+      window.removeEventListener("afterprint", after);
+    };
+  }, []);
+
+  async function print() {
+    setPreparing(true);
+    try {
+      await refreshPhotos?.();
+    } catch {
+      // Links that cannot be renewed leave the ones already on the page, most
+      // of which still load - no reason not to print.
+    }
+    flushSync(() => setAllDrawn(true));
+    await photosLoaded(document.querySelectorAll<HTMLImageElement>(".sheet img"));
+    setPreparing(false);
+    window.print();
+  }
+
+  return { allDrawn, preparing, print };
+}
+
+function photosLoaded(images: Iterable<HTMLImageElement>): Promise<unknown> {
+  const loads = [...images].map((image) =>
+    image.complete ? Promise.resolve() : image.decode().catch(() => undefined),
+  );
+  return Promise.race([
+    Promise.all(loads),
+    new Promise((resolve) => setTimeout(resolve, PHOTO_WAIT_MS)),
+  ]);
 }
