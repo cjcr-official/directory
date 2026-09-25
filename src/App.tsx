@@ -10,6 +10,7 @@ import { UpdateGate } from "@/components/UpdateGate";
 import { DirectoryProvider, useDirectory } from "@/data/DirectoryContext";
 import { LoadingScreen, Notice } from "@/components/ui";
 import { isConfigured } from "@/lib/supabase";
+import { PresenceProvider } from "@/lib/presence";
 import { SetupPage } from "@/pages/SetupPage";
 import { SamplePage } from "@/pages/SamplePage";
 import { OverviewPage } from "@/pages/OverviewPage";
@@ -124,45 +125,47 @@ function Protected() {
   }
 
   return (
-    <DirectoryProvider>
-      <DirectoryGate>
-        <Routes>
-          <Route element={<AppShell />}>
-            <Route index element={<OverviewPage />} />
-            <Route path="families" element={<FamiliesPage />} />
-            <Route path="families/new" element={<FamilyEditPage />} />
-            <Route path="families/:id" element={<FamilyEditPage />} />
-            <Route path="people" element={<PeoplePage />} />
-            <Route path="people/new" element={<PersonEditPage />} />
-            <Route path="people/:id" element={<PersonEditPage />} />
-            <Route path="groups" element={<GroupsPage />} />
-            <Route path="mailchimp" element={<MailchimpPage />} />
-            <Route path="mailchimp/:tagId" element={<ComposePage />} />
-            <Route path="projects" element={<ProjectsPage />} />
-            <Route path="tags" element={<ProjectsPage tags />} />
-            <Route path="tags/:id" element={<TagsEditPage />} />
-            <Route path="projects/new" element={<ProjectEditPage />} />
-            <Route path="projects/:id" element={<ProjectEditPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-            <Route
-              path="backup"
-              element={
-                <Suspense fallback={<LoadingScreen label="Opening backups…" />}>
-                  <BackupPage />
-                </Suspense>
-              }
-            />
-            <Route path="administrators" element={<AdministratorsPage />} />
-          </Route>
-          {/* Full-bleed, outside the shell: the preview needs the whole window. */}
-          <Route path="projects/:id/preview" element={<ProjectPreviewPage />} />
-          <Route path="projects/:id/tags" element={<ProjectPreviewPage tags />} />
-          <Route path="sample" element={<SamplePage />} />
-          <Route path="sample/tags" element={<SamplePage tags />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </DirectoryGate>
-    </DirectoryProvider>
+    <PresenceProvider userId={profile.id}>
+      <DirectoryProvider>
+        <DirectoryGate>
+          <Routes>
+            <Route element={<AppShell />}>
+              <Route index element={<OverviewPage />} />
+              <Route path="families" element={<FamiliesPage />} />
+              <Route path="families/new" element={<FamilyEditPage />} />
+              <Route path="families/:id" element={<FamilyEditPage />} />
+              <Route path="people" element={<PeoplePage />} />
+              <Route path="people/new" element={<PersonEditPage />} />
+              <Route path="people/:id" element={<PersonEditPage />} />
+              <Route path="groups" element={<GroupsPage />} />
+              <Route path="mailchimp" element={<MailchimpPage />} />
+              <Route path="mailchimp/:tagId" element={<ComposePage />} />
+              <Route path="projects" element={<ProjectsPage />} />
+              <Route path="tags" element={<ProjectsPage tags />} />
+              <Route path="tags/:id" element={<TagsEditPage />} />
+              <Route path="projects/new" element={<ProjectEditPage />} />
+              <Route path="projects/:id" element={<ProjectEditPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+              <Route
+                path="backup"
+                element={
+                  <Suspense fallback={<LoadingScreen label="Opening backups…" />}>
+                    <BackupPage />
+                  </Suspense>
+                }
+              />
+              <Route path="administrators" element={<AdministratorsPage />} />
+            </Route>
+            {/* Full-bleed, outside the shell: the preview needs the whole window. */}
+            <Route path="projects/:id/preview" element={<ProjectPreviewPage />} />
+            <Route path="projects/:id/tags" element={<ProjectPreviewPage tags />} />
+            <Route path="sample" element={<SamplePage />} />
+            <Route path="sample/tags" element={<SamplePage tags />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </DirectoryGate>
+      </DirectoryProvider>
+    </PresenceProvider>
   );
 }
 

@@ -4,6 +4,7 @@ import { Caret, ConfirmButton, LoadingScreen, Notice } from "@/components/ui";
 import { deleteAccount, fetchProfiles, updateProfile } from "@/lib/queries";
 import type { AppRole, ProfileRow } from "@/lib/database.types";
 import { describeWhen, message } from "@/lib/format";
+import { useOnline } from "@/lib/presence";
 
 /**
  * "No access" is not a role. The database knows three - owner, editor, viewer -
@@ -217,6 +218,7 @@ function RoleMenu({
 
 export function AdministratorsPage() {
   const { profile: me, isOwner } = useAuth();
+  const online = useOnline();
   const [profiles, setProfiles] = useState<ProfileRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -261,13 +263,23 @@ export function AdministratorsPage() {
   if (!profiles && !error) return <LoadingScreen label="Loading administrators…" />;
 
   const owners = profiles?.filter((row) => row.role === "owner" && row.is_active).length ?? 0;
+  // Only ids that match a row: the channel is not behind row level security,
+  // so anything else on it is somebody who is not on this list.
+  const here = profiles?.filter((row) => online.has(row.id)).length ?? 0;
 
   return (
     <div className="page">
       <div className="page-head">
         <div className="grow">
           <h1>Administrators</h1>
-          <div className="sub">Who can sign in, and what they can do.</div>
+          <div className="sub">
+            Who can sign in, and what they can do.{" "}
+            {!profiles
+              ? null
+              : here <= 1
+                ? "Only you have the app open right now."
+                : `${here} people have the app open right now.`}
+          </div>
         </div>
       </div>
 
@@ -323,6 +335,13 @@ export function AdministratorsPage() {
                       <td className="admins-who">
                         {row.full_name || <span className="muted">—</span>}
                         {isMe ? <span className="pill admins-you">You</span> : null}
+                        {/* Not on your own row: "You" already says it. */}
+                        {!isMe && online.has(row.id) ? (
+                          <span className="pill admins-online" title="Has the app open now">
+                            <span className="dot" aria-hidden />
+                            Online
+                          </span>
+                        ) : null}
                       </td>
                       <td className="admins-email small muted">{row.email}</td>
                       <td className="admins-signed small muted">{signedUp(row.created_at)}</td>
