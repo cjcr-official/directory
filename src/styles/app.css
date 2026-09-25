@@ -1057,6 +1057,14 @@ p:last-child {
 .admins-you {
   margin-left: 7px;
 }
+/* Somebody else with the app open at this moment. The dot is the accent, the
+   word is the plain pill's ink: it is a fact about the row, not a warning. */
+.admins-online {
+  margin-left: 7px;
+}
+.admins-online .dot {
+  background: var(--accent);
+}
 
 .row {
   display: flex;
@@ -4454,7 +4462,8 @@ body.moving-a-part {
        break in it running out of the column and under the menu. */
     overflow-wrap: anywhere;
   }
-  .admins-you {
+  .admins-you,
+  .admins-online {
     margin-left: 6px;
   }
   /* An address is longer than the width it has and has nowhere to break, so
