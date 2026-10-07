@@ -7,6 +7,7 @@ import { PhotoInput } from "@/components/PhotoInput";
 import { TagPicker } from "@/components/TagPicker";
 import {
   Avatar,
+  BirthdayInput,
   ChangedNote,
   Checkbox,
   ConfirmButton,
@@ -479,7 +480,7 @@ export function PersonEditPage() {
               {/* An anniversary belongs to a couple, which is what a family
                   record is - so it is asked for there and only there. */}
               <Field label="Date of birth" hint="Optional." htmlFor="dob">
-                <DateInput
+                <BirthdayInput
                   id="dob"
                   disabled={!canEdit}
                   value={form.date_of_birth}

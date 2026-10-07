@@ -5528,3 +5528,14 @@ body.moving-a-part {
 .group-name-button[aria-expanded="true"] {
   border-bottom-color: var(--line-strong);
 }
+
+/* A birthday kept without its year: month and day side by side, the month
+   given the room its longest name needs, and the tick-box under them. */
+.birthday-month-day {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 8px;
+}
+.birthday-input .check {
+  margin: 8px 0 0;
+}

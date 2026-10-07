@@ -1,5 +1,5 @@
 import type { HouseholdRow, PersonRow, TagRow } from "./database.types";
-import { fileAsName, firstName, sortKey } from "./format";
+import { fileAsName, firstName, hasYear, sortKey } from "./format";
 
 export interface HouseholdWithMembers extends HouseholdRow {
   members: PersonRow[];
@@ -97,8 +97,9 @@ export function sortMembers(members: PersonRow[]): PersonRow[] {
     if (roleDelta !== 0) return roleDelta;
     // Children last, oldest first, so a family reads the way it is introduced.
     if (a.household_role === "child" && b.household_role === "child") {
-      const aDob = a.date_of_birth ?? "9999";
-      const bDob = b.date_of_birth ?? "9999";
+      // A birthday kept without its year says nothing about who is older.
+      const aDob = hasYear(a.date_of_birth) ? a.date_of_birth! : "9999";
+      const bDob = hasYear(b.date_of_birth) ? b.date_of_birth! : "9999";
       if (aDob !== bDob) return aDob < bDob ? -1 : 1;
     }
     return sortKey(a.first_name).localeCompare(sortKey(b.first_name));
