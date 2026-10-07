@@ -14,7 +14,13 @@
  * congregation it has rather than two of it.
  */
 
-import { sortKey, samePersonName, sameDisplayName, suggestHouseholdName } from "./format";
+import {
+  monthDayDate,
+  sortKey,
+  samePersonName,
+  sameDisplayName,
+  suggestHouseholdName,
+} from "./format";
 import type { SheetTable } from "./sheet";
 import type { Gender, HouseholdRole, HouseholdRow, PersonRow } from "./database.types";
 
@@ -148,6 +154,15 @@ export function toIsoDate(raw: string): string | null {
   if (american) {
     const [, month, day, year] = american;
     return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
+  // A day with no year: "--03-02", as the backup spreadsheet writes one, or
+  // "3/2" typed by hand. Kept the way the person editor keeps one.
+  const noYear = /^--(\d{2})-(\d{2})$/.exec(value) ?? /^(\d{1,2})\/(\d{1,2})$/.exec(value);
+  if (noYear) {
+    const month = Number(noYear[1]);
+    const day = Number(noYear[2]);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) return monthDayDate(month, day);
   }
 
   return null;

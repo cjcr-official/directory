@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { getPhotoUrl } from "@/lib/photos";
-import { describeChange, message } from "@/lib/format";
+import {
+  describeChange,
+  hasYear,
+  message,
+  MONTHS,
+  monthDayDate,
+  parseDateParts,
+} from "@/lib/format";
 import type { PhotoFit } from "@/lib/database.types";
 
 export function LoadingScreen({ label = "Loading…" }: { label?: string }) {
@@ -204,6 +211,120 @@ export function DateInput({
       value={value ?? ""}
       onChange={(event) => onChange(event.target.value || null)}
     />
+  );
+}
+
+/**
+ * A birthday, with or without its year.
+ *
+ * Some people would rather the directory knew the day they celebrate and not
+ * how old they are, and a date picker cannot be given a day without a year.
+ * So ticking "Leave out the year" swaps the picker for a month and a day,
+ * kept as a date in year 4 (see NO_YEAR) which nothing ever prints.
+ *
+ * The month and day are held here, and the form is told of a birthday only
+ * once both are chosen. Until then it holds none, so what saves is what the
+ * screen shows - a February with its 30th taken away is not still April 30.
+ */
+export function BirthdayInput({
+  id,
+  value,
+  disabled,
+  onChange,
+}: {
+  id: string;
+  value: string | null;
+  disabled?: boolean;
+  onChange: (value: string | null) => void;
+}) {
+  const yearless = !!value && !hasYear(value);
+  const [noYear, setNoYear] = useState(yearless);
+  const parts = yearless ? parseDateParts(value) : null;
+  const [month, setMonth] = useState(parts?.month ?? 0);
+  const [day, setDay] = useState(parts?.day ?? 0);
+
+  // The record arrives after the first render on an edit screen, and a
+  // restore or another tab can change it underneath; follow what is stored.
+  useEffect(() => {
+    if (!value) return;
+    const stored = parseDateParts(value);
+    if (!stored) return;
+    if (hasYear(value)) {
+      setNoYear(false);
+    } else {
+      setNoYear(true);
+      setMonth(stored.month);
+      setDay(stored.day);
+    }
+  }, [value]);
+
+  // 29 February is allowed: year 4 is a leap year, and so are the birthdays.
+  const daysIn = month ? new Date(Date.UTC(2004, month, 0)).getUTCDate() : 31;
+
+  const choose = (nextMonth: number, nextDay: number) => {
+    const fitted =
+      nextMonth && nextDay > new Date(Date.UTC(2004, nextMonth, 0)).getUTCDate() ? 0 : nextDay;
+    setMonth(nextMonth);
+    setDay(fitted);
+    const next = nextMonth && fitted ? monthDayDate(nextMonth, fitted) : null;
+    if (next !== value) onChange(next);
+  };
+
+  const toggle = (leaveOut: boolean) => {
+    setNoYear(leaveOut);
+    const current = parseDateParts(value);
+    if (leaveOut) {
+      // Keep the day already chosen, and let go of the year.
+      if (current) {
+        setMonth(current.month);
+        setDay(current.day);
+        onChange(monthDayDate(current.month, current.day));
+      }
+    } else {
+      // There is no year to put back, so the picker starts empty.
+      setMonth(0);
+      setDay(0);
+      if (value) onChange(null);
+    }
+  };
+
+  return (
+    <div className="birthday-input">
+      {noYear ? (
+        <div className="birthday-month-day">
+          <select
+            id={id}
+            aria-label="Month"
+            disabled={disabled}
+            value={month}
+            onChange={(event) => choose(Number(event.target.value), day)}
+          >
+            <option value={0}>Month</option>
+            {MONTHS.map((name, index) => (
+              <option key={name} value={index + 1}>
+                {name}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="Day"
+            disabled={disabled}
+            value={day}
+            onChange={(event) => choose(month, Number(event.target.value))}
+          >
+            <option value={0}>Day</option>
+            {Array.from({ length: daysIn }, (_, index) => (
+              <option key={index + 1} value={index + 1}>
+                {index + 1}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <DateInput id={id} disabled={disabled} value={value} onChange={onChange} />
+      )}
+      <Checkbox label="Leave out the year" checked={noYear} disabled={disabled} onChange={toggle} />
+    </div>
   );
 }
 

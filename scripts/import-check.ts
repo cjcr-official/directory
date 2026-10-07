@@ -21,6 +21,10 @@ import { readSheet } from "@/lib/sheet";
 import { planImport, toIsoDate, type LiveForImport } from "@/lib/importPlan";
 import { buildZip } from "@/lib/zip";
 import { check, same } from "./check";
+import { PERSON_COLUMNS } from "@/lib/backupSpec";
+import type { PersonRow } from "@/lib/database.types";
+import { sortMembers } from "@/lib/entries";
+import { formatFullDate, formatMonthDay, formatShortDate, hasYear } from "@/lib/format";
 
 const EMPTY: LiveForImport = { households: [], people: [] };
 
@@ -195,6 +199,32 @@ same(
 same("a spreadsheet that has been through Excel is American", toIsoDate("4/2/2015"), "2015-04-02");
 same("an empty cell is not a date", toIsoDate(""), null);
 same("and neither is a word", toIsoDate("unknown"), null);
+
+console.log("\na birthday with no year\n");
+
+same("the backup spreadsheet's day with no year", toIsoDate("--03-02"), "0004-03-02");
+same("a month and day typed by hand", toIsoDate("3/2"), "0004-03-02");
+same("29 February has somewhere to go", toIsoDate("2/29"), "0004-02-29");
+same("a month that is not one is not a date", toIsoDate("13/2"), null);
+const noYearPerson = { date_of_birth: "0004-03-02" } as PersonRow;
+const birthdayColumn = PERSON_COLUMNS.find((column) => column.column === "date_of_birth")!;
+const written = String(birthdayColumn.value(noYearPerson, {} as never));
+same("the spreadsheet writes it without a year", written, "--03-02");
+same("and reads back the same birthday", toIsoDate(written), "0004-03-02");
+check("a stored year is a year", hasYear("1978-03-02"));
+check("the stand-in year is not", !hasYear("0004-03-02"));
+same("the book prints only the day", formatMonthDay("0004-03-02"), "March 2");
+same("and so does the card", formatShortDate("0004-03-02"), "3/2");
+same("and a full date leaves the year out", formatFullDate("0004-03-02"), "2 March");
+const kids = sortMembers([
+  { first_name: "Amy", household_role: "child", sort_order: 0, date_of_birth: "0004-01-01" },
+  { first_name: "Ben", household_role: "child", sort_order: 0, date_of_birth: "2010-05-05" },
+] as PersonRow[]);
+same(
+  "a child with no birth year is not taken for the eldest",
+  kids.map((kid) => kid.first_name),
+  ["Ben", "Amy"],
+);
 
 console.log("\na household spread over three rows\n");
 

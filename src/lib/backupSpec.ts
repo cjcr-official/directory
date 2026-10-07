@@ -1,7 +1,7 @@
 import type { DirectoryData } from "./entries";
 import type { HouseholdRow, PersonRow, TagRow } from "./database.types";
 import { toCsv, type CsvValue } from "./csv";
-import { formatPhone } from "./format";
+import { formatPhone, hasYear } from "./format";
 
 /**
  * What a backup covers, declared where a check can hold it to the database.
@@ -117,7 +117,16 @@ export const PERSON_COLUMNS: Column<PersonRow>[] = [
   { header: "Gender", column: "gender", value: (row) => row.gender },
   { header: "Phone", column: "phone", value: (row) => formatPhone(row.phone) },
   { header: "Email", column: "email", value: (row) => row.email },
-  { header: "Date of birth", column: "date_of_birth", value: (row) => row.date_of_birth },
+  {
+    header: "Date of birth",
+    column: "date_of_birth",
+    // "--03-02" is how ISO 8601 writes a day with no year, and the importer
+    // reads it back that way, rather than as a birth in year 4.
+    value: (row) =>
+      row.date_of_birth && !hasYear(row.date_of_birth)
+        ? `--${row.date_of_birth.slice(5, 10)}`
+        : row.date_of_birth,
+  },
   { header: "Anniversary", column: "anniversary", value: (row) => row.anniversary },
   {
     header: "Uses family address",

@@ -297,7 +297,7 @@ export function effectiveAddress(
   return hasAddress(person) ? person : (household ?? null);
 }
 
-const MONTHS = [
+export const MONTHS = [
   "January",
   "February",
   "March",
@@ -320,6 +320,29 @@ export function parseDateParts(iso: string | null | undefined) {
   return { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) };
 }
 
+/**
+ * The year a birthday is stored under when the year was left out.
+ *
+ * date_of_birth is a Postgres date, which has to have a year, and some people
+ * would rather give only the day they celebrate. Year 4 is one nobody alive
+ * was born in and a leap year, so 29 February still has somewhere to go. Every
+ * place that prints a birthday prints the month and day only, so the stand-in
+ * year never shows; the few places that care about the year ask `hasYear`.
+ */
+export const NO_YEAR = 4;
+
+/** "0004-MM-DD" for a birthday kept without its year. */
+export function monthDayDate(month: number, day: number): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${String(NO_YEAR).padStart(4, "0")}-${pad(month)}-${pad(day)}`;
+}
+
+/** False for a date stored without its year (see NO_YEAR). */
+export function hasYear(iso: string | null | undefined): boolean {
+  const parts = parseDateParts(iso);
+  return !!parts && parts.year !== NO_YEAR;
+}
+
 /** "June 12" - the form used in the book, where the year is noise. */
 export function formatMonthDay(iso: string | null | undefined): string {
   const parts = parseDateParts(iso);
@@ -338,6 +361,7 @@ export function formatMonthDay(iso: string | null | undefined): string {
 export function formatFullDate(iso: string | null | undefined): string {
   const parts = parseDateParts(iso);
   if (!parts) return "";
+  if (parts.year === NO_YEAR) return `${parts.day} ${MONTHS[parts.month - 1]}`;
   return `${parts.day} ${MONTHS[parts.month - 1]} ${parts.year}`;
 }
 
