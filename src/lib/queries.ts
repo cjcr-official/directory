@@ -8,6 +8,8 @@ import type {
   TagRow,
 } from "./database.types";
 import type { DirectoryData } from "./entries";
+import type { BulkPlan } from "./bulkEdit";
+import { message } from "./format";
 
 /**
  * Postgres speaks in constraint names. A person reading the screen should not
@@ -181,6 +183,17 @@ export function isStaleWrite(error: unknown): boolean {
 }
 
 /**
+ * Raised when a guarded write found no row at all: deleted, not changed.
+ *
+ * Its own kind only so a bulk edit can tell it apart from every other failure.
+ * A person who has gone cannot be changed by trying again, so they are said to
+ * have gone rather than kept for a second attempt that could only fail too.
+ */
+export class MissingRowError extends Error {
+  readonly missing = true;
+}
+
+/**
  * Says why a guarded write matched nothing.
  *
  * Either the row moved on or it is not there at all, and those two want
@@ -193,7 +206,7 @@ async function explainMiss(
 ): Promise<never> {
   const check = await supabase.from(table).select("id").eq("id", id).maybeSingle();
   if (check.error) throw new Error(check.error.message);
-  if (!check.data) throw new Error(`That ${what} no longer exists.`);
+  if (!check.data) throw new MissingRowError(`That ${what} no longer exists.`);
   throw new StaleWriteError(what);
 }
 
@@ -250,6 +263,176 @@ export async function updatePerson(
 
 export async function deletePerson(id: string): Promise<void> {
   return removeById("people", id);
+}
+
+// ---------------------------------------------------------------------------
+// Many people at once
+// ---------------------------------------------------------------------------
+
+/**
+ * Ids in one `in` filter. Each is 36 characters of URL, so a hundred comes to
+ * under four kilobytes - well inside what every proxy between a church hall
+ * and Supabase will pass, where a whole congregation's worth would not be.
+ */
+const IDS_PER_REQUEST = 100;
+
+/** Links in one insert. They travel in the body, which has no such limit. */
+const LINKS_PER_REQUEST = 500;
+
+/** Guarded writes in the air at once: enough not to crawl, few enough for a phone. */
+const GUARDED_AT_ONCE = 4;
+
+function inChunks<T>(items: readonly T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let at = 0; at < items.length; at += size) chunks.push(items.slice(at, at + size));
+  return chunks;
+}
+
+export interface BulkResult {
+  /** Everybody the plan touched who had everything asked of them done. */
+  done: string[];
+  /** Everybody something was not done to and could be tried again, and why, in words. */
+  failed: Map<string, string>;
+  /** Everybody somebody else deleted meanwhile, so there is nobody left to change. */
+  gone: string[];
+}
+
+/**
+ * Carries out a bulk edit worked out by planBulkEdit.
+ *
+ * Everybody getting the same patch is written in one request, a hundred at a
+ * time, rather than one request each: changing the gender of three hundred
+ * people is three round trips on church wifi, not three hundred. That is safe
+ * without the version guard the single-person form uses, because a bulk edit
+ * writes only the columns it was asked to - it cannot carry somebody else's
+ * old values back over their new ones, which is the whole of what the guard
+ * is for.
+ *
+ * The exception is a value worked out from what the row held, and those go
+ * one at a time with the guard: a line added to notes that somebody else has
+ * just rewritten would put back the notes they rewrote.
+ *
+ * It does not stop at the first failure. Each request stands alone, so one
+ * that fails says nothing about the rest, and everybody it could not change
+ * is reported by name rather than the whole edit being called off halfway
+ * with no way to tell which half happened. Because the plan only writes what
+ * differs, running the same edit again afterwards changes only the people
+ * this missed.
+ */
+export async function saveBulkEdit(
+  plan: BulkPlan,
+  onProgress?: (written: number, of: number) => void,
+): Promise<BulkResult> {
+  const failed = new Map<string, string>();
+  const fail = (ids: Iterable<string>, reason: string) => {
+    for (const id of ids) if (!failed.has(id)) failed.set(id, reason);
+  };
+  const gone = new Set<string>();
+
+  const total = plan.shared.reduce((sum, group) => sum + group.ids.length, 0) + plan.guarded.length;
+  let written = 0;
+  const step = (count: number) => {
+    written += count;
+    onProgress?.(written, total);
+  };
+
+  for (const group of plan.shared) {
+    for (const ids of inChunks(group.ids, IDS_PER_REQUEST)) {
+      const { data, error } = await supabase
+        .from("people")
+        .update(withoutAuthor(group.patch))
+        .in("id", ids)
+        .select("id");
+      if (error) fail(ids, readable(error, "record"));
+      else {
+        // A row the update did not come back with was not written: deleted
+        // since the list was loaded, or refused by a policy - which refuses by
+        // matching nothing rather than by raising.
+        const got = new Set((data ?? []).map((row) => row.id));
+        const missed = ids.filter((id) => !got.has(id));
+        if (missed.length) await explainMisses(missed, fail, gone);
+      }
+      step(ids.length);
+    }
+  }
+
+  const queue = [...plan.guarded];
+  const worker = async () => {
+    for (let row = queue.shift(); row; row = queue.shift()) {
+      try {
+        await updatePerson(row.id, row.patch, row.expectedUpdatedAt);
+      } catch (cause) {
+        if (cause instanceof MissingRowError) gone.add(row.id);
+        else
+          fail(
+            [row.id],
+            isStaleWrite(cause)
+              ? "Somebody else changed them while you were editing, so they were left as they were."
+              : message(cause),
+          );
+      }
+      step(1);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(GUARDED_AT_ONCE, queue.length) }, worker));
+
+  // ignoreDuplicates, so a link somebody else added meanwhile is not an error:
+  // the person is in the group, which is what was asked.
+  for (const rows of inChunks(plan.addLinks, LINKS_PER_REQUEST)) {
+    const { error } = await supabase
+      .from("person_tags")
+      .upsert(rows, { onConflict: "person_id,tag_id", ignoreDuplicates: true });
+    if (error)
+      fail(
+        rows.map((row) => row.person_id),
+        readable(error, "group"),
+      );
+  }
+
+  const leavingByTag = new Map<string, string[]>();
+  for (const link of plan.removeLinks) {
+    const ids = leavingByTag.get(link.tag_id);
+    if (ids) ids.push(link.person_id);
+    else leavingByTag.set(link.tag_id, [link.person_id]);
+  }
+  for (const [tagId, personIds] of leavingByTag) {
+    for (const ids of inChunks(personIds, IDS_PER_REQUEST)) {
+      const { error } = await supabase
+        .from("person_tags")
+        .delete()
+        .eq("tag_id", tagId)
+        .in("person_id", ids);
+      if (error) fail(ids, readable(error, "group"));
+    }
+  }
+
+  // Somebody deleted is not somebody to try again, whatever else failed for
+  // them on the way - a group link for a deleted person fails too.
+  for (const id of gone) failed.delete(id);
+  return {
+    done: plan.touched.filter((id) => !failed.has(id) && !gone.has(id)),
+    failed,
+    gone: plan.touched.filter((id) => gone.has(id)),
+  };
+}
+
+/** Why rows an update was given did not come back from it. */
+async function explainMisses(
+  ids: string[],
+  fail: (ids: Iterable<string>, reason: string) => void,
+  gone: Set<string>,
+): Promise<void> {
+  const { data, error } = await supabase.from("people").select("id").in("id", ids);
+  if (error) {
+    fail(ids, error.message);
+    return;
+  }
+  const still = new Set((data ?? []).map((row) => row.id));
+  for (const id of ids) if (!still.has(id)) gone.add(id);
+  fail(
+    ids.filter((id) => still.has(id)),
+    "The database would not change them. Ask an owner whether you have editor access.",
+  );
 }
 
 /** Moves a person into a household, or out of one when householdId is null. */

@@ -1,9 +1,19 @@
-import { useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useDirectory } from "@/data/DirectoryContext";
 import { useAuth } from "@/auth/AuthProvider";
 import { Avatar, EmptyState, LoadingScreen, Notice, TagDots } from "@/components/ui";
 import { ColumnPicker } from "@/components/ColumnPicker";
+import { BulkEditPeople } from "@/components/BulkEditPeople";
+import { NO_CHANGES, type BulkChanges } from "@/lib/bulkEdit";
 import { readColumns, readWidths, rememberColumns, rememberWidths } from "@/lib/columns";
 import type { Gender, HouseholdRow, PersonRow, TagRow } from "@/lib/database.types";
 import {
@@ -13,6 +23,7 @@ import {
   fileAsName,
   formatPhone,
   formatShortDate,
+  fullName,
   labelledHouseholdName,
   personPhotoFit,
   personPhotoPath,
@@ -253,11 +264,30 @@ export function PeoplePage() {
   const { people, tags, householdById, tagsOfPerson, loading, error } = useDirectory();
   const { canEdit } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [params, setParams] = useSearchParams();
   const [query, setQuery] = useState("");
   const [letter, setLetter] = useState<string | null>(null);
   const [scope, setScope] = useState<"all" | "unattached">("all");
   const [shown, setShown] = useState(() => readColumns("people", KEYS));
   const [widths, setWidths] = useState(() => readWidths("people"));
+
+  /*
+   * Choosing people to change together.
+   *
+   * The choice outlives a search: tick three Smiths, search for the Joneses,
+   * tick two more, and five are chosen. And it outlives the form, which is a
+   * step forward in the browser's history rather than a dialog - so Back from
+   * the form, on a phone as much as anywhere, lands on the list with the same
+   * people still ticked, and so does saving an edit that did not reach all of
+   * them. The changes chosen on the form are kept here too, for that second
+   * try.
+   */
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
+  const [changes, setChanges] = useState<BulkChanges>(NO_CHANGES);
+  const [finished, setFinished] = useState<string | null>(null);
+  const editing = params.has("bulk");
 
   const tagsById = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags]);
 
@@ -276,6 +306,90 @@ export function PeoplePage() {
       ).includes(needle);
     });
   }, [people, query, letter, scope]);
+
+  /* In the directory's order, and only those still in it: somebody deleted
+     elsewhere drops out of the choice when the rows next reload. */
+  const chosen = useMemo(
+    () => people.filter((person) => selected.has(person.id)),
+    [people, selected],
+  );
+  const shownIds = useMemo(() => filtered.map((person) => person.id), [filtered]);
+  const chosenHere = shownIds.filter((id) => selected.has(id)).length;
+  const allShown = shownIds.length > 0 && chosenHere === shownIds.length;
+
+  // The form with nobody to edit is a reload or a link straight to it, with
+  // the choice that led there gone. Back to the list, rather than a form for
+  // nobody.
+  const nobodyToEdit = editing && !chosen.length && !loading;
+  useEffect(() => {
+    if (nobodyToEdit) setParams({}, { replace: true });
+  }, [nobodyToEdit, setParams]);
+
+  /*
+   * Where the page is scrolled, between the list and the form.
+   *
+   * The shell puts a new screen at its top, but it goes by the path, and the
+   * form is the same path with ?bulk on the end - so the form opened wherever
+   * the list had been scrolled to, which after ticking people two hundred rows
+   * down was the middle of a form with no heading in sight. So the form is
+   * started at its top here, and the list is put back where it was left when
+   * the form closes, whichever way it closes: the people somebody was ticking
+   * are where they were ticking them. Installed to the Home Screen it is #root
+   * that scrolls rather than the document, so both are read and both are set.
+   */
+  const showingEditor = editing && chosen.length > 0 && canEdit;
+  const listScroll = useRef(0);
+  const wasShowingEditor = useRef(showingEditor);
+  useLayoutEffect(() => {
+    if (showingEditor === wasShowingEditor.current) return;
+    wasShowingEditor.current = showingEditor;
+    const top = showingEditor ? 0 : listScroll.current;
+    window.scrollTo(0, top);
+    document.getElementById("root")?.scrollTo(0, top);
+  }, [showingEditor]);
+
+  function toggle(id: string) {
+    setSelected((before) => {
+      const next = new Set(before);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function chooseShown(on: boolean) {
+    setSelected((before) => {
+      const next = new Set(before);
+      for (const id of shownIds) {
+        if (on) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  }
+
+  function startSelecting() {
+    setFinished(null);
+    setSelecting(true);
+  }
+
+  function stopSelecting() {
+    setSelecting(false);
+    setSelected(new Set());
+    setChanges(NO_CHANGES);
+  }
+
+  function openEditor() {
+    setFinished(null);
+    listScroll.current = Math.max(window.scrollY, document.getElementById("root")?.scrollTop ?? 0);
+    setParams({ bulk: "" }, { state: { fromList: true } });
+  }
+
+  /** Back to the list: a step back in history when the form was a step forward. */
+  function closeEditor() {
+    if ((location.state as { fromList?: boolean } | null)?.fromList) void navigate(-1);
+    else setParams({}, { replace: true });
+  }
 
   const usedLetters = useMemo(
     () => new Set(people.map((person) => alphaBucket(sortKey(person.last_name)))),
@@ -314,8 +428,28 @@ export function PeoplePage() {
 
   if (loading && !people.length) return <LoadingScreen label="Loading people…" />;
 
+  if (showingEditor) {
+    return (
+      <BulkEditPeople
+        people={chosen}
+        changes={changes}
+        onChange={setChanges}
+        onCancel={closeEditor}
+        onNarrow={(ids) => setSelected(new Set(ids))}
+        onDone={(count, note) => {
+          setSelecting(false);
+          setSelected(new Set());
+          setChanges(NO_CHANGES);
+          const changed = count === 1 ? "1 person changed." : `${count} people changed.`;
+          setFinished([count ? changed : null, note].filter(Boolean).join(" "));
+          closeEditor();
+        }}
+      />
+    );
+  }
+
   return (
-    <div className="page">
+    <div className={selecting || finished ? "page selecting" : "page"}>
       <div className="page-head">
         <div className="grow">
           <h1>People</h1>
@@ -323,10 +457,20 @@ export function PeoplePage() {
             Everyone in the database. People who belong to a family print on that family's card.
           </div>
         </div>
-        {canEdit ? (
-          <Link className="btn primary" to="/people/new">
-            Add a person
-          </Link>
+        {canEdit && !selecting ? (
+          <div className="row tight">
+            <button
+              type="button"
+              className="btn"
+              disabled={!people.length}
+              onClick={startSelecting}
+            >
+              Bulk edit
+            </button>
+            <Link className="btn primary" to="/people/new">
+              Add a person
+            </Link>
+          </div>
         ) : null}
       </div>
 
@@ -412,7 +556,20 @@ export function PeoplePage() {
             </colgroup>
             <thead>
               <tr>
-                <th style={{ width: 56 }}></th>
+                <th style={{ width: 56 }}>
+                  {selecting ? (
+                    <input
+                      type="checkbox"
+                      className="row-tick"
+                      aria-label="Choose everybody shown"
+                      checked={allShown}
+                      ref={(box) => {
+                        if (box) box.indeterminate = chosenHere > 0 && !allShown;
+                      }}
+                      onChange={() => chooseShown(!allShown)}
+                    />
+                  ) : null}
+                </th>
                 <th>
                   Name
                   {visible.length ? <Grip onDrag={drag("name")} /> : null}
@@ -434,28 +591,52 @@ export function PeoplePage() {
                   household,
                   tagsOf: () => tagsOfPerson(person.id).flatMap((id) => tagsById.get(id) ?? []),
                 };
+                const picked = selecting && selected.has(person.id);
                 return (
                   <tr
                     key={person.id}
-                    className="row-clickable"
+                    className={picked ? "row-clickable picked" : "row-clickable"}
                     onClick={(event) => {
-                      // A click that landed on a link or a button is that
-                      // control's click, not the row's.
-                      if ((event.target as HTMLElement).closest("a, button")) return;
-                      void navigate(`/people/${person.id}`);
+                      // A click that landed on a link, a button or the tick
+                      // box is that control's click, not the row's.
+                      if ((event.target as HTMLElement).closest("a, button, input")) return;
+                      if (selecting) toggle(person.id);
+                      else void navigate(`/people/${person.id}`);
                     }}
                   >
                     <td>
-                      <Avatar
-                        path={personPhotoPath(person, household)}
-                        fit={personPhotoFit(person, household)}
-                        initials={`${person.first_name[0] ?? ""}${person.last_name[0] ?? ""}`}
-                      />
+                      {/* The box takes the portrait's place while choosing,
+                          rather than a column of its own: on a phone each row
+                          is a card laid out by the order of its cells, and a
+                          new first cell would put the name where the face
+                          goes. */}
+                      {selecting ? (
+                        <input
+                          type="checkbox"
+                          className="row-tick"
+                          aria-label={`Choose ${fullName(person)}`}
+                          checked={picked}
+                          onChange={() => toggle(person.id)}
+                        />
+                      ) : (
+                        <Avatar
+                          path={personPhotoPath(person, household)}
+                          fit={personPhotoFit(person, household)}
+                          initials={`${person.first_name[0] ?? ""}${person.last_name[0] ?? ""}`}
+                        />
+                      )}
                     </td>
                     <td>
-                      <Link className="list-link" to={`/people/${person.id}`}>
-                        {fileAsName(person)}
-                      </Link>
+                      {/* Not a link while choosing: the row is a tick box
+                          then, and a name that opened the record would be the
+                          one place on it that did something else. */}
+                      {selecting ? (
+                        <span className="list-link">{fileAsName(person)}</span>
+                      ) : (
+                        <Link className="list-link" to={`/people/${person.id}`}>
+                          {fileAsName(person)}
+                        </Link>
+                      )}
                       {!person.is_active ? (
                         <span className="pill" style={{ marginLeft: 6 }}>
                           Archived
@@ -492,6 +673,55 @@ export function PeoplePage() {
           </EmptyState>
         )}
       </div>
+
+      {/* Said along the bottom rather than at the top, because the list comes
+          back scrolled to where it was left - and a notice at the top of a
+          list scrolled two hundred rows down is a notice nobody sees. */}
+      {finished && !selecting ? (
+        <div className="select-bar" role="status">
+          <span className="select-bar-text">{finished}</span>
+          <span className="row tight select-bar-actions">
+            <button type="button" className="btn small ghost" onClick={() => setFinished(null)}>
+              OK
+            </button>
+          </span>
+        </div>
+      ) : null}
+
+      {selecting ? (
+        <div className="select-bar" role="region" aria-label="Bulk edit">
+          <span className="select-bar-text">
+            {chosen.length ? `${chosen.length} chosen` : "Tick the people to change"}
+            {chosen.length > chosenHere ? (
+              <span className="select-bar-note">
+                {chosen.length - chosenHere} of them not in this list
+              </span>
+            ) : null}
+          </span>
+          <span className="row tight select-bar-actions">
+            {shownIds.length ? (
+              <button
+                type="button"
+                className="btn small ghost"
+                onClick={() => chooseShown(!allShown)}
+              >
+                {allShown ? "Untick these" : `Tick all ${shownIds.length}`}
+              </button>
+            ) : null}
+            <button type="button" className="btn small ghost" onClick={stopSelecting}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn small primary"
+              disabled={!chosen.length}
+              onClick={openEditor}
+            >
+              {chosen.length ? `Edit ${chosen.length}` : "Edit"}
+            </button>
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 }

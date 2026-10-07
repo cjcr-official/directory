@@ -22,6 +22,15 @@ optionally a date of birth, an anniversary and an address. People can be grouped
 into a family, which then prints as one card with everyone listed on it. A person
 who is not in a family gets their own card.
 
+**Changing many people at once.** Press **Bulk edit** on People, tick the
+people — or everybody a search turns up — and change them together: add them to a
+group or take them out of one, leave them out of the printed book, give them the
+same background check dates, put them in a family or take them out of theirs,
+or set their last name, gender, phone, email, address or notes, or leave the
+year off their birthdays. Every field starts at "leave as they are", only what
+you change is changed, and before anything is saved the form says what saving
+will do and to how many.
+
 **Groups.** Tag a family or a person — _Choir_, _Youth Group_, _Deacons_ — and
 you can print a booklet for just that group later, without picking names again.
 Tagging one chorister pulls their whole family into the choir booklet.

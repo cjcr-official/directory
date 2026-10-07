@@ -5539,3 +5539,157 @@ body.moving-a-part {
 .birthday-input .check {
   margin: 8px 0 0;
 }
+
+/* --- bulk edit ------------------------------------------------------------
+ *
+ * Choosing several people on the People list and changing them together: a
+ * tick box in each row where the portrait was, the chosen rows marked, a bar
+ * along the bottom saying how many with the way on, and the form itself.
+ * -------------------------------------------------------------------------- */
+
+.row-tick {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+/* The canvas rather than the soft accent. Every column but the name is muted
+   text, and muted text measures 4.28:1 on the soft accent - under what small
+   text needs. The rule down the left edge is what says "chosen"; the tint only
+   says "this row", as hovering does. */
+.list-table tr.picked,
+.list-table tr.picked:hover {
+  background: var(--canvas);
+}
+.list-table tr.picked td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* Room under the last row for the bar, which floats over the foot of the page. */
+.page.selecting {
+  padding-bottom: 150px;
+}
+
+.select-bar {
+  position: fixed;
+  /* Under the update bar (35), which is about the app rather than this page. */
+  z-index: 30;
+  left: max(14px, env(safe-area-inset-left));
+  right: max(14px, env(safe-area-inset-right));
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  margin-inline: auto;
+  max-width: 620px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 10px 12px 10px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--raised);
+  color: var(--ink);
+  box-shadow:
+    0 2px 6px rgb(0 0 0 / 10%),
+    0 18px 40px -18px rgb(0 0 0 / 40%);
+}
+.select-bar-text {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.select-bar-note {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--ink-3);
+}
+.select-bar-actions {
+  flex: none;
+  margin-left: auto;
+}
+
+/* Beside the sidebar on a desk, not over its foot. */
+@media (min-width: 821px) {
+  .select-bar {
+    left: calc(232px + 14px);
+  }
+}
+
+@media (max-width: 820px) {
+  /* A row is a card here, so the card carries the rule rather than the
+     portrait's square inside it. */
+  .list-table tr.picked {
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+  .list-table tr.picked td:first-child {
+    box-shadow: none;
+  }
+}
+
+/* A field's choice and, once it is set to something, what to set it to. */
+.bulk-choice {
+  display: grid;
+  gap: 8px;
+}
+
+/* The address typed under its choice. Ruled and indented like .check-child,
+   so it reads as part of the choice above it - but that one is for a single
+   control and takes away a field's spacing, which here ran five fields into
+   one block with no room between a box and the next one's label. */
+.bulk-nested {
+  margin: -4px 0 14px 16px;
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+}
+
+.bulk-names {
+  margin: 10px 0 0;
+  color: var(--ink-2);
+}
+.bulk-names .btn {
+  margin-left: 4px;
+}
+
+.bulk-aside {
+  margin-top: 14px;
+}
+
+.bulk-failures {
+  margin: 8px 0;
+  padding-left: 18px;
+}
+
+.bulk-gone {
+  margin: 8px 0 0;
+}
+
+.bulk-summary {
+  margin-top: 16px;
+}
+.bulk-plan {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.bulk-plan li {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+}
+.bulk-plan li:last-child {
+  border-bottom: none;
+}
+.bulk-plan-count {
+  flex: none;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.bulk-plan li.muted .bulk-plan-count {
+  color: var(--ink-3);
+}
+.bulk-summary .notice {
+  margin-top: 12px;
+}
