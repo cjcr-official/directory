@@ -20,6 +20,7 @@ import {
   togglePick,
   type PickRow,
 } from "../src/lib/projectEntries";
+import { batchChoices, batchFromParam, batchToParam, onlyBatch } from "../src/lib/tagBatch";
 import { COLORS, composeBook } from "../src/lib/layout/compose";
 import { composeTags, contrastRatio, planTag, tagsPerSheet } from "../src/lib/layout/tags";
 import { TAG_ACCENTS, TAG_SIZES, type TagSizeName } from "../src/lib/layout/settings";
@@ -1011,6 +1012,41 @@ async function main() {
     ok(
       row(pickList(archived, false), "person:p3").family === null,
       "somebody whose family is archived was tied to it on the checklist",
+    );
+
+    // A batch of name tags, chosen on the tags screen: a tag each for the
+    // people ticked and nobody else, out of a directory printed as families.
+    const batchTags = (chosen: Set<string> | null) =>
+      drawn(composeTags(onlyBatch(entries, chosen), settings, metrics)).join("\n");
+    const batchOfTwo = batchTags(new Set(["p2", "p6"]));
+    ok(
+      batchOfTwo.includes("Mary") && batchOfTwo.includes("Ruth"),
+      "somebody in the batch got no name tag",
+    );
+    ok(
+      !batchOfTwo.includes("John") && !batchOfTwo.includes("Bob"),
+      "somebody outside the batch got a name tag",
+    );
+    ok(
+      onlyBatch(entries, new Set(["p2"])).length === 1 &&
+        onlyBatch(entries, new Set()).length === 0,
+      "a family with nobody in the batch was kept",
+    );
+    ok(onlyBatch(entries, null) === entries, "no batch at all stopped meaning everyone");
+    // Choosing it from the directory as it is, and carrying it in the address.
+    ok(
+      batchChoices(entries)
+        .map((choice) => choice.label)
+        .join("|") === "Alvarez, Isaac|Jones, Bob|Kemp, Ruth|Smith, John|Smith, Mary|Zimmer, Yuki",
+      `the batch checklist: got ${batchChoices(entries)
+        .map((choice) => choice.label)
+        .join("|")}`,
+    );
+    ok(batchFromParam(null) === null, "an address with no batch chose a batch");
+    ok(batchFromParam("")?.size === 0, "an empty batch in the address was read as everyone");
+    ok(
+      [...batchFromParam(batchToParam(new Set(["p2", "p6"])))!].join() === "p2,p6",
+      "a batch did not survive the trip through the address",
     );
 
     console.log(
