@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useDirectory } from "@/data/DirectoryContext";
 import { useAuth } from "@/auth/AuthProvider";
 import { ChangedNote, Checkbox, Field, LoadingScreen, Notice } from "@/components/ui";
 import { CoverCanvas } from "@/components/BookPreview";
 import { PhotoInput } from "@/components/PhotoInput";
+import { TagBatchPicker } from "@/components/TagBatchPicker";
 import { fetchProject, isStaleWrite, updateProject } from "@/lib/queries";
 import { getPhotoUrls, removePhoto, uploadPhoto } from "@/lib/photos";
 import { resolveEntries } from "@/lib/projectEntries";
+import { BATCH_PARAM, batchChoices, batchFromParam, batchToParam, onlyBatch } from "@/lib/tagBatch";
 import { bandContrast, composeTagPreview, planTag, tagsPerSheet } from "@/lib/layout/tags";
 import { TYPEFACES, TYPEFACE_LABELS, loadMetrics, type Metrics } from "@/lib/layout/metrics";
 import {
@@ -114,22 +116,51 @@ export function TagsEditPage() {
 
   const safeSettings = useMemo(() => (settings ? normalizeSettings(settings) : null), [settings]);
 
-  /**
-   * One tag per person: a household prints its members, not one between them.
-   * The same rule composeTags uses, so the count here is the count that prints.
-   */
-  const people = useMemo(() => {
+  /** Everyone the directory prints, and so everyone a tag can be printed for. */
+  const included = useMemo(() => {
     if (!selection || !safeSettings) return [];
-    const included = resolveEntries(entries, {
+    return resolveEntries(entries, {
       mode: selection.mode,
       tagIds: selection.tagIds,
       entries: selection.entries,
       wholeFamily: safeSettings.groupWholeFamily,
     });
-    return included.flatMap((entry) =>
-      entry.type === "household" ? entry.household.members : [entry.person],
-    );
   }, [entries, selection, safeSettings]);
+
+  /**
+   * A batch of them, when only some are wanted this time. Kept in the address
+   * rather than saved - see tagBatch.ts - and replaced rather than pushed, so
+   * a run of ticks is not a run of entries in the back button.
+   */
+  const [params, setParams] = useSearchParams();
+  const batchParam = params.get(BATCH_PARAM);
+  const batch = useMemo(() => batchFromParam(batchParam), [batchParam]);
+  const setBatch = useCallback(
+    (next: Set<string> | null) =>
+      setParams(
+        (current) => {
+          const updated = new URLSearchParams(current);
+          if (next) updated.set(BATCH_PARAM, batchToParam(next));
+          else updated.delete(BATCH_PARAM);
+          return updated;
+        },
+        { replace: true },
+      ),
+    [setParams],
+  );
+  const choices = useMemo(() => batchChoices(included), [included]);
+
+  /**
+   * One tag per person: a household prints its members, not one between them.
+   * The same rule composeTags uses, so the count here is the count that prints.
+   */
+  const people = useMemo(
+    () =>
+      onlyBatch(included, batch).flatMap((entry) =>
+        entry.type === "household" ? entry.household.members : [entry.person],
+      ),
+    [included, batch],
+  );
 
   /**
    * Font metrics, so the drawing breaks a name where the PDF will break it. A
@@ -442,9 +473,18 @@ export function TagsEditPage() {
           {changed ? <ChangedNote updatedAt={changed.at} author={authorName(changed.by)} /> : null}
         </div>
         <div className="row tight">
-          <Link className="btn" to={`/projects/${project.id}/tags`}>
-            Preview &amp; print
-          </Link>
+          {people.length ? (
+            <Link
+              className="btn"
+              to={{ pathname: `/projects/${project.id}/tags`, search: params.toString() }}
+            >
+              Preview &amp; print
+            </Link>
+          ) : (
+            <button type="button" className="btn" disabled>
+              Preview &amp; print
+            </button>
+          )}
           {canEdit ? (
             <button
               type="button"
@@ -506,6 +546,39 @@ export function TagsEditPage() {
             a phone the two stack and the drawing leads. */}
         <div className="desk">
           <div className="desk-settings">
+            {/* First, because it is the first thing decided on the day: is
+                this the whole run, or the handful who still need one. */}
+            <section className="card" aria-labelledby="tags-who">
+              <div className="card-head">
+                <h2 id="tags-who">Who gets a tag</h2>
+              </div>
+              <div className="card-body">
+                <Field
+                  label="Print tags for"
+                  htmlFor="tag_batch"
+                  hint={
+                    batch
+                      ? "Only the people ticked get a tag. This choice is not saved: it is for this printing, and the directory itself is not changed."
+                      : undefined
+                  }
+                >
+                  <select
+                    id="tag_batch"
+                    value={batch ? "batch" : "everyone"}
+                    onChange={(event) =>
+                      setBatch(event.target.value === "batch" ? new Set() : null)
+                    }
+                  >
+                    <option value="everyone">Everyone in this directory ({choices.length})</option>
+                    <option value="batch">Only people I choose</option>
+                  </select>
+                </Field>
+                {batch ? (
+                  <TagBatchPicker choices={choices} chosen={batch} onChange={setBatch} />
+                ) : null}
+              </div>
+            </section>
+
             <section className="card" aria-labelledby="tags-tag">
               <div className="card-head">
                 <h2 id="tags-tag">Tag</h2>
@@ -791,10 +864,9 @@ export function TagsEditPage() {
                 pointed at from here rather than answered twice. */}
             <div className="form-decision">
               <p className="hint" style={{ marginBottom: 0 }}>
-                Everyone in this directory gets a tag.{" "}
-                <Link to={`/projects/${project.id}`}>Edit the directory</Link> to change who. To tag
-                only certain people, choose Hand-picked records there, print as individuals, and
-                tick them one by one.
+                The people to choose from are the people in this directory.{" "}
+                <Link to={`/projects/${project.id}`}>Edit the directory</Link> to change who is in
+                it.
               </p>
             </div>
           </div>

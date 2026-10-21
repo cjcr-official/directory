@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useDirectory } from "@/data/DirectoryContext";
 import { BookPreview } from "@/components/BookPreview";
 import { PreviewZoom, usePreviewZoom } from "@/components/PreviewZoom";
@@ -13,6 +13,7 @@ import { loadMetrics, type Metrics } from "@/lib/layout/metrics";
 import { normalizeSettings, recordsPerSheet, type ProjectSettings } from "@/lib/layout/settings";
 import { composeTags, tagsPerSheet } from "@/lib/layout/tags";
 import { resolveEntries } from "@/lib/projectEntries";
+import { BATCH_PARAM, batchFromParam, onlyBatch } from "@/lib/tagBatch";
 import type { DirectoryEntry } from "@/lib/entries";
 import type { ProjectRow } from "@/lib/database.types";
 import { failureMessage } from "@/lib/staleBuild";
@@ -23,6 +24,13 @@ const PREVIEW_SHEET_LIMIT = 40;
 export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
   const { id } = useParams();
   const { entries } = useDirectory();
+  /**
+   * The batch of people chosen on the name tags screen, when only some of the
+   * directory is getting a tag this time. Carried here in the address - see
+   * tagBatch.ts - and only ever applied to tags: the book is everyone.
+   */
+  const [params] = useSearchParams();
+  const batchParam = tags ? params.get(BATCH_PARAM) : null;
 
   const [project, setProject] = useState<ProjectRow | null>(null);
   /**
@@ -90,12 +98,15 @@ export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
         setProject(fetched.project);
 
         const settings = normalizeSettings(fetched.project.settings);
-        const included = resolveEntries(entries, {
-          mode: fetched.project.selection_mode,
-          tagIds: fetched.tagIds,
-          entries: fetched.entries,
-          wholeFamily: settings.groupWholeFamily,
-        });
+        const included = onlyBatch(
+          resolveEntries(entries, {
+            mode: fetched.project.selection_mode,
+            tagIds: fetched.tagIds,
+            entries: fetched.entries,
+            wholeFamily: settings.groupWholeFamily,
+          }),
+          batchFromParam(batchParam),
+        );
 
         // Tags are set in their own faces, and can be set in two at once, so
         // the family the measurements default to is the tag's rather than the
@@ -124,7 +135,7 @@ export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
     return () => {
       active = false;
     };
-  }, [id, entries, tags]);
+  }, [id, entries, tags, batchParam]);
 
   const settings = useMemo(() => (project ? normalizeSettings(project.settings) : null), [project]);
 
@@ -190,7 +201,11 @@ export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
               the book from the directory's own page. */}
           <Link
             className="preview-back"
-            to={tags ? `/tags/${project.id}` : `/projects/${project.id}`}
+            to={
+              tags
+                ? { pathname: `/tags/${project.id}`, search: params.toString() }
+                : `/projects/${project.id}`
+            }
             aria-label="Back"
           >
             <span aria-hidden>←</span>
