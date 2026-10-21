@@ -13,7 +13,13 @@
  */
 import { PDFDocument, type PDFFont } from "pdf-lib";
 import { buildEntries } from "../src/lib/entries";
-import { resolveEntries } from "../src/lib/projectEntries";
+import {
+  isPicked,
+  pickList,
+  resolveEntries,
+  togglePick,
+  type PickRow,
+} from "../src/lib/projectEntries";
 import { COLORS, composeBook } from "../src/lib/layout/compose";
 import { composeTags, contrastRatio, planTag, tagsPerSheet } from "../src/lib/layout/tags";
 import { TAG_ACCENTS, TAG_SIZES, type TagSizeName } from "../src/lib/layout/settings";
@@ -896,6 +902,115 @@ async function main() {
     ok(
       pick({ wholeFamily: false, tagIds: [] }).length === 0,
       "a booklet with no group chosen printed somebody",
+    );
+
+    // A person picked by hand from a family - one name tag, not the family's.
+    // Printed as individuals that is just them; printed as families they
+    // bring their family, the way being in a group does.
+    const byPeople = (wholeFamily: boolean, refs: [string, string][]) =>
+      ids(
+        resolveEntries(entries, {
+          mode: "manual",
+          tagIds: [],
+          wholeFamily,
+          entries: refs.map(([type, ref], position) => ({
+            project_id: "p",
+            entry_type: type as "household" | "person",
+            ref_id: ref,
+            position,
+          })),
+        }),
+      );
+    ok(
+      JSON.stringify(
+        byPeople(false, [
+          ["person", "p2"],
+          ["person", "p4"],
+          ["person", "p6"],
+        ]),
+      ) === JSON.stringify(["person:p6", "person:p2", "person:p4"]),
+      `people picked by hand as individuals: got ${byPeople(false, [
+        ["person", "p2"],
+        ["person", "p4"],
+        ["person", "p6"],
+      ]).join(", ")}`,
+    );
+    ok(
+      JSON.stringify(
+        byPeople(true, [
+          ["person", "p2"],
+          ["person", "p6"],
+        ]),
+      ) === JSON.stringify(["person:p6", "household:h1"]),
+      "a person picked by hand did not bring their family, printed as families",
+    );
+    ok(
+      JSON.stringify(
+        byPeople(false, [
+          ["household", "h1"],
+          ["person", "p1"],
+        ]),
+      ) === JSON.stringify(["person:p1", "person:p2"]),
+      "a family ticked whole and one of its members ticked printed somebody twice",
+    );
+    // And the tags follow: a tag each for the people ticked, nobody else.
+    const tagged = drawn(
+      composeTags(
+        resolveEntries(entries, {
+          mode: "manual",
+          tagIds: [],
+          wholeFamily: false,
+          entries: [{ project_id: "p", entry_type: "person" as const, ref_id: "p2", position: 0 }],
+        }),
+        settings,
+        metrics,
+      ),
+    ).join("\n");
+    ok(tagged.includes("Mary"), "the person picked for a name tag got none");
+    ok(!tagged.includes("John"), "somebody not picked for a name tag got one");
+
+    // The checklist. As individuals it is every person, and the two kinds of
+    // pick read each other's.
+    const asPeople = pickList(entries, false);
+    ok(
+      JSON.stringify(asPeople.map((row) => row.key)) === JSON.stringify(everyone(false)),
+      `the checklist of people: got ${asPeople.map((row) => row.key).join(", ")}`,
+    );
+    const row = (list: PickRow[], key: string) => list.find((candidate) => candidate.key === key)!;
+    const mary = row(asPeople, "person:p2");
+    ok(isPicked(new Set(["household:h1"]), mary), "a family ticked whole left a member unticked");
+    ok(
+      isPicked(new Set(["person:p2"]), row(pickList(entries, true), "household:h1")),
+      "a member ticked left their family unticked, printed as families",
+    );
+    // Unticking one of a family ticked whole keeps everyone else's tag.
+    ok(
+      JSON.stringify(togglePick(["household:h1"], mary, false)) === JSON.stringify(["person:p1"]),
+      `unticking one of a whole family: got ${togglePick(["household:h1"], mary, false).join(", ")}`,
+    );
+    // Unticking a family takes the members who were bringing it.
+    ok(
+      togglePick(
+        ["person:p1", "person:p2", "person:p6"],
+        row(pickList(entries, true), "household:h1"),
+        false,
+      ).join() === "person:p6",
+      "unticking a family left it ticked through its members",
+    );
+    ok(
+      JSON.stringify(togglePick([], mary, true)) === JSON.stringify(["person:p2"]) &&
+        togglePick(["household:h1"], mary, true).join() === "household:h1",
+      "ticking somebody already printing stored them twice",
+    );
+    // Somebody whose family is archived is a record of their own, with no
+    // family to belong to on the checklist.
+    const archived = buildEntries({
+      ...data,
+      households: data.households.map((h) => (h.id === "h2" ? { ...h, is_active: false } : h)),
+    });
+    ok(
+      row(pickList(archived, false), "person:p3").family === null,
+      "somebody whose family is archived was tied to it on the checklist",
     );
 
     console.log(

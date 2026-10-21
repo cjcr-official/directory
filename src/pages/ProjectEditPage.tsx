@@ -45,7 +45,14 @@ import {
   type TextScale,
   type Typeface,
 } from "@/lib/layout/settings";
-import { resolveEntries, type Selection } from "@/lib/projectEntries";
+import {
+  isPicked,
+  pickList,
+  resolveEntries,
+  togglePick,
+  type PickRow,
+  type Selection,
+} from "@/lib/projectEntries";
 import { labelledHouseholdName, message } from "@/lib/format";
 import { getPhotoUrls, removePhoto, uploadPhoto } from "@/lib/photos";
 import { CoverCanvas, type MovableParts } from "@/components/BookPreview";
@@ -228,13 +235,8 @@ export function ProjectEditPage() {
   // are composed from - putting it there would print the office's filing note
   // in the congregation's book.
   const pickable = useMemo(
-    () =>
-      entries.map((entry) => ({
-        type: entry.type,
-        id: entry.id,
-        title: entry.type === "household" ? labelledHouseholdName(entry.household) : entry.title,
-      })),
-    [entries],
+    () => pickList(entries, settings.groupWholeFamily, labelledHouseholdName),
+    [entries, settings.groupWholeFamily],
   );
   // The rows/columns inputs can hold a half-typed or empty value; the summary
   // and the saved record both use the clamped version so neither can show or
@@ -827,7 +829,8 @@ export function ProjectEditPage() {
 
                 {mode === "manual" ? (
                   <ManualPicker
-                    entries={pickable}
+                    rows={pickable}
+                    people={!settings.groupWholeFamily}
                     picked={picked}
                     disabled={!canEdit}
                     onChange={setPicked}
@@ -855,7 +858,11 @@ export function ProjectEditPage() {
                         ? settings.groupWholeFamily
                           ? "Anyone in a group brings their whole family. Groups stay live: anyone added to one prints next time."
                           : "Only the people in the groups print. Groups stay live: anyone added to one prints next time."
-                        : "",
+                        : mode === "manual"
+                          ? settings.groupWholeFamily
+                            ? "To pick people one at a time, for name tags say, print as individuals."
+                            : "Only the people ticked print, each with a card and a name tag of their own."
+                          : "",
                     ]
                       .filter(Boolean)
                       .join(" ")}
@@ -1388,14 +1395,20 @@ const PickerRow = memo(function PickerRow({
   );
 });
 
-/** Checklist of every record, for the hand-picked mode. */
+/**
+ * Checklist of every record, for the hand-picked mode: the families, or -
+ * printed as individuals - every person, so a run of name tags can be for
+ * just the people ticked.
+ */
 function ManualPicker({
-  entries,
+  rows,
+  people,
   picked,
   onChange,
   disabled,
 }: {
-  entries: { type: "household" | "person"; id: string; title: string }[];
+  rows: PickRow[];
+  people: boolean;
   picked: string[];
   onChange: (next: string[]) => void;
   disabled?: boolean;
@@ -1403,23 +1416,28 @@ function ManualPicker({
   const [query, setQuery] = useState("");
 
   const chosen = useMemo(() => new Set(picked), [picked]);
+  /** Counted by line, so a family ticked whole counts as everyone in it. */
+  const count = useMemo(() => rows.filter((row) => isPicked(chosen, row)).length, [rows, chosen]);
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return entries;
-    return entries.filter((entry) => entry.title.toLowerCase().includes(needle));
-  }, [entries, query]);
+    if (!needle) return rows;
+    return rows.filter((row) => row.title.toLowerCase().includes(needle));
+  }, [rows, query]);
 
-  // Held in a ref so the callback below can read the current selection without
+  // Held in refs so the callback below can read the current selection without
   // being rebuilt when it changes - a new callback every render would be a new
   // prop on every row, and the memo above would never once hold.
   const pickedRef = useRef(picked);
   pickedRef.current = picked;
+  const byKey = useMemo(() => new Map(rows.map((row) => [row.key, row])), [rows]);
+  const rowsRef = useRef(byKey);
+  rowsRef.current = byKey;
 
   const onToggle = useCallback(
     (entryKey: string, on: boolean) => {
-      const next = pickedRef.current.filter((key) => key !== entryKey);
-      onChange(on ? [...next, entryKey] : next);
+      const row = rowsRef.current.get(entryKey);
+      if (row) onChange(togglePick(pickedRef.current, row, on));
     },
     [onChange],
   );
@@ -1430,11 +1448,11 @@ function ManualPicker({
         <input
           className="search"
           type="search"
-          placeholder="Search records…"
+          placeholder={people ? "Search people…" : "Search records…"}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
-        <span className="muted small">{picked.length} chosen</span>
+        <span className="muted small">{count} chosen</span>
         {picked.length ? (
           <button
             type="button"
@@ -1448,19 +1466,16 @@ function ManualPicker({
       </div>
 
       <div className="picker-list">
-        {visible.map((entry) => {
-          const key = `${entry.type}:${entry.id}`;
-          return (
-            <PickerRow
-              key={key}
-              entryKey={key}
-              label={entry.title}
-              checked={chosen.has(key)}
-              disabled={disabled}
-              onToggle={onToggle}
-            />
-          );
-        })}
+        {visible.map((row) => (
+          <PickerRow
+            key={row.key}
+            entryKey={row.key}
+            label={row.title}
+            checked={isPicked(chosen, row)}
+            disabled={disabled}
+            onToggle={onToggle}
+          />
+        ))}
         {!visible.length ? <p className="muted small">Nothing matches.</p> : null}
       </div>
     </div>

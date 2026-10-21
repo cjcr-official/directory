@@ -792,7 +792,9 @@ export function TagsEditPage() {
             <div className="form-decision">
               <p className="hint" style={{ marginBottom: 0 }}>
                 Everyone in this directory gets a tag.{" "}
-                <Link to={`/projects/${project.id}`}>Edit the directory</Link> to change who.
+                <Link to={`/projects/${project.id}`}>Edit the directory</Link> to change who. To tag
+                only certain people, choose Hand-picked records there, print as individuals, and
+                tick them one by one.
               </p>
             </div>
           </div>
