@@ -75,6 +75,8 @@ export function SamplePage({ tags = false }: { tags?: boolean }) {
           churchName: "Fairhaven Community Church",
           coverSubtitle: "Sample edition — invented records",
           footerText: "Sample directory",
+          // Two ruled note pages at the back, so the sample shows them.
+          notePages: 2,
           showBirthdays: true,
           showAnniversary: true,
           // Only the tag sheet reads these, and only the sample sets them: a

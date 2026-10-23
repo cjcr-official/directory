@@ -29,6 +29,7 @@ import { directoryKinds, mainDirectoryId, type DirectoryKind } from "@/lib/direc
 import {
   COVER_PARTS,
   DEFAULT_SETTINGS,
+  NOTE_PAGES_MAX,
   PAGE_SIZES,
   TAG_SIZES,
   TAG_STYLES,
@@ -497,6 +498,8 @@ export function ProjectEditPage() {
   const bookSummary = listOr(
     [
       safeSettings.includeIndex && "index",
+      safeSettings.notePages > 0 &&
+        `${safeSettings.notePages} note ${safeSettings.notePages === 1 ? "page" : "pages"}`,
       safeSettings.runningHeader && "running header",
       safeSettings.showLetterTabs && "letter tabs",
       safeSettings.showPageNumbers && "page numbers",
@@ -1221,8 +1224,8 @@ export function ProjectEditPage() {
             </Disclosure>
 
             {/* In the order the summary reads them, and the typed field
-                last: four things that are on or off, then the one line
-                somebody has to write. */}
+                last: what goes in the back, the furniture that is on or off,
+                then the one line somebody has to write. */}
             <Disclosure title="Inside the book" summary={bookSummary}>
               <Checkbox
                 label="Alphabetical index at the back"
@@ -1231,6 +1234,26 @@ export function ProjectEditPage() {
                 disabled={!canEdit}
                 onChange={(value) => set({ includeIndex: value })}
               />
+              <div className="form-decision">
+                <Field
+                  label="Note pages at the back"
+                  hint="Ruled pages after everything else, headed Notes, for writing in by hand."
+                  htmlFor="note_pages"
+                >
+                  <select
+                    id="note_pages"
+                    value={settings.notePages}
+                    disabled={!canEdit}
+                    onChange={(event) => set({ notePages: Number(event.target.value) })}
+                  >
+                    {Array.from({ length: NOTE_PAGES_MAX + 1 }, (_, n) => (
+                      <option key={n} value={n}>
+                        {n === 0 ? "None" : n === 1 ? "1 page" : `${n} pages`}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
               <Checkbox
                 label="Church name in the running header"
                 checked={settings.runningHeader}

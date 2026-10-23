@@ -107,6 +107,13 @@ export const COVER_SCALE_MIN = 0.25;
 export const COVER_SCALE_MAX = 4;
 
 /**
+ * The most note pages a book can carry at the back. A dozen is three folded
+ * sheets of nothing but lines; past that it is a notebook with a directory in
+ * the front.
+ */
+export const NOTE_PAGES_MAX = 12;
+
+/**
  * Everything about how one project prints. Stored as JSON in projects.settings,
  * so adding a field here only needs a default below - no migration.
  */
@@ -225,6 +232,11 @@ export type ProjectSettings = {
   coverPlacements: CoverPlacements;
   includeCover: boolean;
   includeIndex: boolean;
+  /**
+   * Plain ruled pages at the very back, headed "Notes", for whatever somebody
+   * wants to write in after the book is printed. Zero for none.
+   */
+  notePages: number;
   runningHeader: boolean;
   showPageNumbers: boolean;
   /** The big A / B / C letter in the corner of each half-page. */
@@ -294,6 +306,7 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   coverPlacements: {},
   includeCover: true,
   includeIndex: true,
+  notePages: 0,
   runningHeader: true,
   showPageNumbers: true,
   showLetterTabs: true,
@@ -328,6 +341,7 @@ export function normalizeSettings(raw: unknown): ProjectSettings {
   // Guard rails: the layout maths assumes at least one card per half.
   merged.rows = clamp(Math.round(merged.rows), 1, 8);
   merged.columns = clamp(Math.round(merged.columns), 1, 3);
+  merged.notePages = clamp(Math.round(merged.notePages), 0, NOTE_PAGES_MAX);
   if (!["badge4x3", "badge3x4", "avery5395"].includes(merged.tagSize)) merged.tagSize = "badge4x3";
   if (!["classic", "banner", "plain"].includes(merged.tagStyle)) merged.tagStyle = "classic";
   if (!TYPEFACES.includes(merged.tagNameFont)) merged.tagNameFont = DEFAULT_SETTINGS.tagNameFont;

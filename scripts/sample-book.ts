@@ -48,6 +48,8 @@ async function main() {
     coverPhotoPath: "covers/building.jpg",
     coverLogoPath: "covers/logo.jpg",
     footerText: "Please keep this directory for church use only.",
+    // Two ruled note pages at the back, so the sample shows them.
+    notePages: 2,
     showBirthdays: true,
     showAnniversary: true,
     // Read only by the tag sheet below, and set here so that CI renders a tag

@@ -131,7 +131,7 @@ export interface FillModel {
 
 /** One page of the finished book - a half of a landscape sheet. */
 export interface BookPage {
-  kind: "cover" | "records" | "index" | "blank";
+  kind: "cover" | "records" | "index" | "notes" | "blank";
   /** 1-based page number as printed. Blank filler pages carry 0. */
   number: number;
   box: Box;
@@ -1477,6 +1477,69 @@ function composeIndexPages(
   return pages;
 }
 
+/**
+ * How far apart the lines on a note page are, before they are spread to fill
+ * the page evenly: a little over a quarter inch, between college and wide rule,
+ * which is room for an ordinary hand without the page looking like a form.
+ */
+const NOTE_LINE_SPACING = 21;
+
+/**
+ * Plain ruled pages at the very back, for whatever somebody wants to write in:
+ * a new family, a changed number, a prayer list.
+ *
+ * Nothing but lines, deliberately - a page that asks for a name and an address
+ * can only be used for names and addresses. The first carries a heading so it
+ * reads as part of the book rather than a sheet left in by mistake, and the
+ * running header and page number go on all of them as on every other page.
+ * The lines are spread evenly down the whole page, so it ends on a line
+ * rather than on a strip of nothing above the footer.
+ */
+function composeNotePages(count: number, geo: Geometry, metrics: Metrics): BookPage[] {
+  const pages: BookPage[] = [];
+  const pad = 4;
+  const headingSize = 13;
+  const headingHeight = metrics.lineHeight(headingSize) + 8;
+  // Short of the foot by a little, so the last line does not sit on the
+  // page number and footer note underneath it.
+  const bottom = geo.contentTop + geo.contentHeight - 8;
+
+  for (let n = 0; n < count; n += 1) {
+    const page = blankPage(geo);
+    page.kind = "notes";
+
+    let top = geo.contentTop;
+    if (n === 0) {
+      page.runs.push({
+        x: pad,
+        y: geo.contentTop + 2,
+        w: geo.pageWidth - pad * 2,
+        size: headingSize,
+        weight: "bold",
+        color: COLORS.strong,
+        align: "left",
+        text: "Notes",
+      });
+      top += headingHeight;
+    }
+
+    const lines = Math.max(1, Math.floor((bottom - top) / NOTE_LINE_SPACING));
+    const spacing = (bottom - top) / lines;
+    for (let i = 1; i <= lines; i += 1) {
+      page.rules.push({
+        x: pad,
+        y: top + spacing * i,
+        w: geo.pageWidth - pad * 2,
+        color: COLORS.border,
+      });
+    }
+
+    pages.push(page);
+  }
+
+  return pages;
+}
+
 // ---------------------------------------------------------------------------
 // Sheet assembly
 // ---------------------------------------------------------------------------
@@ -1617,11 +1680,12 @@ export function composeBook(
   }
 
   const indexPages = composeIndexPages(indexRecords, settings, geo, metrics);
+  const notePages = composeNotePages(settings.notePages, geo, metrics);
 
   // --- assemble -----------------------------------------------------------
   const pages: BookPage[] = [];
   if (cover) pages.push(cover);
-  pages.push(...recordPages, ...indexPages);
+  pages.push(...recordPages, ...indexPages, ...notePages);
 
   pages.forEach((page, i) => {
     page.number = i + 1;
