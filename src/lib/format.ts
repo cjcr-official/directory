@@ -127,8 +127,8 @@ export function sameDisplayName(a: string, b: string): boolean {
  *
  * Used on the three screens that show a family by name and nothing else - the
  * family a person belongs to, the Family column on the people list, and the
- * hand-picked checklist. Everywhere a reader can see, and everywhere the book
- * is composed from, uses display_name on its own.
+ * hand-picked checklist. Everywhere else a reader can see uses display_name on
+ * its own; the book files a family under its surname instead.
  */
 export function labelledHouseholdName(
   household: Pick<HouseholdRow, "display_name"> & { office_label?: string | null },

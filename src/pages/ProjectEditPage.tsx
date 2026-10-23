@@ -1168,7 +1168,7 @@ export function ProjectEditPage() {
                         set({ memberStyle: event.target.value as "compact" | "detailed" })
                       }
                     >
-                      <option value="compact">One line of first names</option>
+                      <option value="compact">First names only</option>
                       <option value="detailed">A line each, with their own contact details</option>
                     </select>
                   </Field>
