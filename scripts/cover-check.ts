@@ -7,6 +7,7 @@ import {
   type ProjectSettings,
 } from "@/lib/layout/settings";
 import { pdfMetrics } from "@/lib/layout/pdf";
+import { snapToCentre } from "@/lib/layout/guides";
 import { buildEntries, type DirectoryData } from "@/lib/entries";
 import type { HouseholdRow } from "@/lib/database.types";
 import { check } from "./check";
@@ -490,6 +491,76 @@ console.log("");
     }),
   );
   check("a part put back where it was composed is forgotten", !("coverTitle" in home));
+}
+
+// ---------------------------------------------------------------------------
+// The centring guides
+//
+// Two lines down and across the middle of the paper, and a part dragged with
+// its middle near one is pulled onto it. The canvas does the pulling, but it
+// measures against the ink the composer reports and moves through the same
+// placeCoverPart as every drag - so what has to hold is that the ink is where
+// the type is, and that a snapped part ends up centred to the point.
+// ---------------------------------------------------------------------------
+
+console.log("\nthe centring guides\n");
+{
+  const paper = { width: still.width, height: still.height };
+  const middle = (box: { x: number; w: number }) => box.x + box.w / 2;
+
+  const title = still.boxes.coverTitle;
+  check(
+    "the composer reports the ink of every part that is on the cover",
+    ["churchName", "coverTitle", "coverStatement", "coverContact", "coverPhoto"].every(
+      (part) => part in still.boxes,
+    ) && !("coverSubtitle" in still.boxes),
+    Object.keys(still.boxes).join(", "),
+  );
+  check(
+    "and a title as composed is centred on the line down the middle",
+    !!title && near(middle(title), paper.width / 2),
+    title ? `${middle(title).toFixed(2)} against ${(paper.width / 2).toFixed(2)}` : "no title",
+  );
+
+  const box = { x: 100, y: 100, w: 80, h: 20 };
+  const across = { width: 2 * (box.x + box.w / 2) + 5, height: 2 * (box.y + box.h / 2) + 30 };
+  const near5 = snapToCentre(box, across, 6);
+  check(
+    "a part within reach of the line down the middle is pulled onto it",
+    near5.snapped.x &&
+      near(near5.dx, 2.5) &&
+      near(middle({ x: box.x + near5.dx, w: box.w }), across.width / 2),
+    JSON.stringify(near5),
+  );
+  check(
+    "and is left alone on the other axis when that line is out of reach",
+    !near5.snapped.y && near5.dy === 0,
+    JSON.stringify(near5),
+  );
+  const far = snapToCentre(box, { width: across.width + 20, height: across.height }, 6);
+  check("a part out of reach of both is not pulled at all", !far.snapped.x && far.dx === 0);
+
+  // A title dragged down the page and a little off the middle, as the canvas
+  // would hand it over: the pull is a movement like any other.
+  const dragged = withPlacements({ coverTitle: { dx: 4, dy: 60, scale: 1 } });
+  const off = dragged.boxes.coverTitle!;
+  check(
+    "a moved part's ink moves with it",
+    !!title && near(off.x - title.x, 4) && near(off.y - title.y, 60),
+  );
+  const pull = snapToCentre(off, paper, 6);
+  const snapped = placeCoverPart(
+    { coverTitle: { dx: 4, dy: 60, scale: 1 } },
+    dragged.placed,
+    "coverTitle",
+    (from) => ({ ...from, dx: from.dx + pull.dx, dy: from.dy + pull.dy }),
+  );
+  const landed = withPlacements(snapped).boxes.coverTitle!;
+  check(
+    "and snapped, it lands on the middle to the point and keeps its height",
+    pull.snapped.x && near(middle(landed), paper.width / 2) && near(landed.y, off.y),
+    `${middle(landed).toFixed(2)} against ${(paper.width / 2).toFixed(2)}`,
+  );
 }
 
 console.log("");
