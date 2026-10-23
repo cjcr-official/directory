@@ -284,6 +284,11 @@ interface Block {
   spaceBefore: number;
   /** Blocks that must never be dropped when a card runs out of room. */
   essential?: boolean;
+  /**
+   * Set in bold ahead of the text, at the same size, with a comma between:
+   * the surname a record is filed under, in "Smith, John & Mary".
+   */
+  lead?: string;
 }
 
 function initialsFor(entry: DirectoryEntry): string {
@@ -299,6 +304,12 @@ function memberLabel(person: PersonRow, householdSurname: string): string {
   return person.last_name.toLowerCase() === householdSurname.toLowerCase()
     ? given
     : `${given} ${person.last_name}`;
+}
+
+/** "John", "John & Mary", "John, Mary & Ruth". */
+function joinNames(names: string[]): string {
+  if (names.length < 2) return names.join("");
+  return `${names.slice(0, -1).join(", ")} & ${names[names.length - 1]}`;
 }
 
 /**
@@ -375,49 +386,66 @@ function householdBlocks(
   type: TypeScale,
 ): Block[] {
   const household = entry.household;
+  const members = household.members;
+  const listed = settings.showMembers ? members : [];
+
+  // A family is filed under its surname, and the couple it is known by sit
+  // beside it - "Smith, John & Mary" - with everyone else underneath. A family
+  // nobody in it has been marked head or spouse of puts every member who is
+  // not a child up there, rather than guessing which of them is which.
+  const isCouple = (member: PersonRow) =>
+    member.household_role === "head" || member.household_role === "spouse";
+  const top = listed.some(isCouple)
+    ? listed.filter(isCouple)
+    : listed.filter((member) => member.household_role !== "child");
+  const below = listed.filter((member) => !top.includes(member));
+
   const blocks: Block[] = [
     {
-      text: household.display_name,
+      lead: household.sort_name.trim() || household.display_name,
+      text: joinNames(top.map((member) => memberLabel(member, household.sort_name))),
       size: type.title,
-      weight: "bold",
+      weight: "regular",
       color: COLORS.strong,
       spaceBefore: 0,
       essential: true,
     },
   ];
 
-  const members = household.members;
-
-  if (settings.showMembers && members.length) {
-    if (settings.memberStyle === "detailed") {
-      for (const member of members) {
-        const detail = join(
-          [
-            settings.showPhone ? formatPhone(member.phone) : "",
-            settings.showEmail ? (member.email ?? "") : "",
-            ...personDates(member, settings),
-          ],
-          " · ",
-        );
-        blocks.push({
-          text: detail
-            ? `${memberLabel(member, household.sort_name)} — ${detail}`
-            : memberLabel(member, household.sort_name),
-          size: type.body,
-          weight: "regular",
-          color: COLORS.ink,
-          spaceBefore: blocks.length === 1 ? 3 : 1,
-        });
-      }
-    } else {
+  if (settings.memberStyle === "detailed") {
+    // A line each for whoever has something of their own to say. The couple
+    // are already named, so they get one only when there is a number, an
+    // address or a birthday to go with it; the children always do.
+    for (const member of listed) {
+      const detail = join(
+        [
+          settings.showPhone ? formatPhone(member.phone) : "",
+          settings.showEmail ? (member.email ?? "") : "",
+          ...personDates(member, settings),
+        ],
+        " · ",
+      );
+      if (!detail && top.includes(member)) continue;
       blocks.push({
-        text: members.map((m) => memberLabel(m, household.sort_name)).join(", "),
+        text: detail
+          ? `${memberLabel(member, household.sort_name)} — ${detail}`
+          : memberLabel(member, household.sort_name),
         size: type.body,
         weight: "regular",
         color: COLORS.ink,
-        spaceBefore: 3,
+        spaceBefore: blocks.length === 1 ? 3 : 1,
       });
     }
+  } else if (below.length) {
+    blocks.push({
+      // The same size as the names beside the surname: every name on the card
+      // is one size, and only the surname is bold.
+      text: below.map((member) => memberLabel(member, household.sort_name)).join(", "),
+      size: type.title,
+      weight: "regular",
+      color: COLORS.ink,
+      spaceBefore: 1,
+    });
   }
 
   if (settings.showAddress) {
@@ -524,11 +552,13 @@ function personBlocks(
   type: TypeScale,
 ): Block[] {
   const person = entry.person;
+  const surname = person.last_name.trim();
   const blocks: Block[] = [
     {
-      text: fullName(person),
+      // "Smith, John", filed the way a family is.
+      ...(surname ? { lead: surname, text: firstName(person) } : { text: fullName(person) }),
       size: type.title,
-      weight: "bold",
+      weight: surname ? "regular" : "bold",
       color: COLORS.strong,
       spaceBefore: 0,
       essential: true,
@@ -594,6 +624,40 @@ const PHOTO_MAX_WIDTH_RATIO = 0.4;
 interface LaidOutBlock extends Block {
   lines: string[];
   height: number;
+  /** How far the first line's text starts in, past a bold lead. */
+  leadWidth: number;
+}
+
+/**
+ * Wraps a block that opens on a bold lead.
+ *
+ * The first line is the lead's, so it is that much narrower and starts with
+ * the comma joining the two; "Smith" then ", John & Mary". Its text is in the
+ * first of the lines returned, which is only the comma when not even the first
+ * name fits beside the lead, and empty when there are no names at all. The
+ * lines after it have the whole width.
+ */
+function wrapAfterLead(
+  block: Block & { lead: string },
+  width: number,
+  metrics: Metrics,
+): { lead: string; leadWidth: number; lines: string[] } {
+  const words = block.text.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+  const comma = words.length ? metrics.widthOf(",", block.size, block.weight) : 0;
+  const lead = truncate(block.lead, width - comma, block.size, "bold", metrics);
+  const leadWidth = metrics.widthOf(lead, block.size, "bold");
+  if (!words.length) return { lead, leadWidth, lines: [""] };
+
+  let first = ",";
+  let taken = 0;
+  while (taken < words.length) {
+    const candidate = `${first} ${words[taken]}`;
+    if (leadWidth + metrics.widthOf(candidate, block.size, block.weight) > width) break;
+    first = candidate;
+    taken += 1;
+  }
+  const rest = wrapText(words.slice(taken).join(" "), width, block.size, block.weight, metrics);
+  return { lead, leadWidth, lines: [first, ...rest] };
 }
 
 /**
@@ -655,11 +719,25 @@ function composeCard(
   const laidOut: LaidOutBlock[] = [];
   let contentHeight = 0;
   for (const block of blocks) {
-    const lines = wrapText(block.text, textW, block.size, block.weight, metrics);
+    const led = block.lead
+      ? wrapAfterLead({ ...block, lead: block.lead }, textW, metrics)
+      : {
+          lead: undefined,
+          leadWidth: 0,
+          lines: wrapText(block.text, textW, block.size, block.weight, metrics),
+        };
+    const { lines } = led;
     if (!lines.length) continue;
     const spaceBefore = laidOut.length ? block.spaceBefore : 0;
     const height = lines.length * metrics.lineHeight(block.size);
-    laidOut.push({ ...block, lines, spaceBefore, height });
+    laidOut.push({
+      ...block,
+      lead: led.lead,
+      leadWidth: led.leadWidth,
+      lines,
+      spaceBefore,
+      height,
+    });
     contentHeight += spaceBefore + height;
   }
 
@@ -673,24 +751,40 @@ function composeCard(
     const lineHeight = metrics.lineHeight(block.size);
     cursor += runs.length ? block.spaceBefore : 0;
 
-    for (const line of block.lines) {
+    for (const [i, line] of block.lines.entries()) {
       if (cursor + lineHeight > bottom + 0.01) {
         const last = runs[runs.length - 1];
         if (last && !block.essential) {
-          last.text = truncate(`${last.text} ...`, textW, last.size, last.weight, metrics);
+          last.text = truncate(`${last.text} ...`, last.w, last.size, last.weight, metrics);
         }
         return finishCard(entry, box, settings, photo, runs);
       }
-      runs.push({
-        x: textX,
-        y: cursor,
-        w: textW,
-        size: block.size,
-        weight: block.weight,
-        color: block.color,
-        align: "left",
-        text: line,
-      });
+      const lead = i === 0 ? block.lead : undefined;
+      const indent = lead ? block.leadWidth : 0;
+      if (lead) {
+        runs.push({
+          x: textX,
+          y: cursor,
+          w: block.leadWidth,
+          size: block.size,
+          weight: "bold",
+          color: block.color,
+          align: "left",
+          text: lead,
+        });
+      }
+      if (line) {
+        runs.push({
+          x: textX + indent,
+          y: cursor,
+          w: textW - indent,
+          size: block.size,
+          weight: block.weight,
+          color: block.color,
+          align: "left",
+          text: line,
+        });
+      }
       cursor += lineHeight;
     }
   }
