@@ -19,7 +19,6 @@ import {
   PAGE_SIZES,
   TEXT_SCALES,
   type CardStyle,
-  type CoverPart,
   type CoverPlacements,
   type PhotoFit,
   type ProjectSettings,
@@ -1748,23 +1747,9 @@ export function composeCoverPage(
    * stored - see applyPlacements.
    */
   placed: CoverPlacements;
-  /**
-   * The ink of every part that is on the cover, where it is drawn now - what
-   * the centring guides measure a dragged part's middle against.
-   */
-  boxes: Partial<Record<CoverPart, Box>>;
 } {
   const geo = computeGeometry(settings);
   const { page, placed } = composeCover(settings, geo, typeScale(settings), metrics);
-  const boxes: Partial<Record<CoverPart, Box>> = {};
-  for (const part of COVER_PARTS) {
-    const runs = page.runs.filter((run) => run.field === part);
-    const rules = page.rules.filter((rule) => rule.field === part);
-    const photos = page.photos.filter((slot) => slot.field === part);
-    if (runs.length || rules.length || photos.length) {
-      boxes[part] = inkBox(runs, rules, photos, metrics);
-    }
-  }
   const photoPaths = [
     ...new Set(page.photos.map((slot) => slot.path).filter((path): path is string => !!path)),
   ];
@@ -1775,6 +1760,5 @@ export function composeCoverPage(
     photoPaths,
     typeface: settings.typeface,
     placed,
-    boxes,
   };
 }

@@ -3268,49 +3268,6 @@ th.num {
   opacity: 1;
 }
 
-/*
- * The centring guides, down and across the middle of the paper.
- *
- * Faint and dashed at rest, because the drawing is still meant to read as the
- * printed page behind them; solid in the accent while a dragged part is
- * sitting on one, which is the only moment either of them has anything to
- * say. A hairline in screen pixels whatever the paper is scaled to, for the
- * same reason the handles are, and never a target: a pointer on a guide is a
- * pointer on whatever is drawn under it.
- */
-.cover-guide {
-  position: absolute;
-  z-index: 1;
-  pointer-events: none;
-  border: 0 dashed color-mix(in srgb, var(--sheet-accent) 40%, transparent);
-}
-.cover-guide.down {
-  top: 0;
-  bottom: 0;
-  width: 0;
-  border-left-width: calc(1px * var(--part-counter, 1));
-  transform: translateX(-50%);
-}
-.cover-guide.across {
-  left: 0;
-  right: 0;
-  height: 0;
-  border-top-width: calc(1px * var(--part-counter, 1));
-  transform: translateY(-50%);
-}
-.cover-guide.on {
-  border-style: solid;
-  border-color: var(--sheet-accent);
-}
-
-/* The switch for them, at the far end of the card's heading. */
-.cover-guides-toggle {
-  margin-left: auto;
-}
-.cover-guides-toggle .check {
-  margin: 0;
-}
-
 /* What has been moved, and the way to take it all back.
    A row rather than a sentence with a button inside it: undoing a drag is the
    one thing on this screen that cannot be done on the drawing itself, so it
