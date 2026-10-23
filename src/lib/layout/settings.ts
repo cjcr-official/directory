@@ -108,8 +108,8 @@ export const COVER_SCALE_MAX = 4;
 
 /**
  * The most note pages a book can carry at the back. A dozen is three folded
- * sheets of nothing but blanks, which is already more than a year of new
- * families; past that it is a notebook with a directory in the front.
+ * sheets of nothing but lines; past that it is a notebook with a directory in
+ * the front.
  */
 export const NOTE_PAGES_MAX = 12;
 
@@ -233,9 +233,8 @@ export type ProjectSettings = {
   includeCover: boolean;
   includeIndex: boolean;
   /**
-   * Ruled pages at the very back for writing in whoever joins after the book
-   * is printed, each laid out as blank records - name, address, phone - in the
-   * same rhythm as the records in front of them. Zero for none.
+   * Plain ruled pages at the very back, headed "Notes", for whatever somebody
+   * wants to write in after the book is printed. Zero for none.
    */
   notePages: number;
   runningHeader: boolean;

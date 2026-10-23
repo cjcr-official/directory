@@ -1061,11 +1061,11 @@ async function main() {
 
   // ---- 14. note pages at the back -----------------------------------------
   //
-  // Blank records for whoever joins after the book is printed. They are the
-  // only pages with nothing from the database on them, so the things that
-  // could go wrong are all geometry: a page too few or too many, a page that
-  // lands in front of the index rather than behind it, or a writing line run
-  // off the edge of the paper on a shape of book nobody tried.
+  // Ruled pages for writing in after the book is printed. They are the only
+  // pages with nothing from the database on them, so the things that could go
+  // wrong are all geometry: a page too few or too many, a page that lands in
+  // front of the index rather than behind it, or a line run off the edge of
+  // the paper on a shape of book nobody tried.
   {
     const data = buildDemoData(30, 4);
     const entries = buildEntries(data);
@@ -1080,11 +1080,9 @@ async function main() {
       {},
       { columns: 1, rows: 1 },
       { columns: 3, rows: 8, textScale: "compact" },
-      { columns: 3, rows: 8, textScale: "large", showBirthdays: true, showAnniversary: true },
       { pageSize: "a4", cardStyle: "box", showPhotos: false },
       { pageSize: "legal", textScale: "large", runningHeader: false, showPageNumbers: false },
-      { memberStyle: "detailed", showBirthdays: true, showAnniversary: true, rows: 5 },
-      { groupWholeFamily: false, showEmail: false, includeIndex: false },
+      { includeIndex: false, footerText: "For church use only" },
       { bookletOrder: true, includeCover: false },
     ];
 
@@ -1112,11 +1110,14 @@ async function main() {
           notes.every((page) => page.number > lastOther),
           `${label}: a note page landed in front of the book it belongs to`,
         );
-        // Every blank record has at least a name to write in.
-        const names = notes.flatMap((page) => page.runs).filter((run) => run.text === "NAME");
+        // Lines to write on, filling every page, and the heading only once.
         ok(
-          names.length === notePages * settings.rows,
-          `${label}: ${names.length} places to write a name, expected ${notePages * settings.rows}`,
+          notes.every((page) => page.rules.length >= 10),
+          `${label}: a note page with fewer than ten lines to write on`,
+        );
+        ok(
+          notes.flatMap((page) => page.runs).filter((run) => run.text === "Notes").length === 1,
+          `${label}: the Notes heading is not printed exactly once`,
         );
 
         const inside = (
@@ -1162,7 +1163,7 @@ async function main() {
       ([given, want]) => normalizeSettings({ notePages: given }).notePages === want,
     );
     ok(read.length === stored.length, `${stored.length - read.length} note page count(s) misread`);
-    console.log(`note pages: ${checked} book shapes carry them at the back, on the paper`);
+    console.log(`note pages: ${checked} book shapes carry them ruled, at the back, on the paper`);
   }
 
   // -------------------------------------------------------------------------
@@ -1182,7 +1183,7 @@ async function main() {
       { columns: 3, rows: 8, textScale: "compact" },
       { bookletOrder: true, includeCover: false },
       { includeIndex: false, showPhotos: false, cardStyle: "box" },
-      { notePages: 3, rows: 6, showBirthdays: true, showAnniversary: true },
+      { notePages: 3, runningHeader: false },
       { memberStyle: "detailed", showBirthdays: true, showAnniversary: true, textScale: "large" },
       { pageSize: "a4", showLetterTabs: false, runningHeader: false, showPageNumbers: false },
       { pageSize: "legal", footerText: "For the congregation", photoFit: "fit" },

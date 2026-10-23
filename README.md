@@ -75,9 +75,8 @@ a phone it is a screen of its own. Your own typing is not counted back at you.
 
 **Printing.** A preview that matches the PDF line for line, then either a
 downloaded PDF or a straight browser print. Optional cover page, alphabetical
-index, A–Z letter tabs, page numbers, blank note pages at the back for writing
-in people who join after the printing, and booklet page ordering for folding and
-stapling.
+index, A–Z letter tabs, page numbers, ruled note pages at the back, and booklet
+page ordering for folding and stapling.
 
 Want to see it? Run the app and open **/sample** — a complete sample directory
 built from invented families, with no account and no database.

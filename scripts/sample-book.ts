@@ -48,7 +48,7 @@ async function main() {
     coverPhotoPath: "covers/building.jpg",
     coverLogoPath: "covers/logo.jpg",
     footerText: "Please keep this directory for church use only.",
-    // Two pages of blank records at the back, so the sample shows them.
+    // Two ruled note pages at the back, so the sample shows them.
     notePages: 2,
     showBirthdays: true,
     showAnniversary: true,

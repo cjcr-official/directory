@@ -1237,7 +1237,7 @@ export function ProjectEditPage() {
               <div className="form-decision">
                 <Field
                   label="Note pages at the back"
-                  hint="Blank records to write in anyone who joins after this printing, laid out like the pages in front of them."
+                  hint="Ruled pages after everything else, headed Notes, for writing in by hand."
                   htmlFor="note_pages"
                 >
                   <select
