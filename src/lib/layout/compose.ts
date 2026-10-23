@@ -131,7 +131,7 @@ export interface FillModel {
 
 /** One page of the finished book - a half of a landscape sheet. */
 export interface BookPage {
-  kind: "cover" | "records" | "index" | "blank";
+  kind: "cover" | "records" | "index" | "notes" | "blank";
   /** 1-based page number as printed. Blank filler pages carry 0. */
   number: number;
   box: Box;
@@ -1477,6 +1477,235 @@ function composeIndexPages(
   return pages;
 }
 
+/** Writing lines on a note page are never further apart than this... */
+const NOTE_LINE_MAX = 24;
+/** ...nor closer than this, which is about as tight as handwriting goes. */
+const NOTE_LINE_MIN = 15;
+/** Between the two halves of a line that carries two things, phone and email. */
+const NOTE_HALF_GAP = 14;
+/** The least line worth leaving beside a label: a short phone number, written small. */
+const NOTE_WRITING_MIN = 48;
+
+/** One writing line: its labels, one per part, and "" for an address's second line. */
+type NoteLine = string[];
+
+/**
+ * What a blank record asks for, in the order a record prints it.
+ *
+ * Read from the same settings the records are: a book that leaves email off
+ * every card has no business asking for one at the back, and a book of
+ * individuals has no family to write in.
+ */
+function noteLines(settings: ProjectSettings): NoteLine[] {
+  const families = settings.groupWholeFamily;
+  const lines: NoteLine[] = [["Name"]];
+  if (families && settings.showMembers) lines.push(["Family"]);
+  if (settings.showAddress) lines.push(["Address"], [""]);
+  if (settings.showPhone) lines.push(["Phone"]);
+  if (settings.showEmail) lines.push(["Email"]);
+  if (settings.showBirthdays) lines.push([families ? "Birthdays" : "Birthday"]);
+  if (settings.showAnniversary && families) lines.push(["Anniversary"]);
+  return lines;
+}
+
+/**
+ * The same lines, made to fit a slot that is short of room.
+ *
+ * Doubled up first - phone beside email, birthdays beside the anniversary -
+ * then the address's second line goes, and only then are lines cut from the
+ * bottom. The name is never cut, so a slot always has somewhere to start.
+ * Two things only share a line when each half still leaves room to write.
+ */
+function fitNoteLines(lines: NoteLine[], room: number, canPair: boolean): NoteLine[] {
+  const fits = (candidate: NoteLine[]) => candidate.length * NOTE_LINE_MIN <= room;
+  let fitted = lines;
+
+  const pair = (a: string, b: string) => {
+    if (!canPair) return;
+    const at = fitted.findIndex((line) => line.length === 1 && line[0] === a);
+    const other = fitted.findIndex((line) => line.length === 1 && line[0] === b);
+    if (at === -1 || other === -1) return;
+    fitted = fitted.map((line, i) => (i === at ? [a, b] : line)).filter((_, i) => i !== other);
+  };
+
+  if (!fits(fitted)) pair("Phone", "Email");
+  if (!fits(fitted))
+    pair(fitted.some((l) => l[0] === "Birthdays") ? "Birthdays" : "Birthday", "Anniversary");
+  if (!fits(fitted)) fitted = fitted.filter((line) => line[0] !== "");
+  if (!fits(fitted)) fitted = fitted.slice(0, Math.max(1, Math.floor(room / NOTE_LINE_MIN)));
+  return fitted;
+}
+
+/**
+ * Pages at the back for whoever joins after the book is printed.
+ *
+ * Each is laid out as a page of blank records: the same number to a page as
+ * the records in front of it, the same separator between them and, when the
+ * book has photographs, a frame where a picture would go - so a family written
+ * in by hand sits in the book like one that was printed, rather than on a page
+ * of loose lines somebody will use for a shopping list. The first carries a
+ * heading saying what the pages are for.
+ */
+function composeNotePages(
+  count: number,
+  settings: ProjectSettings,
+  geo: Geometry,
+  type: TypeScale,
+  metrics: Metrics,
+): BookPage[] {
+  const pages: BookPage[] = [];
+  if (count <= 0) return pages;
+
+  const pad = 4;
+  const headingSize = 13;
+  const introSize = type.small;
+  const headingHeight = metrics.lineHeight(headingSize) + 2 + metrics.lineHeight(introSize) + 10;
+  const labelSize = type.tiny * 0.86;
+  const labels = noteLines(settings);
+
+  for (let n = 0; n < count; n += 1) {
+    const page = blankPage(geo);
+    page.kind = "notes";
+
+    let top = geo.contentTop;
+    if (n === 0) {
+      page.runs.push({
+        x: pad,
+        y: geo.contentTop + 2,
+        w: geo.pageWidth - pad * 2,
+        size: headingSize,
+        weight: "bold",
+        color: COLORS.strong,
+        align: "left",
+        text: "Additions",
+      });
+      page.runs.push({
+        x: pad,
+        y: geo.contentTop + 2 + metrics.lineHeight(headingSize) + 2,
+        w: geo.pageWidth - pad * 2,
+        size: introSize,
+        weight: "italic",
+        color: COLORS.muted,
+        align: "left",
+        text: truncate(
+          "For those who joined after this directory went to print.",
+          geo.pageWidth - pad * 2,
+          introSize,
+          "italic",
+          metrics,
+        ),
+      });
+      top += headingHeight;
+    }
+
+    const rows = geo.rows;
+    const slotH = (geo.contentTop + geo.contentHeight - top - CARD_GAP * (rows - 1)) / rows;
+
+    for (let row = 0; row < rows; row += 1) {
+      const box: Box = { x: 0, y: top + row * (slotH + CARD_GAP), w: geo.pageWidth, h: slotH };
+      composeNoteSlot(page, box, labels, labelSize, settings, metrics);
+
+      if (settings.cardStyle === "box") {
+        page.fills.push({ ...box, color: null, borderColor: COLORS.border });
+      } else if (settings.cardStyle === "rule" && row < rows - 1) {
+        page.rules.push({
+          x: box.x,
+          y: box.y + box.h + CARD_GAP / 2,
+          w: box.w,
+          color: COLORS.rule,
+        });
+      }
+    }
+
+    pages.push(page);
+  }
+
+  return pages;
+}
+
+/** One blank record: a frame for a photograph, and labelled lines to write on. */
+function composeNoteSlot(
+  page: BookPage,
+  box: Box,
+  labels: NoteLine[],
+  labelSize: number,
+  settings: ProjectSettings,
+  metrics: Metrics,
+): void {
+  const innerX = box.x + CARD_PADDING;
+  const innerY = box.y + CARD_PADDING;
+  const innerW = box.w - CARD_PADDING * 2;
+  const innerH = box.h - CARD_PADDING * 2;
+  if (innerH <= 0 || innerW <= 0) return;
+
+  let textX = innerX;
+  let textW = innerW;
+
+  if (settings.showPhotos) {
+    // The size and place a printed record's portrait takes, so the frame
+    // lines up with the photographs on the pages before it.
+    let photoH = innerH;
+    let photoW = photoH / PHOTO_ASPECT;
+    const maxWidth = innerW * PHOTO_MAX_WIDTH_RATIO;
+    if (photoW > maxWidth) {
+      photoW = maxWidth;
+      photoH = photoW * PHOTO_ASPECT;
+    }
+    const frame = { x: innerX, y: innerY + (innerH - photoH) / 2, w: photoW, h: photoH };
+    page.fills.push({ ...frame, color: null, borderColor: COLORS.photoEdge });
+    const captionSize = labelSize;
+    page.runs.push({
+      x: frame.x,
+      y: frame.y + frame.h / 2 - captionSize / 2,
+      w: frame.w,
+      size: captionSize,
+      weight: "regular",
+      color: COLORS.soft,
+      align: "center",
+      text: "PHOTO",
+    });
+    textX = innerX + photoW + PHOTO_GAP;
+    textW = innerX + innerW - textX;
+  }
+
+  const widthOf = (label: string) =>
+    label ? metrics.widthOf(label.toUpperCase(), labelSize, "regular") + 6 : 0;
+  const halfW = (textW - NOTE_HALF_GAP) / 2;
+  // Against the widest label, since the first half of a line starts where
+  // every line's writing does.
+  const widest = Math.max(...labels.flat().map(widthOf));
+  const lines = fitNoteLines(labels, innerH, widest + NOTE_WRITING_MIN <= halfW);
+  const spacing = Math.max(NOTE_LINE_MIN, Math.min(NOTE_LINE_MAX, innerH / lines.length));
+  // Centred against the frame, as a record's text is against its portrait.
+  const start = innerY + Math.max(0, (innerH - spacing * lines.length) / 2);
+  // Every first label in one column, so the lines all start at the same place.
+  const column = Math.max(...lines.map((line) => widthOf(line[0])));
+
+  lines.forEach((line, i) => {
+    const ruleY = start + spacing * (i + 1);
+    const partW = line.length > 1 ? halfW : textW;
+
+    line.forEach((label, half) => {
+      const x = textX + half * (partW + NOTE_HALF_GAP);
+      const indent = half === 0 ? column : widthOf(label);
+      if (label) {
+        page.runs.push({
+          x,
+          // Resting on its line, with a hair of air between.
+          y: ruleY - 2 - labelSize * 0.8,
+          w: indent,
+          size: labelSize,
+          weight: "regular",
+          color: COLORS.soft,
+          align: "left",
+          text: label.toUpperCase(),
+        });
+      }
+      page.rules.push({ x: x + indent, y: ruleY, w: partW - indent, color: COLORS.border });
+    });
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Sheet assembly
 // ---------------------------------------------------------------------------
@@ -1617,11 +1846,12 @@ export function composeBook(
   }
 
   const indexPages = composeIndexPages(indexRecords, settings, geo, metrics);
+  const notePages = composeNotePages(settings.notePages, settings, geo, type, metrics);
 
   // --- assemble -----------------------------------------------------------
   const pages: BookPage[] = [];
   if (cover) pages.push(cover);
-  pages.push(...recordPages, ...indexPages);
+  pages.push(...recordPages, ...indexPages, ...notePages);
 
   pages.forEach((page, i) => {
     page.number = i + 1;

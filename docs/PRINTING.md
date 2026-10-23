@@ -71,7 +71,9 @@ while does not print initials where the faces should be.
 
 ## How much paper?
 
-Six records to a sheet, plus a cover and an index.
+Six records to a sheet, plus a cover and an index. Note pages at the back add
+one sheet for every four, though a folded booklet is made up to a multiple of
+four pages anyway, so the first one or two often cost no paper at all.
 
 | Records | Sheets, double-sided |
 | ------- | -------------------- |

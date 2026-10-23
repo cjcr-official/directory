@@ -33,7 +33,12 @@ import {
   type Typeface,
 } from "../src/lib/layout/metrics";
 import { toWinAnsi } from "../src/lib/format";
-import { DEFAULT_SETTINGS, normalizeSettings, recordsPerSheet } from "../src/lib/layout/settings";
+import {
+  DEFAULT_SETTINGS,
+  NOTE_PAGES_MAX,
+  normalizeSettings,
+  recordsPerSheet,
+} from "../src/lib/layout/settings";
 import { buildDemoData } from "../src/lib/demo";
 import type { HouseholdRow, PersonRow } from "../src/lib/database.types";
 
@@ -1054,6 +1059,112 @@ async function main() {
     );
   }
 
+  // ---- 14. note pages at the back -----------------------------------------
+  //
+  // Blank records for whoever joins after the book is printed. They are the
+  // only pages with nothing from the database on them, so the things that
+  // could go wrong are all geometry: a page too few or too many, a page that
+  // lands in front of the index rather than behind it, or a writing line run
+  // off the edge of the paper on a shape of book nobody tried.
+  {
+    const data = buildDemoData(30, 4);
+    const entries = buildEntries(data);
+
+    const none = composeBook(entries, normalizeSettings(DEFAULT_SETTINGS), metrics);
+    ok(
+      none.sheets.every((sheet) => sheet.pages.every((page) => page.kind !== "notes")),
+      "a book that asked for no note pages printed some",
+    );
+
+    const shapes: Partial<typeof DEFAULT_SETTINGS>[] = [
+      {},
+      { columns: 1, rows: 1 },
+      { columns: 3, rows: 8, textScale: "compact" },
+      { columns: 3, rows: 8, textScale: "large", showBirthdays: true, showAnniversary: true },
+      { pageSize: "a4", cardStyle: "box", showPhotos: false },
+      { pageSize: "legal", textScale: "large", runningHeader: false, showPageNumbers: false },
+      { memberStyle: "detailed", showBirthdays: true, showAnniversary: true, rows: 5 },
+      { groupWholeFamily: false, showEmail: false, includeIndex: false },
+      { bookletOrder: true, includeCover: false },
+    ];
+
+    let checked = 0;
+    for (const shape of shapes) {
+      for (const notePages of [1, 4]) {
+        const without = composeBook(entries, normalizeSettings(shape), metrics);
+        const settings = normalizeSettings({ ...shape, notePages });
+        const book = composeBook(entries, settings, metrics);
+        const label = `${JSON.stringify(shape)} with ${notePages} note page(s)`;
+        const pages = book.sheets.flatMap((sheet) => sheet.pages).filter((p) => p.kind !== "blank");
+        const notes = pages.filter((page) => page.kind === "notes");
+
+        ok(notes.length === notePages, `${label}: printed ${notes.length} note pages`);
+        ok(
+          book.pageCount === without.pageCount + notePages,
+          `${label}: ${book.pageCount} pages, expected ${without.pageCount + notePages}`,
+        );
+        // At the very back: every note page numbered after every other page.
+        const lastOther = Math.max(
+          0,
+          ...pages.filter((p) => p.kind !== "notes").map((p) => p.number),
+        );
+        ok(
+          notes.every((page) => page.number > lastOther),
+          `${label}: a note page landed in front of the book it belongs to`,
+        );
+        // Every blank record has at least a name to write in.
+        const names = notes.flatMap((page) => page.runs).filter((run) => run.text === "NAME");
+        ok(
+          names.length === notePages * settings.rows,
+          `${label}: ${names.length} places to write a name, expected ${notePages * settings.rows}`,
+        );
+
+        const inside = (
+          x: number,
+          y: number,
+          w: number,
+          h: number,
+          box: (typeof notes)[0]["box"],
+        ) =>
+          x >= box.x - 0.01 &&
+          y >= box.y - 0.01 &&
+          x + w <= box.x + box.w + 0.01 &&
+          y + h <= box.y + box.h + 0.01;
+        for (const page of notes) {
+          const off = [
+            ...page.runs.filter(
+              (run) =>
+                !inside(run.x, run.y, run.w, metrics.lineHeight(run.size), page.box) ||
+                metrics.widthOf(run.text, run.size, run.weight) > run.w + 0.01,
+            ),
+            ...page.rules.filter(
+              (rule) => !inside(rule.x, rule.y, rule.w, 0, page.box) || rule.w <= 0,
+            ),
+            ...page.fills.filter((fill) => !inside(fill.x, fill.y, fill.w, fill.h, page.box)),
+          ];
+          ok(
+            off.length === 0,
+            `${label}: ${off.length} thing(s) drawn off note page ${page.number}`,
+          );
+        }
+        checked += 1;
+      }
+    }
+
+    const stored = [
+      [-3, 0],
+      [2.6, 3],
+      [99, NOTE_PAGES_MAX],
+      ["4", 0],
+      [null, 0],
+    ] as const;
+    const read = stored.filter(
+      ([given, want]) => normalizeSettings({ notePages: given }).notePages === want,
+    );
+    ok(read.length === stored.length, `${stored.length - read.length} note page count(s) misread`);
+    console.log(`note pages: ${checked} book shapes carry them at the back, on the paper`);
+  }
+
   // -------------------------------------------------------------------------
   // Measuring text is cached, and a cache that returns a wrong width would not
   // throw - it would set a line slightly off and print it that way. So compose
@@ -1071,6 +1182,7 @@ async function main() {
       { columns: 3, rows: 8, textScale: "compact" },
       { bookletOrder: true, includeCover: false },
       { includeIndex: false, showPhotos: false, cardStyle: "box" },
+      { notePages: 3, rows: 6, showBirthdays: true, showAnniversary: true },
       { memberStyle: "detailed", showBirthdays: true, showAnniversary: true, textScale: "large" },
       { pageSize: "a4", showLetterTabs: false, runningHeader: false, showPageNumbers: false },
       { pageSize: "legal", footerText: "For the congregation", photoFit: "fit" },
