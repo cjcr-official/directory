@@ -58,6 +58,7 @@ import { labelledHouseholdName, message } from "@/lib/format";
 import { getPhotoUrls, removePhoto, uploadPhoto } from "@/lib/photos";
 import { CoverCanvas, type MovableParts } from "@/components/BookPreview";
 import { composeCoverPage } from "@/lib/layout/compose";
+import { readGuides, rememberGuides } from "@/lib/layout/guides";
 import { tagsPerSheet } from "@/lib/layout/tags";
 import { TYPEFACE_LABELS, loadMetrics, type Metrics } from "@/lib/layout/metrics";
 import { PhotoInput } from "@/components/PhotoInput";
@@ -348,6 +349,12 @@ export function ProjectEditPage() {
    */
   const placedRef = useRef<CoverPlacements>({});
   placedRef.current = coverPage?.placed ?? {};
+  /* The same, for what each part's ink covers - what the guides centre. */
+  const boxesRef = useRef<NonNullable<typeof coverPage>["boxes"]>({});
+  boxesRef.current = coverPage?.boxes ?? {};
+
+  /** Whether the centring guides are drawn, and pull a dragged part onto them. */
+  const [guides, setGuides] = useState(readGuides);
 
   /**
    * One part of the cover, moved or resized from where it is drawn now.
@@ -384,6 +391,7 @@ export function ProjectEditPage() {
             onMove: (part, dx, dy) =>
               place(part, (from) => ({ ...from, dx: from.dx + dx, dy: from.dy + dy })),
             onResize: (part, by) => place(part, (from) => ({ ...from, scale: from.scale * by })),
+            box: (part) => boxesRef.current[part as CoverPart],
           }
         : undefined,
     [canEdit, place],
@@ -1330,6 +1338,18 @@ export function ProjectEditPage() {
             <section className="card" aria-labelledby="book-preview">
               <div className="card-head">
                 <h2 id="book-preview">Cover preview</h2>
+                {canEdit && coverPage ? (
+                  <div className="cover-guides-toggle">
+                    <Checkbox
+                      label="Centring guides"
+                      checked={guides}
+                      onChange={(on) => {
+                        setGuides(on);
+                        rememberGuides(on);
+                      }}
+                    />
+                  </div>
+                ) : null}
               </div>
               <div className="card-body">
                 {coverPage ? (
@@ -1342,6 +1362,7 @@ export function ProjectEditPage() {
                       typeface={coverPage.typeface}
                       editable={editableCover}
                       movable={movableCover}
+                      guides={guides}
                     />
                     {/* Two facts rather than a sentence: which paper, and the
                         face it is set in. That it redraws as you type is
@@ -1354,7 +1375,8 @@ export function ProjectEditPage() {
                           Click a line to change its words, or drag it to move it — on a phone, hold
                           it a moment first. Pictures move the same way, and a picture's corner
                           makes it bigger. The handle beside a part moves it too, and answers the
-                          arrow keys.
+                          arrow keys. With the centring guides on, a part dragged near the middle of
+                          the page snaps onto it.
                         </span>
                       ) : null}
                       {canEdit && moved.length ? (
