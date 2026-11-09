@@ -1695,7 +1695,8 @@ async function main() {
         id: `s${i}`,
         role: `Role number ${i + 1}`,
         people: [{ personId: null, name: `Staff member ${i + 1}` }],
-        lines: "someone@example.org\n(406) 555-0100\nMonday to Thursday, mornings only",
+        lines: "someone@example.org\n(406) 555-0100",
+        hours: "Monday to Thursday, mornings only",
       }));
       const back = composeBook(
         entries,
@@ -1720,6 +1721,7 @@ async function main() {
         role: "Senior Pastor",
         people: [{ personId: null, name: "Jason Siebert" }],
         lines: "",
+        hours: "",
       });
       ok(
         JSON.stringify(one.strong) === JSON.stringify(["Jason Siebert, Senior Pastor"]),
@@ -1733,12 +1735,14 @@ async function main() {
           { personId: null, name: "Melissa Bishop" },
         ],
         lines: " office@example.org \n\n(406) 826-3916",
+        hours: " (Monday—Thursday) ",
       });
+      // The office hours print last, under the email and phone.
       ok(
         JSON.stringify(two) ===
           JSON.stringify({
             strong: ["Anne Siebert & Melissa Bishop", "Office Assistants"],
-            plain: ["office@example.org", "(406) 826-3916"],
+            plain: ["office@example.org", "(406) 826-3916", "(Monday—Thursday)"],
           }),
         `two people printed as ${JSON.stringify(two)}`,
       );

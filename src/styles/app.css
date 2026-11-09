@@ -6084,5 +6084,5 @@ body.moving-a-part {
 
 /* "Fill from …'s record", under a staff entry's lines. */
 .staff-fill {
-  margin-top: -6px;
+  margin: -6px 0 14px;
 }

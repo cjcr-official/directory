@@ -1114,6 +1114,7 @@ console.log("\na directory's back cover comes back with it");
         role: "Senior Pastor",
         people: [{ personId: "p1", name: "Ann Smith" }],
         lines: "pastor@example.org\n(406) 555-0100",
+        hours: "(Monday - Thursday)",
       },
     ],
     backQrLink: "https://example.org",

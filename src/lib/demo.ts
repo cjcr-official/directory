@@ -421,13 +421,15 @@ export function demoStaff(demo: DemoData): StaffEntry[] {
       id: "demo-pastor",
       role: "Senior Pastor",
       people: [pick(0)],
-      lines: "pastor@example.org\n(216) 555-0142\n(Monday - Thursday)",
+      lines: "pastor@example.org\n(216) 555-0142",
+      hours: "(Monday - Thursday)",
     },
     {
       id: "demo-office",
       role: "Office Assistants",
       people: [pick(5), pick(9)],
       lines: "office@example.org\n(216) 555-0142",
+      hours: "",
     },
   ];
 }
