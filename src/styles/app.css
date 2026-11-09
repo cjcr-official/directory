@@ -5889,7 +5889,6 @@ body.moving-a-part {
 .person-option + .person-option {
   margin-top: 1px;
 }
-.person-option:hover,
 .person-option.active {
   background: var(--accent-soft);
 }
@@ -6036,4 +6035,48 @@ body.moving-a-part {
   display: flex;
   justify-content: flex-end;
   margin-top: 10px;
+}
+
+/* The groups at the top of the person picker, as pills on a line or two. */
+.person-option-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 8px 10px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+}
+.person-group-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.person-group-pill {
+  cursor: pointer;
+  font-size: 0.86rem;
+  padding: 5px 12px;
+  background: var(--canvas);
+  border-color: var(--line);
+  color: var(--ink-2);
+  min-height: 34px;
+}
+.person-group-pill.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+/* Hover only where there is a pointer that hovers. A phone keeps :hover on
+   whatever was last tapped, which lit a second row beside the chosen one. */
+@media (hover: hover) {
+  .person-option:hover {
+    background: var(--accent-soft);
+  }
+  .person-group-pill:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent-deep);
+  }
+}
+.leader-chip .leader-badge {
+  margin-left: 6px;
 }
