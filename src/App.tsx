@@ -20,7 +20,6 @@ import { PeoplePage } from "@/pages/PeoplePage";
 import { PersonEditPage } from "@/pages/PersonEditPage";
 import { GroupsPage } from "@/pages/GroupsPage";
 import { ProjectsPage } from "@/pages/ProjectsPage";
-import { ProjectEditPage } from "@/pages/ProjectEditPage";
 import { ProjectPreviewPage } from "@/pages/ProjectPreviewPage";
 import { TagsEditPage } from "@/pages/TagsEditPage";
 import { AdministratorsPage } from "@/pages/AdministratorsPage";
@@ -52,6 +51,18 @@ const MailchimpPage = lazy(() =>
 );
 const ComposePage = lazy(() =>
   import("@/pages/ComposePage").then((module) => ({ default: module.ComposePage })),
+);
+
+/**
+ * A directory's own form, the same way again.
+ *
+ * It carries the cover editor and the leadership page's editor - opened to set
+ * a book up before a print run, not on a visit to look somebody up. Moved out
+ * when the leadership page's groups took the first load 0.2 kB over its
+ * budget, with the deploy refusing to go.
+ */
+const ProjectEditPage = lazy(() =>
+  import("@/pages/ProjectEditPage").then((module) => ({ default: module.ProjectEditPage })),
 );
 
 /**
@@ -170,8 +181,22 @@ function Protected() {
               <Route path="projects" element={<ProjectsPage />} />
               <Route path="tags" element={<ProjectsPage tags />} />
               <Route path="tags/:id" element={<TagsEditPage />} />
-              <Route path="projects/new" element={<ProjectEditPage />} />
-              <Route path="projects/:id" element={<ProjectEditPage />} />
+              <Route
+                path="projects/new"
+                element={
+                  <Suspense fallback={<LoadingScreen label="Loading directory…" />}>
+                    <ProjectEditPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="projects/:id"
+                element={
+                  <Suspense fallback={<LoadingScreen label="Loading directory…" />}>
+                    <ProjectEditPage />
+                  </Suspense>
+                }
+              />
               <Route path="settings" element={<SettingsPage />} />
               <Route
                 path="backup"
