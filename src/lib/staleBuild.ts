@@ -119,8 +119,47 @@ export function reloadForStaleBuild(): boolean {
     // attemptedRecently answers true when storage will not answer, so this is
     // only reached where writing is possible; a throw here is still survivable.
   }
-  window.location.reload();
+  reloadFresh();
   return true;
+}
+
+/**
+ * The query parameter a fresh reload carries, and public/boot.js uses too.
+ *
+ * Kept in step with boot.js by hand: that file runs before any of this is
+ * loaded, which is the whole point of it, so it cannot import the name.
+ */
+export const FRESH_PARAM = "fresh";
+
+/**
+ * Reloads the page from the server, not from anything that kept a copy of it.
+ *
+ * `location.reload()` asks again for the very address it is on, and whatever
+ * cached that address - the phone, an app on the Home Screen, anything between
+ * here and Cloudflare - can hand back the same old page. A phone on the Home
+ * Screen was found doing exactly that: told there was a new version, reloading
+ * onto the old one, and then, as UpdateGate is written to, giving up - left a
+ * fortnight and two deploys behind. An address with a tag nobody has asked for
+ * before cannot be in any cache, so it has to come from the server; the tag is
+ * taken off again as the app starts (see forgetFreshParam).
+ */
+export function reloadFresh(tag: string = Date.now().toString(36)): void {
+  const url = new URL(window.location.href);
+  url.searchParams.set(FRESH_PARAM, tag);
+  window.location.replace(url.toString());
+}
+
+/**
+ * Takes the tag a fresh reload left behind off the address bar.
+ *
+ * Before the router reads the address, so nothing in the app ever sees it,
+ * and with replaceState, so Back does not walk through it either.
+ */
+export function forgetFreshParam(): void {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has(FRESH_PARAM)) return;
+  url.searchParams.delete(FRESH_PARAM);
+  window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
 }
 
 /**

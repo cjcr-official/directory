@@ -64,6 +64,9 @@
                form-action 'self'"
     />
     <title>Church Directory</title>
+    <!-- Before the app, and outside it: if the app's own scripts fail to load,
+         nothing in them can notice. See public/boot.js. -->
+    <script src="/boot.js"></script>
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232f6d63'/%3E%3Cpath d='M14 6h4v6h6v4h-6v10h-4V16H8v-4h6z' fill='white'/%3E%3C/svg%3E"

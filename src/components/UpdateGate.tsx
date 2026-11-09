@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Logo } from "@/components/Logo";
 import { APP_VERSION, fetchDeployedVersion } from "@/lib/version";
+import { reloadFresh } from "@/lib/staleBuild";
 
 const CHECK_INTERVAL_MS = 10 * 60 * 1000;
 /** Long enough that the screen reads as an answer rather than a flicker. */
@@ -143,11 +144,13 @@ export function UpdateGate() {
     setUpdating(true);
   }, []);
 
+  // Fresh rather than a plain reload: a plain reload can be answered with the
+  // same cached page it is trying to leave - see reloadFresh.
   useEffect(() => {
     if (!updating) return;
-    const timer = window.setTimeout(() => window.location.reload(), SHOW_SCREEN_MS);
+    const timer = window.setTimeout(() => reloadFresh(pending ?? undefined), SHOW_SCREEN_MS);
     return () => clearTimeout(timer);
-  }, [updating]);
+  }, [updating, pending]);
 
   // The preview renders a book and the backup builds a zip file; neither is a
   // form, and neither should be interrupted halfway. Settings is here for the
