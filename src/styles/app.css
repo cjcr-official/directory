@@ -5747,7 +5747,7 @@ body.moving-a-part {
 
 .leader-explain {
   display: block;
-  margin: 0 0 12px;
+  margin: 14px 0 12px;
 }
 
 .leader-sections {
@@ -5824,9 +5824,7 @@ body.moving-a-part {
   flex-basis: auto;
 }
 
-/* The groups that can go on the leadership page, ticked rather than typed.
-   Two across where there is room: a church has a handful of groups and a
-   column of them one under another is mostly empty space. */
+/* The groups that can go on the leadership page, as pills rather than typed. */
 .leader-groups {
   border: none;
   margin: 14px 0 0;
@@ -5841,11 +5839,6 @@ body.moving-a-part {
 .leader-groups .hint {
   display: block;
   margin: 0 0 8px;
-}
-.leader-group-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 2px 16px;
 }
 
 /* A group in the list is marked by a stripe in the accent: it is the one kind
