@@ -1522,6 +1522,39 @@ async function main() {
       );
     }
 
+    // An office held by a group as a whole - Food Services, by the
+    // deaconesses - prints as the group's name, follows a rename, and keeps
+    // the last name it had if the group goes.
+    {
+      const stored = normalizeLeadership([
+        {
+          id: "food",
+          title: "Food Services",
+          people: [{ personId: null, groupId: "g-dcn", name: "Deaconess" }],
+        },
+      ]);
+      ok(stored[0].people[0].groupId === "g-dcn", "an office's group was dropped when read back");
+      const renamed = currentLeadership(
+        stored,
+        new Map(),
+        new Map([["g-dcn", { name: "Deaconess Team", members: [] }]]),
+      );
+      ok(renamed[0].people[0].name === "Deaconess Team", "an office's group kept its old name");
+      const gone = currentLeadership(renamed, new Map(), new Map());
+      ok(gone === renamed, "an office whose group was deleted changed");
+      const texts = leadershipOf(
+        composeBook(
+          entries,
+          normalizeSettings({ includeLeadership: true, leadership: gone }),
+          metrics,
+        ),
+      ).flatMap((page) => page.runs.map((run) => run.text));
+      ok(
+        texts.includes("Food Services") && texts.includes("Deaconess Team"),
+        "an office held by a group did not print as the group's name",
+      );
+    }
+
     console.log(
       `leadership page: ${checked} book shapes put it after the cover, every leader once, on the paper`,
     );

@@ -227,6 +227,7 @@ export function LeadershipEditor({
                         key={section.id}
                         section={section}
                         exists={exists}
+                        groups={groups}
                         onOpen={() => {
                           setFreshId(null);
                           setOpenId(section.id);
@@ -237,7 +238,12 @@ export function LeadershipEditor({
                   return section.groupId ? (
                     <GroupRow key={section.id} {...common} exists={exists} />
                   ) : (
-                    <OfficeEditor key={section.id} {...common} fresh={section.id === freshId} />
+                    <OfficeEditor
+                      key={section.id}
+                      {...common}
+                      groups={groups}
+                      fresh={section.id === freshId}
+                    />
                   );
                 })}
               </ol>
@@ -378,6 +384,17 @@ function GroupRow({
   );
 }
 
+/** A person, or a group, an office was given that the directory no longer has. */
+function leaderGone(
+  leader: Leader,
+  personById: ReadonlyMap<string, unknown>,
+  groups: ReadonlyMap<string, LeaderGroup>,
+): boolean {
+  if (leader.personId) return !personById.has(leader.personId);
+  if (leader.groupId) return !groups.has(leader.groupId);
+  return false;
+}
+
 /**
  * An office or group closed down to one line: what it is called and who holds
  * it, the whole line a button that opens it. Somebody who has left the
@@ -387,17 +404,18 @@ function GroupRow({
 function SectionLine({
   section,
   exists,
+  groups,
   onOpen,
 }: {
   section: LeadershipSection;
   exists: boolean;
+  groups: ReadonlyMap<string, LeaderGroup>;
   onOpen: () => void;
 }) {
   const { personById } = useDirectory();
   const title = sectionTitle(section);
   const names = section.people.map((leader) => leader.name);
-  const gone =
-    !exists || section.people.some((leader) => leader.personId && !personById.has(leader.personId));
+  const gone = !exists || section.people.some((leader) => leaderGone(leader, personById, groups));
   return (
     <li className={`leader-line${section.groupId ? " is-group" : ""}`}>
       <button type="button" className="leader-line-button" aria-expanded={false} onClick={onOpen}>
@@ -426,6 +444,7 @@ function SectionLine({
 /** One office: its name, who holds it, and the box that adds to them. */
 function OfficeEditor({
   section,
+  groups,
   onDone,
   fresh = false,
   first,
@@ -436,6 +455,8 @@ function OfficeEditor({
   onRemove,
 }: {
   section: LeadershipSection;
+  /** Every group, for an office held by one as a whole. */
+  groups: ReadonlyMap<string, LeaderGroup>;
   /** Just added with the button: the caret goes straight to its name. */
   fresh?: boolean;
   first: boolean;
@@ -454,6 +475,8 @@ function OfficeEditor({
   const add = (leader: Leader) =>
     onChange((current) => {
       if (leader.personId && current.people.some((other) => other.personId === leader.personId))
+        return current;
+      if (leader.groupId && current.people.some((other) => other.groupId === leader.groupId))
         return current;
       return {
         ...current,
@@ -514,20 +537,24 @@ function OfficeEditor({
       {section.people.length ? (
         <ul className="leader-chips">
           {section.people.map((leader, index) => {
-            const gone = !!leader.personId && !personById.has(leader.personId);
+            const gone = leaderGone(leader, personById, groups);
+            const typed = !leader.personId && !leader.groupId;
             return (
               <li
-                key={`${leader.personId ?? "typed"}:${leader.name}:${index}`}
-                className={`leader-chip${gone ? " gone" : ""}${leader.personId ? "" : " typed"}`}
+                key={`${leader.personId ?? leader.groupId ?? "typed"}:${leader.name}:${index}`}
+                className={`leader-chip${gone ? " gone" : ""}${typed ? " typed" : ""}`}
                 title={
                   gone
                     ? "No longer in the directory — prints as saved"
-                    : leader.personId
-                      ? undefined
-                      : "Typed in"
+                    : leader.groupId
+                      ? "A group — prints as its name"
+                      : typed
+                        ? "Typed in"
+                        : undefined
                 }
               >
                 <span>{leader.name}</span>
+                {leader.groupId ? <span className="leader-badge">Group</span> : null}
                 {disabled ? null : (
                   <button
                     type="button"
@@ -549,9 +576,9 @@ function OfficeEditor({
       ) : (
         <p className="muted small leader-empty">Nobody yet — this office is left off the page.</p>
       )}
-      {section.people.some((leader) => leader.personId && !personById.has(leader.personId)) ? (
+      {section.people.some((leader) => leaderGone(leader, personById, groups)) ? (
         <p className="small leader-gone leader-empty">
-          Somebody here is no longer in the directory, and prints as they were saved.
+          Somebody here, or a group, is no longer in the directory, and prints as saved.
         </p>
       ) : null}
 
@@ -559,7 +586,9 @@ function OfficeEditor({
         <PersonPicker
           label={label}
           taken={section.people}
+          groups={groups}
           onPick={(person) => add({ personId: person.id, name: leaderName(person) })}
+          onPickGroup={(id, group) => add({ personId: null, groupId: id, name: group.name })}
           onType={(name) => add({ personId: null, name })}
         />
       )}
@@ -591,17 +620,23 @@ const PICKER_LIMIT = 80;
 function PersonPicker({
   label,
   taken,
+  groups,
   onPick,
+  onPickGroup,
   onType,
 }: {
   /** What the office is called, for the box's name read aloud. */
   label: string;
   /** Who is already in the office, and so is not offered again. */
   taken: Leader[];
+  /** Every group, for an office held by one as a whole. */
+  groups: ReadonlyMap<string, LeaderGroup>;
   onPick: (person: PersonRow) => void;
+  onPickGroup: (id: string, group: LeaderGroup) => void;
   onType: (words: string) => void;
 }) {
-  const { people, householdById } = useDirectory();
+  const { people, householdById, tags } = useDirectory();
+  const colourOf = useMemo(() => new Map(tags.map((tag) => [tag.id, tag.color])), [tags]);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -640,15 +675,36 @@ function PersonPicker({
     };
   }, [filed, query, taken]);
 
-  /** The rows in order, the typed words last. */
-  const options = words ? [...shown, null] : shown;
+  /** Groups whose name has what was typed in it, not already holding this office. */
+  const groupsShown = useMemo(() => {
+    const needle = sortKey(query);
+    const already = new Set(taken.map((leader) => leader.groupId).filter(Boolean));
+    return [...groups.entries()]
+      .filter(
+        ([id, group]) => !already.has(id) && (!needle || sortKey(group.name).includes(needle)),
+      )
+      .sort(([, a], [, b]) => a.name.localeCompare(b.name));
+  }, [groups, query, taken]);
+
+  /** Everything that can be chosen, in the order it is drawn: groups, people, the typed words. */
+  type Option =
+    | { kind: "group"; id: string; group: LeaderGroup }
+    | { kind: "person"; person: PersonRow }
+    | { kind: "typed" };
+  const options: Option[] = [
+    ...groupsShown.map(([id, group]) => ({ kind: "group" as const, id, group })),
+    ...shown.map((person) => ({ kind: "person" as const, person })),
+    ...(words ? [{ kind: "typed" as const }] : []),
+  ];
   const current = Math.min(active, options.length - 1);
+  const groupCount = groupsShown.length;
 
   const choose = (index: number) => {
     const option = options[index];
     if (option === undefined) return;
-    if (option === null) onType(words);
-    else onPick(option);
+    if (option.kind === "typed") onType(words);
+    else if (option.kind === "group") onPickGroup(option.id, option.group);
+    else onPick(option.person);
     setQuery("");
     setActive(0);
     setOpen(false);
@@ -667,7 +723,7 @@ function PersonPicker({
         aria-controls={listId}
         aria-autocomplete="list"
         aria-activedescendant={open && options.length ? optionId(current) : undefined}
-        placeholder="Add a person — tap or type…"
+        placeholder="Add a person or group…"
         autoComplete="off"
         value={query}
         onFocus={() => {
@@ -716,7 +772,35 @@ function PersonPicker({
           // Keeps the caret in the box while a row is pressed with a mouse.
           onMouseDown={(event) => event.preventDefault()}
         >
-          {shown.map((person, index) => {
+          {groupCount ? (
+            // A group holds an office as a whole - the deaconesses doing the
+            // food - and prints as the group's name. As pills, the way groups
+            // are picked everywhere else, so a dozen of them are a few lines
+            // at the top rather than a screen to scroll past to reach people.
+            <li role="group" aria-label="Groups" className="person-option-groups">
+              <span className="muted small">Groups</span>
+              <span className="person-group-pills">
+                {groupsShown.map(([id, group], index) => (
+                  <span
+                    key={id}
+                    id={optionId(index)}
+                    role="option"
+                    aria-selected={index === current}
+                    className={`pill person-group-pill${index === current ? " active" : ""}`}
+                    onClick={() => choose(index)}
+                  >
+                    <span
+                      className="dot"
+                      style={{ background: colourOf.get(id) ?? "var(--accent)" }}
+                    />
+                    {group.name}
+                  </span>
+                ))}
+              </span>
+            </li>
+          ) : null}
+          {shown.map((person, at) => {
+            const index = groupCount + at;
             const home = person.household_id ? householdById.get(person.household_id) : null;
             return (
               <li
@@ -737,22 +821,22 @@ function PersonPicker({
               {more} more — type a few letters of a name to find them.
             </li>
           ) : null}
-          {!shown.length && !words ? (
+          {!shown.length && !groupCount && !words ? (
             <li className="person-option-more muted small" aria-hidden="true">
               Everybody in the directory is already here.
             </li>
           ) : null}
           {words ? (
             <li
-              id={optionId(shown.length)}
+              id={optionId(options.length - 1)}
               role="option"
-              aria-selected={current === shown.length}
-              className={`person-option typed${current === shown.length ? " active" : ""}`}
-              onClick={() => choose(shown.length)}
+              aria-selected={current === options.length - 1}
+              className={`person-option typed${current === options.length - 1 ? " active" : ""}`}
+              onClick={() => choose(options.length - 1)}
             >
               <span className="person-option-name">“{words}”</span>
               <span className="muted small">
-                {shown.length
+                {shown.length || groupCount
                   ? "Or print these words as they are"
                   : "Nobody by that name — print these words as they are"}
               </span>

@@ -29,9 +29,17 @@
 
 /** One name under an office. */
 export interface Leader {
-  /** The person in the directory, or null for words typed in. */
+  /** The person in the directory, or null for a group or words typed in. */
   personId: string | null;
-  /** What prints. Kept up to date from the directory while the person is in it. */
+  /**
+   * A group holding the office as a whole - Food Services, held by the
+   * deaconesses - printed as the group's name. Absent or null otherwise.
+   */
+  groupId?: string | null;
+  /**
+   * What prints. Kept up to date from the directory while the person, or the
+   * group, is in it.
+   */
   name: string;
 }
 
@@ -98,9 +106,11 @@ export function normalizeLeadership(raw: unknown): LeadershipSection[] {
         const leader = entry as Record<string, unknown>;
         const personId =
           typeof leader.personId === "string" && leader.personId ? leader.personId : null;
+        const groupId =
+          !personId && typeof leader.groupId === "string" && leader.groupId ? leader.groupId : null;
         const name = typeof leader.name === "string" ? leader.name.slice(0, TEXT_MAX) : "";
-        if (!personId && !name.trim()) continue;
-        people.push({ personId, name });
+        if (!personId && !groupId && !name.trim()) continue;
+        people.push(groupId ? { personId, groupId, name } : { personId, name });
       }
     }
 
@@ -264,7 +274,20 @@ export function currentLeadership(
   let changed = false;
   const next = withCurrentNames(sections, personById).map((section) => {
     const group = section.groupId ? groups.get(section.groupId) : undefined;
-    if (!group) return section;
+    if (!group) {
+      // An office held by a group as a whole prints under the group's name
+      // as it is now; a group that has gone keeps the name it was saved with.
+      let renamed = false;
+      const people = section.people.map((leader) => {
+        const holder = leader.groupId ? groups.get(leader.groupId) : undefined;
+        if (!holder || holder.name === leader.name) return leader;
+        renamed = true;
+        return { ...leader, name: holder.name };
+      });
+      if (!renamed) return section;
+      changed = true;
+      return { ...section, people };
+    }
     const same =
       group.name === section.groupName &&
       group.members.length === section.people.length &&
