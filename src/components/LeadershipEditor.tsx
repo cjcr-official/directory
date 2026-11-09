@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useDirectory } from "@/data/DirectoryContext";
-import { Checkbox, Field } from "@/components/ui";
+import { Caret, Checkbox, Field } from "@/components/ui";
 import { TagPicker } from "@/components/TagPicker";
 import { sortKey } from "@/lib/format";
 import {
@@ -10,6 +10,7 @@ import {
   STARTER_SECTIONS,
   leaderName,
   newSectionId,
+  sectionTitle,
   type Leader,
   type LeaderGroup,
   type LeadershipSection,
@@ -90,6 +91,12 @@ export function LeadershipEditor({
   const onPage = new Set(sections.map((section) => section.groupId).filter(Boolean));
   /** The office the button made a moment ago, so its name box can take the caret. */
   const [freshId, setFreshId] = useState<string | null>(null);
+  /**
+   * The one office open for changing. The rest are a line each - its name and
+   * who holds it - because every office open at once, a row per person and a
+   * search box apiece, made a church's ordinary list several screens long.
+   */
+  const [openId, setOpenId] = useState<string | null>(null);
   const groupList = [...groups.entries()].sort(([, a], [, b]) => a.name.localeCompare(b.name));
   const { tags } = useDirectory();
   /** The directory's groups as pills, in the same order as the list above. */
@@ -191,44 +198,48 @@ export function LeadershipEditor({
             ) : null}
 
             <p className="hint leader-explain">
-              Offices that aren't a group — Treasurer, Facilities Manager — are added below. One
-              person prints on a line of its own, “Treasurer ……… Kim Feiro”; two or more print under
-              a heading, in two columns. Anything with nobody in it is left off the page.
+              Tap a line to change it. Offices that aren't a group — Treasurer, Facilities Manager —
+              are added with the button underneath. One person prints on a line of its own; two or
+              more print under a heading. Anything with nobody in it is left off.
             </p>
 
             {sections.length ? (
               <ol className="leader-sections">
-                {sections.map((section, index) =>
-                  section.groupId ? (
-                    <GroupRow
-                      key={section.id}
-                      section={section}
-                      exists={groups.has(section.groupId)}
-                      first={index === 0}
-                      last={index === sections.length - 1}
-                      disabled={disabled}
-                      onChange={(change) => update(section.id, change)}
-                      onMove={(by) => setSections(shift(sections, index, by))}
-                      onRemove={() =>
-                        setSections(sections.filter((other) => other.id !== section.id))
-                      }
-                    />
+                {sections.map((section, index) => {
+                  const common = {
+                    section,
+                    first: index === 0,
+                    last: index === sections.length - 1,
+                    disabled,
+                    onChange: (change: (section: LeadershipSection) => LeadershipSection) =>
+                      update(section.id, change),
+                    onMove: (by: -1 | 1) => setSections(shift(sections, index, by)),
+                    onRemove: () => {
+                      setOpenId(null);
+                      setSections(sections.filter((other) => other.id !== section.id));
+                    },
+                    onDone: () => setOpenId(null),
+                  };
+                  const exists = !section.groupId || groups.has(section.groupId);
+                  if (openId !== section.id) {
+                    return (
+                      <SectionLine
+                        key={section.id}
+                        section={section}
+                        exists={exists}
+                        onOpen={() => {
+                          setFreshId(null);
+                          setOpenId(section.id);
+                        }}
+                      />
+                    );
+                  }
+                  return section.groupId ? (
+                    <GroupRow key={section.id} {...common} exists={exists} />
                   ) : (
-                    <OfficeEditor
-                      key={section.id}
-                      section={section}
-                      fresh={section.id === freshId}
-                      first={index === 0}
-                      last={index === sections.length - 1}
-                      disabled={disabled}
-                      onChange={(change) => update(section.id, change)}
-                      onMove={(by) => setSections(shift(sections, index, by))}
-                      onRemove={() =>
-                        setSections(sections.filter((other) => other.id !== section.id))
-                      }
-                    />
-                  ),
-                )}
+                    <OfficeEditor key={section.id} {...common} fresh={section.id === freshId} />
+                  );
+                })}
               </ol>
             ) : null}
 
@@ -241,6 +252,7 @@ export function LeadershipEditor({
                   onClick={() => {
                     const made = office("");
                     setFreshId(made.id);
+                    setOpenId(made.id);
                     setSections([...sections, made]);
                   }}
                 >
@@ -266,6 +278,7 @@ export function LeadershipEditor({
  */
 function GroupRow({
   section,
+  onDone,
   exists,
   first,
   last,
@@ -282,11 +295,13 @@ function GroupRow({
   onChange: (change: (section: LeadershipSection) => LeadershipSection) => void;
   onMove: (by: -1 | 1) => void;
   onRemove: () => void;
+  /** Closes it back to its one line. */
+  onDone: () => void;
 }) {
   const label = section.title.trim() || section.groupName || "this group";
   const names = section.people.map((leader) => leader.name);
   return (
-    <li className="leader-section is-group">
+    <li className="leader-section is-group is-open">
       <div className="leader-head">
         <input
           type="text"
@@ -354,6 +369,56 @@ function GroupRow({
           Nobody in this group yet — it is left off the page.
         </p>
       )}
+      <div className="leader-done">
+        <button type="button" className="btn small" onClick={onDone}>
+          Done
+        </button>
+      </div>
+    </li>
+  );
+}
+
+/**
+ * An office or group closed down to one line: what it is called and who holds
+ * it, the whole line a button that opens it. Somebody who has left the
+ * directory, or a group that has been deleted, is said here too - it is the
+ * one thing on a closed line that wants looking at.
+ */
+function SectionLine({
+  section,
+  exists,
+  onOpen,
+}: {
+  section: LeadershipSection;
+  exists: boolean;
+  onOpen: () => void;
+}) {
+  const { personById } = useDirectory();
+  const title = sectionTitle(section);
+  const names = section.people.map((leader) => leader.name);
+  const gone =
+    !exists || section.people.some((leader) => leader.personId && !personById.has(leader.personId));
+  return (
+    <li className={`leader-line${section.groupId ? " is-group" : ""}`}>
+      <button type="button" className="leader-line-button" aria-expanded={false} onClick={onOpen}>
+        <span className="leader-line-text">
+          <span className="leader-line-title">
+            {title || <span className="muted">Untitled office</span>}
+            {section.groupId ? <span className="leader-badge">Group</span> : null}
+          </span>
+          <span className={`leader-line-names${names.length ? "" : " muted"}`}>
+            {names.length
+              ? names.join(", ")
+              : section.groupId
+                ? "Nobody in this group yet"
+                : "Nobody yet — left off the page"}
+          </span>
+          {gone ? (
+            <span className="leader-line-names leader-gone">Needs a look — tap to see why</span>
+          ) : null}
+        </span>
+        <Caret className="leader-line-mark" />
+      </button>
     </li>
   );
 }
@@ -361,6 +426,7 @@ function GroupRow({
 /** One office: its name, who holds it, and the box that adds to them. */
 function OfficeEditor({
   section,
+  onDone,
   fresh = false,
   first,
   last,
@@ -378,8 +444,10 @@ function OfficeEditor({
   onChange: (change: (section: LeadershipSection) => LeadershipSection) => void;
   onMove: (by: -1 | 1) => void;
   onRemove: () => void;
+  /** Closes it back to its one line. */
+  onDone: () => void;
 }) {
-  const { personById, householdById } = useDirectory();
+  const { personById } = useDirectory();
   const label = section.title.trim() || "this office";
   const full = section.people.length >= LEADERS_PER_SECTION_MAX;
 
@@ -394,7 +462,7 @@ function OfficeEditor({
     });
 
   return (
-    <li className="leader-section">
+    <li className="leader-section is-open">
       <div className="leader-head">
         <input
           type="text"
@@ -444,61 +512,35 @@ function OfficeEditor({
       </div>
 
       {section.people.length ? (
-        <ul className="member-list leader-people">
+        <ul className="leader-chips">
           {section.people.map((leader, index) => {
-            const person = leader.personId ? personById.get(leader.personId) : undefined;
-            const home = person?.household_id ? householdById.get(person.household_id) : null;
-            const note = !leader.personId
-              ? "Typed in"
-              : !person
-                ? "No longer in the directory — prints as saved"
-                : (home?.display_name ?? "");
+            const gone = !!leader.personId && !personById.has(leader.personId);
             return (
               <li
                 key={`${leader.personId ?? "typed"}:${leader.name}:${index}`}
-                className="member-row"
+                className={`leader-chip${gone ? " gone" : ""}${leader.personId ? "" : " typed"}`}
+                title={
+                  gone
+                    ? "No longer in the directory — prints as saved"
+                    : leader.personId
+                      ? undefined
+                      : "Typed in"
+                }
               >
-                <div className="member-name">
-                  <div style={{ fontWeight: 600 }}>{leader.name}</div>
-                  {note ? (
-                    <div
-                      className={leader.personId && !person ? "small leader-gone" : "muted small"}
-                    >
-                      {note}
-                    </div>
-                  ) : null}
-                </div>
+                <span>{leader.name}</span>
                 {disabled ? null : (
-                  <div className="leader-tools">
-                    <button
-                      type="button"
-                      className="btn ghost small"
-                      aria-label={`Move ${leader.name} up`}
-                      title="Move up"
-                      disabled={index === 0}
-                      onClick={() =>
-                        onChange((current) => ({
-                          ...current,
-                          people: shift(current.people, index, -1),
-                        }))
-                      }
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      className="btn ghost small danger-hover"
-                      aria-label={`Take ${leader.name} off ${label}`}
-                      onClick={() =>
-                        onChange((current) => ({
-                          ...current,
-                          people: current.people.filter((_, i) => i !== index),
-                        }))
-                      }
-                    >
-                      Remove
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    aria-label={`Take ${leader.name} off ${label}`}
+                    onClick={() =>
+                      onChange((current) => ({
+                        ...current,
+                        people: current.people.filter((_, i) => i !== index),
+                      }))
+                    }
+                  >
+                    ×
+                  </button>
                 )}
               </li>
             );
@@ -507,6 +549,11 @@ function OfficeEditor({
       ) : (
         <p className="muted small leader-empty">Nobody yet — this office is left off the page.</p>
       )}
+      {section.people.some((leader) => leader.personId && !personById.has(leader.personId)) ? (
+        <p className="small leader-gone leader-empty">
+          Somebody here is no longer in the directory, and prints as they were saved.
+        </p>
+      ) : null}
 
       {disabled || full ? null : (
         <PersonPicker
@@ -516,6 +563,11 @@ function OfficeEditor({
           onType={(name) => add({ personId: null, name })}
         />
       )}
+      <div className="leader-done">
+        <button type="button" className="btn small" onClick={onDone}>
+          Done
+        </button>
+      </div>
     </li>
   );
 }
