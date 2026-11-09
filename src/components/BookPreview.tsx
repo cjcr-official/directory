@@ -8,6 +8,7 @@ import {
   type TextRun,
 } from "@/lib/layout/compose";
 import { CSS_FONT_STACKS, type Typeface } from "@/lib/layout/metrics";
+import { NOT_SNAPPED, snapToCentre, type Snapped } from "@/lib/layout/guides";
 
 interface Props {
   book: BookModel;
@@ -84,12 +85,27 @@ export interface MovableParts {
   onMove: (part: string, dx: number, dy: number) => void;
   /** A multiple of the size the picture is drawn at now. Pictures only. */
   onResize: (part: string, by: number) => void;
+  /**
+   * The ink of a part where it is drawn now, in points. What the centring
+   * guides measure a dragged part's middle against; without it a drag is
+   * never pulled onto them.
+   */
+  box?: (part: string) => Box | undefined;
 }
 
 /** The same, once the canvas has said what it is scaled to. */
 interface Moving extends MovableParts {
   /** Screen pixels into points on the paper. */
   points: (px: number) => number;
+  /**
+   * One drag of one part, from the pointer going down to it coming up.
+   *
+   * A drag that snaps has to remember where the pointer would have put the
+   * part had nothing pulled it: measured from where the part was left by the
+   * last frame instead, a part sitting on a guide would never come off it,
+   * because every small movement would be pulled straight back.
+   */
+  drag: (part: string) => { step: (dx: number, dy: number) => void; end: () => void };
 }
 
 /** How far a pointer may wander before it is dragging something rather than aiming at it. */
@@ -108,6 +124,9 @@ const HOLD_MS = 320;
 
 /** How far in from the edge of the paper the handles sit, in screen pixels. */
 const GRIP_INSET = 13;
+
+/** How near a guide a dragged part's middle has to come to be pulled onto it, in screen pixels. */
+const SNAP_REACH = 8;
 
 /** A nudge from the keyboard, in points, and the same with Shift held. */
 const NUDGE = 1;
@@ -133,7 +152,7 @@ const NUDGE_SCALE = 1.06;
 function dragFrom(
   event: React.PointerEvent,
   onMove: (dx: number, dy: number) => void,
-  options: { atOnce?: boolean } = {},
+  options: { atOnce?: boolean; onEnd?: () => void } = {},
 ): void {
   const from = event.currentTarget as HTMLElement;
   const finger = event.pointerType === "touch";
@@ -202,6 +221,7 @@ function dragFrom(
       settle();
     }
     document.body.classList.remove("moving-a-part");
+    options.onEnd?.();
     if (moved) swallowTheClick();
   }
 
@@ -215,6 +235,17 @@ function dragFrom(
 
   if (options.atOnce) begin();
   else if (finger) held = window.setTimeout(begin, HOLD_MS);
+}
+
+/** A drag of one part of the cover, snapping as it goes where the canvas has guides. */
+function dragPart(
+  event: React.PointerEvent,
+  moving: Moving,
+  part: string,
+  options: { atOnce?: boolean } = {},
+): void {
+  const drag = moving.drag(part);
+  dragFrom(event, drag.step, { ...options, onEnd: drag.end });
 }
 
 /**
@@ -290,9 +321,7 @@ function PartGrip({
            only on the cover for as long as it is being typed in would vanish
            from under the hand that reached for it. */
         event.preventDefault();
-        dragFrom(event, (dx, dy) => moving.onMove(part, moving.points(dx), moving.points(dy)), {
-          atOnce: true,
-        });
+        dragPart(event, moving, part, { atOnce: true });
       }}
       onKeyDown={(event) => {
         const by = nudgeFor(event.key, event.shiftKey ? NUDGE_FAR : NUDGE);
@@ -473,7 +502,7 @@ function EditableRun({
        is one of the things the handle is for. */
     onPointerDown: (event: React.PointerEvent) => {
       if (!moving || event.currentTarget.matches(":focus")) return;
-      dragFrom(event, (dx, dy) => moving.onMove(run.field, moving.points(dx), moving.points(dy)));
+      dragPart(event, moving, run.field);
     },
     style: {
       ...runStyle(run, fontStack),
@@ -584,12 +613,7 @@ function PagePhoto({ slot, url, moving }: { slot: PhotoSlot; url: string; moving
             h: event.currentTarget.naturalHeight,
           })
         }
-        onPointerDown={
-          move && part
-            ? (event) =>
-                dragFrom(event, (dx, dy) => move.onMove(part, move.points(dx), move.points(dy)))
-            : undefined
-        }
+        onPointerDown={move && part ? (event) => dragPart(event, move, part) : undefined}
         style={{
           position: "absolute",
           left: `${box.x}pt`,
@@ -872,6 +896,7 @@ export function CoverCanvas({
   typeface,
   editable,
   movable,
+  guides = false,
 }: {
   page: BookPage;
   width: number;
@@ -882,10 +907,18 @@ export function CoverCanvas({
   editable?: EditableRuns;
   /** Given, the parts the composer marked can be dragged about the page. */
   movable?: MovableParts;
+  /**
+   * Draw the lines down and across the middle of the paper, and pull a part
+   * dragged near one onto it. Only on a canvas whose parts move: on any other
+   * there is nothing to centre.
+   */
+  guides?: boolean;
 }) {
   const holder = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.5);
   const fontStack = CSS_FONT_STACKS[typeface] ?? CSS_FONT_STACKS.sans;
+  /** Which guide the part being dragged is sitting on, for the guide to light up. */
+  const [snapped, setSnapped] = useState<Snapped>(NOT_SNAPPED);
 
   /*
    * A drag speaks in screen pixels and the paper is measured in points, so
@@ -894,10 +927,42 @@ export function CoverCanvas({
    * place that knows the scale - and it changes under a drag when the window
    * is resized mid-move.
    */
-  const moving: Moving | undefined = useMemo(
-    () => (movable ? { ...movable, points: (px: number) => px / (scale * PX_PER_PT) } : undefined),
-    [movable, scale],
-  );
+  const moving: Moving | undefined = useMemo(() => {
+    if (!movable) return undefined;
+    const points = (px: number) => px / (scale * PX_PER_PT);
+    const show = (next: Snapped) =>
+      setSnapped((current) => (current.x === next.x && current.y === next.y ? current : next));
+    return {
+      ...movable,
+      points,
+      drag: (part) => {
+        const from = guides ? movable.box?.(part) : undefined;
+        /* Both in points from where the part was when the pointer went down:
+           where the pointer has taken it, and where it has been drawn. */
+        let wanted = { x: 0, y: 0 };
+        let drawn = { x: 0, y: 0 };
+        return {
+          step: (dx, dy) => {
+            wanted = { x: wanted.x + points(dx), y: wanted.y + points(dy) };
+            let next = wanted;
+            if (from) {
+              const snap = snapToCentre(
+                { ...from, x: from.x + wanted.x, y: from.y + wanted.y },
+                { width, height },
+                points(SNAP_REACH),
+              );
+              next = { x: wanted.x + snap.dx, y: wanted.y + snap.dy };
+              show(snap.snapped);
+            }
+            const by = { x: next.x - drawn.x, y: next.y - drawn.y };
+            drawn = next;
+            if (by.x || by.y) movable.onMove(part, by.x, by.y);
+          },
+          end: () => show(NOT_SNAPPED),
+        };
+      },
+    };
+  }, [movable, scale, guides, width, height]);
 
   /*
    * Measured, not assumed - in both directions.
@@ -965,6 +1030,22 @@ export function CoverCanvas({
             editable={editable}
             moving={moving}
           />
+          {/* Drawn over the page and never printed: the PDF is written from the
+              composed page, and these are not on it. */}
+          {moving && guides ? (
+            <Fragment>
+              <div
+                aria-hidden
+                className={snapped.x ? "cover-guide down on" : "cover-guide down"}
+                style={{ left: `${width / 2}pt` }}
+              />
+              <div
+                aria-hidden
+                className={snapped.y ? "cover-guide across on" : "cover-guide across"}
+                style={{ top: `${height / 2}pt` }}
+              />
+            </Fragment>
+          ) : null}
         </div>
       </div>
     </div>
