@@ -1576,7 +1576,6 @@ async function main() {
     const backSettings = {
       includeBack: true,
       backHoursHeading: "Staff Office Hours",
-      backHours: "9-3pm, Monday-Friday",
       backStaff: demoStaff(data),
       backMotto: "All of Jesus for All the World",
       backQrLink: link,
@@ -1766,6 +1765,18 @@ async function main() {
         normalizeStaff([null, { role: 5, people: "x" }, { id: "k", role: "Pastor" }]).length === 2,
         "staff misread",
       );
+    }
+
+    // The line of church hours under the heading is gone from the form, so a
+    // directory saved with one must not go on printing it.
+    {
+      const saved = { ...backSettings, backHours: "9-3pm, Monday-Friday" };
+      const texts = composeBook(entries, normalizeSettings(saved), metrics)
+        .sheets.flatMap((sheet) => sheet.pages)
+        .filter((page) => page.kind === "back")
+        .flatMap((page) => page.runs.map((run) => run.text));
+      ok(texts.includes("Staff Office Hours"), "the hours heading stopped printing");
+      ok(!texts.includes("9-3pm, Monday-Friday"), "a saved line of church hours still prints");
     }
 
     // Picking a member of staff fills in their email and phone: their own,

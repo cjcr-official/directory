@@ -59,7 +59,6 @@ async function main() {
     // And a back cover, so the sample shows the last page as well.
     includeBack: true,
     backHoursHeading: "Staff Office Hours",
-    backHours: "9am - 3pm, Monday - Friday",
     backStaff: demoStaff(demo),
     backMotto: "Welcome home - all are welcome here.",
     backQrLink: "https://example.org",
