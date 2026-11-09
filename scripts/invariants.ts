@@ -40,7 +40,7 @@ import {
   recordsPerSheet,
 } from "../src/lib/layout/settings";
 import { buildDemoData, demoLeadership, demoStaff } from "../src/lib/demo";
-import { normalizeQr, normalizeStaff, staffLines } from "../src/lib/layout/backCover";
+import { contactLines, normalizeQr, normalizeStaff, staffLines } from "../src/lib/layout/backCover";
 import { qrModules } from "../src/lib/layout/qrCode";
 import {
   LEADERS_PER_SECTION_MAX,
@@ -1761,6 +1761,32 @@ async function main() {
       ok(
         normalizeStaff([null, { role: 5, people: "x" }, { id: "k", role: "Pastor" }]).length === 2,
         "staff misread",
+      );
+    }
+
+    // Picking a member of staff fills in their email and phone: their own,
+    // the family's where they have none, the number written out properly.
+    {
+      const own = contactLines(
+        { email: " pastor@example.org ", phone: "4068263916" },
+        { email: "home@example.org", phone: "4065550100" },
+      );
+      ok(
+        own === "pastor@example.org\n(406) 826-3916",
+        `own contact read as ${JSON.stringify(own)}`,
+      );
+      const family = contactLines(
+        { email: null, phone: "" },
+        { email: "home@example.org", phone: "1-406-555-0100" },
+      );
+      ok(
+        family === "home@example.org\n(406) 555-0100",
+        `family contact read as ${JSON.stringify(family)}`,
+      );
+      ok(contactLines({ email: null, phone: null }, null) === "", "nobody's contact was not empty");
+      ok(
+        contactLines({ email: null, phone: "555-0100" }) === "555-0100",
+        "a number that is not ten digits was not left as typed",
       );
     }
 
