@@ -20,7 +20,6 @@ type Patch = Partial<
     | "includeBack"
     | "backTitle"
     | "backHoursHeading"
-    | "backHours"
     | "backStaff"
     | "backShowLogo"
     | "backMotto"
@@ -107,8 +106,12 @@ export function BackCoverEditor({
                 />
               </Field>
             </div>
-            <div className="grid two">
-              <Field label="Hours heading" htmlFor="back_hours_heading">
+            <div>
+              <Field
+                label="Hours heading"
+                hint="Over the staff. Each person's office hours go with them below."
+                htmlFor="back_hours_heading"
+              >
                 <input
                   id="back_hours_heading"
                   type="text"
@@ -116,16 +119,6 @@ export function BackCoverEditor({
                   placeholder="Staff Office Hours"
                   disabled={disabled}
                   onChange={(event) => onChange({ backHoursHeading: event.target.value })}
-                />
-              </Field>
-              <Field label="Hours" htmlFor="back_hours">
-                <input
-                  id="back_hours"
-                  type="text"
-                  value={settings.backHours}
-                  placeholder="9am – 3pm, Monday – Friday"
-                  disabled={disabled}
-                  onChange={(event) => onChange({ backHours: event.target.value })}
                 />
               </Field>
             </div>

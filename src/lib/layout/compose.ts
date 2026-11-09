@@ -1836,8 +1836,7 @@ function composeBackPage(
   const motto = settings.backMotto.trim();
   const qr = settings.backQr;
   const hoursHeading = settings.backHoursHeading.trim();
-  const hours = settings.backHours.trim();
-  if (!title && !hoursHeading && !hours && !staff.length && !logo && !motto && !qr.length) {
+  if (!title && !hoursHeading && !staff.length && !logo && !motto && !qr.length) {
     return null;
   }
 
@@ -1860,13 +1859,6 @@ function composeBackPage(
       push(title, { size: 14.5 * f, weight: "bold", color: COLORS.strong, gap: 0, rule: true });
     if (hoursHeading)
       push(hoursHeading, { size: 12.5 * f, weight: "bold", color: COLORS.strong, gap: 18 * f });
-    if (hours)
-      push(hours, {
-        size: 9.5 * f,
-        weight: "regular",
-        color: COLORS.muted,
-        gap: hoursHeading ? 3 * f : 18 * f,
-      });
     for (const entry of staff) {
       entry.strong.forEach((text, i) =>
         push(text, {

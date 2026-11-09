@@ -1107,7 +1107,6 @@ console.log("\na directory's back cover comes back with it");
 {
   const settings = {
     includeBack: true,
-    backHours: "9-3pm, Monday-Friday",
     backStaff: [
       {
         id: "t1",

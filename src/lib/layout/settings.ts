@@ -251,10 +251,13 @@ export type ProjectSettings = {
   includeBack: boolean;
   /** The name across the top of the box. Empty is the church's name. */
   backTitle: string;
-  /** "Staff Office Hours". */
+  /**
+   * "Staff Office Hours", over the staff. There is no line of hours under it
+   * any more - each member of staff has their own - and a "backHours" saved
+   * before that is dropped on reading, so it cannot go on printing with no
+   * box left to change it in.
+   */
   backHoursHeading: string;
-  /** "9-3pm, Monday-Friday". */
-  backHours: string;
   backStaff: StaffEntry[];
   /** The cover's logo, at the foot of the box. */
   backShowLogo: boolean;
@@ -345,7 +348,6 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   includeBack: false,
   backTitle: "",
   backHoursHeading: "Office Hours",
-  backHours: "",
   backStaff: [],
   backShowLogo: true,
   backMotto: "",
