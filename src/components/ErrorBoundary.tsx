@@ -1,6 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Logo } from "@/components/Logo";
-import { isStaleBuildError, reloadForStaleBuild } from "@/lib/staleBuild";
+import { isStaleBuildError, reloadForStaleBuild, reloadFresh } from "@/lib/staleBuild";
 
 /**
  * The last thing between a thrown error and a white screen.
@@ -87,7 +87,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   private readonly reload = () => {
-    window.location.reload();
+    reloadFresh();
   };
 
   private readonly goHome = () => {
