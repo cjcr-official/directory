@@ -39,7 +39,9 @@ import {
   normalizeSettings,
   recordsPerSheet,
 } from "../src/lib/layout/settings";
-import { buildDemoData, demoLeadership } from "../src/lib/demo";
+import { buildDemoData, demoLeadership, demoStaff } from "../src/lib/demo";
+import { normalizeQr, normalizeStaff, staffLines } from "../src/lib/layout/backCover";
+import { qrModules } from "../src/lib/layout/qrCode";
 import {
   LEADERS_PER_SECTION_MAX,
   currentLeadership,
@@ -1557,6 +1559,213 @@ async function main() {
 
     console.log(
       `leadership page: ${checked} book shapes put it after the cover, every leader once, on the paper`,
+    );
+  }
+
+  // ---- 16. the back cover --------------------------------------------------
+  //
+  // The last page. What goes wrong without a sound: it lands in front of the
+  // blanks a booklet is made up with, so the folded book ends on a blank and
+  // the back cover is somewhere inside; a staff list too long for the page
+  // runs off it; and a QR code drawn one module out, which looks like a QR
+  // code and opens nothing.
+  {
+    const data = buildDemoData(30, 4);
+    const entries = buildEntries(data);
+    const link = "https://example.org/directory";
+    const backSettings = {
+      includeBack: true,
+      backHoursHeading: "Staff Office Hours",
+      backHours: "9-3pm, Monday-Friday",
+      backStaff: demoStaff(data),
+      backMotto: "All of Jesus for All the World",
+      backQrLink: link,
+      backQr: qrModules(link),
+    };
+    const shapes: Partial<typeof DEFAULT_SETTINGS>[] = [
+      {},
+      { includeCover: false },
+      { bookletOrder: true },
+      { bookletOrder: true, notePages: 1 },
+      {
+        bookletOrder: true,
+        notePages: 2,
+        includeLeadership: true,
+        leadership: demoLeadership(data),
+      },
+      { columns: 1, rows: 1 },
+      { columns: 3, rows: 8, textScale: "compact" },
+      { pageSize: "a4", typeface: "sans" },
+      { pageSize: "legal", textScale: "large" },
+    ];
+
+    const off = composeBook(
+      entries,
+      normalizeSettings({ ...backSettings, includeBack: false }),
+      metrics,
+    );
+    ok(
+      off.sheets.every((sheet) => sheet.pages.every((page) => page.kind !== "back")),
+      "a book with the back cover off printed one",
+    );
+
+    let checked = 0;
+    for (const shape of shapes) {
+      const label = `back cover ${JSON.stringify(shape)}`;
+      const without = composeBook(entries, normalizeSettings(shape), metrics);
+      const settings = normalizeSettings({ ...shape, ...backSettings });
+      const book = composeBook(entries, settings, metrics);
+      const slots = book.sheets.flatMap((sheet) => sheet.pages);
+      const backs = slots.filter((page) => page.kind === "back");
+      ok(backs.length === 1, `${label}: ${backs.length} back covers`);
+      const back = backs[0];
+      if (!back) continue;
+      ok(book.pageCount === without.pageCount + 1, `${label}: page count did not grow by one`);
+      // The last page of the book, whatever the order the sheets print in.
+      ok(
+        back.number === slots.length,
+        `${label}: back cover is page ${back.number} of ${slots.length}`,
+      );
+      const real = slots.map((page) => page.number).filter((n) => n > 0);
+      ok(
+        new Set(real).size === real.length && real.length === book.pageCount,
+        `${label}: a page imposed twice or not at all`,
+      );
+      ok(
+        !back.runs.some((run) => /^\d+$/.test(run.text)),
+        `${label}: the back cover carries a page number`,
+      );
+
+      const box = back.box;
+      const inside = (x: number, y: number, w: number, h: number) =>
+        x >= box.x - 0.01 &&
+        y >= box.y - 0.01 &&
+        x + w <= box.x + box.w + 0.01 &&
+        y + h <= box.y + box.h + 0.01;
+      const stray = [
+        ...back.runs.filter(
+          (run) =>
+            !inside(run.x, run.y, run.w, metrics.lineHeight(run.size)) ||
+            metrics.widthOf(run.text, run.size, run.weight) > run.w + 0.01,
+        ),
+        ...back.fills.filter((fill) => !inside(fill.x, fill.y, fill.w, fill.h)),
+        ...back.photos.filter((slot) => !inside(slot.box.x, slot.box.y, slot.box.w, slot.box.h)),
+      ];
+      ok(stray.length === 0, `${label}: ${stray.length} thing(s) off the back cover`);
+
+      const texts = back.runs.map((run) => run.text);
+      for (const want of [
+        "Staff Office Hours",
+        "Office Assistants",
+        "All of Jesus for All the World",
+      ]) {
+        ok(texts.includes(want), `${label}: "${want}" is not on the back cover`);
+      }
+
+      // Read the QR code back off the page: the middle of every module is
+      // dark exactly where the stored code says it should be.
+      const dark = back.fills.filter((fill) => fill.color === "#000000");
+      const qr = settings.backQr;
+      if (dark.length && qr.length) {
+        const left = Math.min(...dark.map((fill) => fill.x));
+        const top = Math.min(...dark.map((fill) => fill.y));
+        const right = Math.max(...dark.map((fill) => fill.x + fill.w));
+        const module = (right - left) / qr.length;
+        let wrong = 0;
+        qr.forEach((row, r) =>
+          [...row].forEach((bit, c) => {
+            const cx = left + (c + 0.5) * module;
+            const cy = top + (r + 0.5) * module;
+            const drawn = dark.some(
+              (fill) => cx > fill.x && cx < fill.x + fill.w && cy > fill.y && cy < fill.y + fill.h,
+            );
+            if (drawn !== (bit === "1")) wrong += 1;
+          }),
+        );
+        ok(wrong === 0, `${label}: ${wrong} QR module(s) drawn wrong`);
+      } else {
+        ok(false, `${label}: no QR code drawn`);
+      }
+      checked += 1;
+    }
+
+    // Too much for the page: it shrinks, and nothing goes off the paper.
+    {
+      const many = Array.from({ length: 12 }, (_, i) => ({
+        id: `s${i}`,
+        role: `Role number ${i + 1}`,
+        people: [{ personId: null, name: `Staff member ${i + 1}` }],
+        lines: "someone@example.org\n(406) 555-0100\nMonday to Thursday, mornings only",
+      }));
+      const back = composeBook(
+        entries,
+        normalizeSettings({ ...backSettings, backStaff: many }),
+        metrics,
+      )
+        .sheets.flatMap((sheet) => sheet.pages)
+        .find((page) => page.kind === "back");
+      ok(!!back, "a crowded back cover was not printed");
+      if (back) {
+        const off = back.runs.filter(
+          (run) => run.y + metrics.lineHeight(run.size) > back.box.y + back.box.h + 0.01,
+        );
+        ok(off.length === 0, `a crowded back cover ran ${off.length} line(s) off the page`);
+      }
+    }
+
+    // One person and their role share a line; two or more put it under them.
+    {
+      const one = staffLines({
+        id: "a",
+        role: "Senior Pastor",
+        people: [{ personId: null, name: "Jason Siebert" }],
+        lines: "",
+      });
+      ok(
+        JSON.stringify(one.strong) === JSON.stringify(["Jason Siebert, Senior Pastor"]),
+        `one person printed as ${JSON.stringify(one.strong)}`,
+      );
+      const two = staffLines({
+        id: "b",
+        role: "Office Assistants",
+        people: [
+          { personId: null, name: "Anne Siebert" },
+          { personId: null, name: "Melissa Bishop" },
+        ],
+        lines: " office@example.org \n\n(406) 826-3916",
+      });
+      ok(
+        JSON.stringify(two) ===
+          JSON.stringify({
+            strong: ["Anne Siebert & Melissa Bishop", "Office Assistants"],
+            plain: ["office@example.org", "(406) 826-3916"],
+          }),
+        `two people printed as ${JSON.stringify(two)}`,
+      );
+    }
+
+    // Stored settings are JSON anybody can write: a QR code that is not a
+    // square of ones and noughts is no QR code, rather than a wrong one.
+    {
+      const good = qrModules(link);
+      ok(normalizeQr(good).length === good.length, "a real QR code was thrown away");
+      ok(
+        normalizeQr([...good.slice(0, -1), good[0].slice(1)]).length === 0,
+        "a ragged QR code was kept",
+      );
+      ok(
+        normalizeQr(good.map((row) => row.replace("1", "2"))).length === 0,
+        "a QR code with stray characters was kept",
+      );
+      ok(normalizeQr("1010").length === 0, "a string was read as a QR code");
+      ok(
+        normalizeStaff([null, { role: 5, people: "x" }, { id: "k", role: "Pastor" }]).length === 2,
+        "staff misread",
+      );
+    }
+
+    console.log(
+      `back cover: ${checked} book shapes end on it, on the paper, with a QR code that reads back`,
     );
   }
 

@@ -57,12 +57,18 @@ import {
 import { labelledHouseholdName, message } from "@/lib/format";
 import { getPhotoUrls, removePhoto, uploadPhoto } from "@/lib/photos";
 import { CoverCanvas, type MovableParts } from "@/components/BookPreview";
-import { composeCoverPage, composeLeadershipPreview } from "@/lib/layout/compose";
+import {
+  composeBackPreview,
+  composeCoverPage,
+  composeLeadershipPreview,
+} from "@/lib/layout/compose";
 import { readGuides, rememberGuides } from "@/lib/layout/guides";
 import { tagsPerSheet } from "@/lib/layout/tags";
 import { TYPEFACE_LABELS, loadMetrics, type Metrics } from "@/lib/layout/metrics";
 import { PhotoInput } from "@/components/PhotoInput";
 import { LeadershipEditor } from "@/components/LeadershipEditor";
+import { BackCoverEditor } from "@/components/BackCoverEditor";
+import { currentStaff } from "@/lib/layout/backCover";
 import { currentLeadership, leadershipGroups } from "@/lib/layout/leadership";
 
 /*
@@ -261,6 +267,11 @@ export function ProjectEditPage() {
     () => currentLeadership(settings.leadership, personById, groups),
     [settings.leadership, personById, groups],
   );
+  /** The back cover's staff the same way. */
+  const backStaff = useMemo(
+    () => currentStaff(settings.backStaff, personById, groups),
+    [settings.backStaff, personById, groups],
+  );
   const sheets = Math.ceil(included.length / recordsPerSheet(safeSettings));
 
   // --- the cover, drawn ------------------------------------------------------
@@ -320,6 +331,7 @@ export function ProjectEditPage() {
           ? PENDING_PHOTO
           : safeSettings.coverPhotoPath,
       leadership: currentLeadership(safeSettings.leadership, personById, groups),
+      backStaff: currentStaff(safeSettings.backStaff, personById, groups),
     }),
     [safeSettings, coverBlobs, coverRemoved, personById, groups],
   );
@@ -368,8 +380,18 @@ export function ProjectEditPage() {
    * being worked in - typing a deacon's name shows the leadership page - and
    * the buttons over it change it by hand.
    */
-  const [stage, setStage] = useState<"cover" | "leadership">("cover");
-  const showing = stage === "leadership" && leadershipPreview ? "leadership" : "cover";
+  /** The back cover as it would print, when there is one. */
+  const backPreview = useMemo(
+    () => (metrics && safeSettings.includeBack ? composeBackPreview(drawnSettings, metrics) : null),
+    [metrics, safeSettings.includeBack, drawnSettings],
+  );
+  const [stage, setStage] = useState<"cover" | "leadership" | "back">("cover");
+  const showing =
+    stage === "leadership" && leadershipPreview
+      ? "leadership"
+      : stage === "back" && backPreview
+        ? "back"
+        : "cover";
 
   /*
    * Where each part of the cover actually ended up.
@@ -541,6 +563,7 @@ export function ProjectEditPage() {
     [
       safeSettings.includeLeadership && "leadership page",
       safeSettings.includeIndex && "index",
+      safeSettings.includeBack && "back cover",
       safeSettings.notePages > 0 &&
         `${safeSettings.notePages} note ${safeSettings.notePages === 1 ? "page" : "pages"}`,
       safeSettings.runningHeader && "running header",
@@ -636,6 +659,7 @@ export function ProjectEditPage() {
         ...safeSettings,
         ...cover,
         leadership: currentLeadership(safeSettings.leadership, personById, groups),
+        backStaff: currentStaff(safeSettings.backStaff, personById, groups),
       };
 
       const payload = {
@@ -1087,6 +1111,19 @@ export function ProjectEditPage() {
               }}
             />
 
+            {/* The last page, so the last of the cards that set a page. */}
+            <BackCoverEditor
+              settings={settings}
+              staff={backStaff}
+              groups={groups}
+              disabled={!canEdit}
+              onFocus={() => setStage("back")}
+              onChange={(patch) => {
+                set(patch);
+                if (patch.includeBack !== false) setStage("back");
+              }}
+            />
+
             {/* Name tags are set under Name tags, not here.
 
                 They were a panel on this form, which meant the one screen in
@@ -1394,13 +1431,23 @@ export function ProjectEditPage() {
             <section className="card" aria-labelledby="book-preview">
               <div className="card-head">
                 <h2 id="book-preview">
-                  {showing === "leadership" ? "Leadership page" : "Cover preview"}
+                  {showing === "leadership"
+                    ? "Leadership page"
+                    : showing === "back"
+                      ? "Back cover"
+                      : "Cover preview"}
                 </h2>
                 {/* Only once there is a second page to show: a switch with
                     one position is a label pretending to be a control. */}
-                {leadershipPreview ? (
+                {leadershipPreview || backPreview ? (
                   <div className="row tight stage-switch" role="group" aria-label="Page to show">
-                    {(["cover", "leadership"] as const).map((view) => (
+                    {(
+                      [
+                        "cover",
+                        ...(leadershipPreview ? ["leadership" as const] : []),
+                        ...(backPreview ? ["back" as const] : []),
+                      ] as const
+                    ).map((view) => (
                       <button
                         key={view}
                         type="button"
@@ -1408,7 +1455,7 @@ export function ProjectEditPage() {
                         aria-pressed={showing === view}
                         onClick={() => setStage(view)}
                       >
-                        {view === "cover" ? "Cover" : "Leadership"}
+                        {view === "cover" ? "Cover" : view === "back" ? "Back" : "Leadership"}
                       </button>
                     ))}
                   </div>
@@ -1429,6 +1476,25 @@ export function ProjectEditPage() {
               <div className="card-body">
                 {showing === "leadership" && leadershipPreview ? (
                   <LeadershipFigure preview={leadershipPreview} />
+                ) : showing === "back" && backPreview ? (
+                  backPreview.page ? (
+                    <figure className="cover-figure">
+                      <CoverCanvas
+                        page={backPreview.page}
+                        width={backPreview.width}
+                        height={backPreview.height}
+                        photoUrls={coverUrls}
+                        typeface={backPreview.typeface}
+                      />
+                      <figcaption className="hint">
+                        The last page of the book. Redraws as you type.
+                      </figcaption>
+                    </figure>
+                  ) : (
+                    <p className="hint cover-figure">
+                      Nothing to print yet. Add the hours, a member of staff, or a motto.
+                    </p>
+                  )
                 ) : coverPage ? (
                   <figure className="cover-figure">
                     <CoverCanvas

@@ -1,5 +1,6 @@
 import { TYPEFACES, type Typeface } from "./metrics";
 import { normalizeLeadership, type LeadershipSection } from "./leadership";
+import { normalizeQr, normalizeStaff, type StaffEntry } from "./backCover";
 
 export type PageSizeName = "letter" | "a4" | "legal";
 import type { PhotoFit } from "../database.types";
@@ -243,6 +244,26 @@ export type ProjectSettings = {
   leadershipNote: string;
   /** The offices, in the order they print. */
   leadership: LeadershipSection[];
+  /**
+   * A back cover, on the very last page however many blanks a booklet needs
+   * before it. See backCover.ts.
+   */
+  includeBack: boolean;
+  /** The name across the top of the box. Empty is the church's name. */
+  backTitle: string;
+  /** "Staff Office Hours". */
+  backHoursHeading: string;
+  /** "9-3pm, Monday-Friday". */
+  backHours: string;
+  backStaff: StaffEntry[];
+  /** The cover's logo, at the foot of the box. */
+  backShowLogo: boolean;
+  /** Under the box, in italics: "All of Jesus for All the World". */
+  backMotto: string;
+  /** What the QR code opens - the church's website, usually. */
+  backQrLink: string;
+  /** The QR code for backQrLink, worked out when it was typed. See qrCode.ts. */
+  backQr: string[];
   includeIndex: boolean;
   /**
    * Plain ruled pages at the very back, headed "Notes", for whatever somebody
@@ -321,6 +342,15 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   leadershipTitle: "Church Leadership",
   leadershipNote: "",
   leadership: [],
+  includeBack: false,
+  backTitle: "",
+  backHoursHeading: "Office Hours",
+  backHours: "",
+  backStaff: [],
+  backShowLogo: true,
+  backMotto: "",
+  backQrLink: "",
+  backQr: [],
   includeIndex: true,
   notePages: 0,
   runningHeader: true,
@@ -355,6 +385,8 @@ export function normalizeSettings(raw: unknown): ProjectSettings {
   merged.coverPlacements = normalizePlacements(input.coverPlacements);
   // The same goes for the leadership list, which is an array of sections.
   merged.leadership = normalizeLeadership(input.leadership);
+  merged.backStaff = normalizeStaff(input.backStaff);
+  merged.backQr = normalizeQr(input.backQr);
 
   // Guard rails: the layout maths assumes at least one card per half.
   merged.rows = clamp(Math.round(merged.rows), 1, 8);
