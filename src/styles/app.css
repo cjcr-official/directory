@@ -5823,3 +5823,40 @@ body.moving-a-part {
 .member-list.leader-people .member-name {
   flex-basis: auto;
 }
+
+/* The groups that can go on the leadership page, ticked rather than typed.
+   Two across where there is room: a church has a handful of groups and a
+   column of them one under another is mostly empty space. */
+.leader-groups {
+  border: none;
+  margin: 14px 0 0;
+  padding: 0;
+  min-width: 0;
+}
+.leader-groups legend {
+  font-weight: 600;
+  padding: 0;
+  margin-bottom: 2px;
+}
+.leader-groups .hint {
+  display: block;
+  margin: 0 0 8px;
+}
+.leader-group-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 2px 16px;
+}
+
+/* A group in the list is marked by a stripe in the accent: it is the one kind
+   of section whose people are not edited here. */
+.leader-section.is-group {
+  border-left: 3px solid var(--accent-line);
+}
+.leader-group-source {
+  margin: 8px 0 2px;
+}
+.leader-group-names {
+  margin: 0;
+  line-height: 1.5;
+}

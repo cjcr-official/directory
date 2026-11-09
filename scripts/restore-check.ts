@@ -1064,8 +1064,20 @@ console.log("\nwhich directory is the main one");
 console.log("\na directory's leadership page comes back with it");
 {
   const leadership = [
-    { id: "s1", title: "Deacons", people: [{ personId: "p1", name: "Ann Smith" }] },
-    { id: "s2", title: "Food Services", people: [{ personId: null, name: "Deaconess Team" }] },
+    {
+      id: "s1",
+      title: "",
+      groupId: "t1",
+      groupName: "Deacons",
+      people: [{ personId: "p1", name: "Ann Smith" }],
+    },
+    {
+      id: "s2",
+      title: "Food Services",
+      groupId: null,
+      groupName: "",
+      people: [{ personId: null, name: "Deaconess Team" }],
+    },
   ];
   const settings = {
     includeLeadership: true,

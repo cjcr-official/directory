@@ -54,7 +54,7 @@ async function main() {
     includeLeadership: true,
     leadershipTitle: "Church Leadership",
     leadershipNote: "Please be praying for these individuals as they serve this year.",
-    leadership: demoLeadership(demo.people),
+    leadership: demoLeadership(demo),
     showBirthdays: true,
     showAnniversary: true,
     // Read only by the tag sheet below, and set here so that CI renders a tag
