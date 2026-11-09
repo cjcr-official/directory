@@ -79,14 +79,16 @@ page after it, alphabetical index, A–Z letter tabs, page numbers, ruled note
 pages at the back, and booklet page ordering for folding and stapling.
 
 **The leadership page.** Deacons, elders, the treasurer — the church's offices
-and who holds them, on a page of their own straight after the cover. Add an
-office, then fill it by typing a few letters of someone's name and picking them
-from the directory, adding a whole group at once, or typing words in for an
-office held by a team ("Deaconess Team"). An office of one prints on a line of
-its own — "Treasurer . . . . Kim Feiro" — and an office of several prints under
-a heading in two columns. Names follow the directory, so somebody who changes
-the name they go by is printed under the new one. Set under **Leadership page**
-on a directory, with the page drawn beside the list as you fill it in.
+and who holds them, on a page of their own straight after the cover. Elders,
+deacons and deaconesses are groups you already keep, so they are ticked rather
+than typed: each prints under its name with whoever is in the group when the
+book is printed, by surname, and adding someone to the group is all it takes
+to put them on the page. Offices that are not a group — Treasurer, Facilities
+Manager — are added by hand, picking the person from the directory or typing
+words in for an office held by a team ("Deaconess Team"). One person prints on
+a line of their own — "Treasurer . . . . Kim Feiro" — and several print under a
+heading in two columns. Set under **Leadership page** on a directory, with the
+page drawn beside the list as you fill it in.
 
 Want to see it? Run the app and open **/sample** — a complete sample directory
 built from invented families, with no account and no database.

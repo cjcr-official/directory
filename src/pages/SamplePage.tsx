@@ -81,7 +81,7 @@ export function SamplePage({ tags = false }: { tags?: boolean }) {
           includeLeadership: true,
           leadershipTitle: "Church Leadership",
           leadershipNote: "Please be praying for these individuals as they serve this year.",
-          leadership: demoLeadership(demo.people),
+          leadership: demoLeadership(demo),
           showBirthdays: true,
           showAnniversary: true,
           // Only the tag sheet reads these, and only the sample sets them: a

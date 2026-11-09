@@ -6,10 +6,17 @@
  * for it and where the paper this replaces always put it.
  *
  * Stored on the directory with the rest of its settings, as a list of
- * sections in the order they print. A section is an office and the people in
- * it: "Deacons" and seven names, or "Treasurer" and one. Each name is either
- * somebody in the directory, picked from it, or a few words typed in for an
- * office that is held by a team rather than a person - "Deaconess Team".
+ * sections in the order they print. A section is one of two things:
+ *
+ *  - A group. Elders, deacons and deaconesses are already groups in the
+ *    directory, and the page lists whoever is in the group at the moment it
+ *    is printed - add a deacon to the group and he is on the next page
+ *    printed, with nobody having to come here. Its heading is the group's
+ *    name unless one is typed over it.
+ *  - An office filled in by hand: "Treasurer" and one name. Each name is
+ *    either somebody in the directory, picked from it, or a few words typed
+ *    in for an office that is held by a team rather than a person -
+ *    "Deaconess Team".
  *
  * A picked person keeps the name they had when they were picked as well as
  * their id. The id is what makes the page follow the directory - Bill who
@@ -32,7 +39,24 @@ export interface Leader {
 export interface LeadershipSection {
   /** Stable across reordering, so the editor's rows keep their focus. */
   id: string;
+  /**
+   * What the heading says. For a group, empty means "the group's name", and
+   * anything typed is printed instead of it.
+   */
   title: string;
+  /**
+   * The group this section lists, or null for an office filled in by hand.
+   * A group's people are not chosen here: they are whoever is in the group.
+   */
+  groupId: string | null;
+  /** The group's name when it was last seen, for a heading left empty. */
+  groupName: string;
+  /**
+   * Who holds it. For a group, the people who were in it when the directory
+   * was last saved - kept so that a group deleted since still prints the
+   * names it had rather than vanishing from the page, and refreshed from the
+   * group every time the page is drawn while it exists.
+   */
   people: Leader[];
 }
 
@@ -83,6 +107,8 @@ export function normalizeLeadership(raw: unknown): LeadershipSection[] {
     sections.push({
       id,
       title: typeof source.title === "string" ? source.title.slice(0, TEXT_MAX) : "",
+      groupId: typeof source.groupId === "string" && source.groupId ? source.groupId : null,
+      groupName: typeof source.groupName === "string" ? source.groupName.slice(0, TEXT_MAX) : "",
       people,
     });
   }
@@ -143,16 +169,112 @@ export function printedSections(
 ): { title: string; names: string[] }[] {
   return sections
     .map((section) => ({
-      title: section.title.trim(),
+      title: sectionTitle(section),
       names: section.people.map((leader) => leader.name.trim()).filter(Boolean),
     }))
     .filter((section) => section.names.length > 0);
 }
 
+/** The heading a section prints under: what was typed, or its group's name. */
+export function sectionTitle(section: LeadershipSection): string {
+  return section.title.trim() || (section.groupId ? section.groupName.trim() : "");
+}
+
 /**
- * Where a new directory starts: the offices most churches have, empty.
- *
- * Offered by a button rather than filled in by default, because a directory
- * for the youth retreat has no use for a page of elders.
+ * Where a new page starts: the offices most churches fill by hand, empty.
+ * Elders and deacons are not among them - those are groups, ticked rather
+ * than typed. Offered by a button rather than filled in by default, because
+ * a directory for the youth retreat has no use for a page of elders.
  */
-export const STARTER_SECTIONS = ["Pastor", "Elders", "Deacons", "Treasurer", "Secretary"];
+export const STARTER_SECTIONS = ["Pastor", "Treasurer", "Secretary"];
+
+/**
+ * The groups that are leadership by their name, ticked by the same button.
+ * Matched loosely - "Deacons", "Deacon Board", "Elders 2026" - and never
+ * "Deaconesses" for "Deacons": each pattern is anchored to a whole word.
+ */
+export const LEADERSHIP_GROUP_NAMES = [/\belders?\b/i, /\bdeacons?\b/i, /\bdeaconess(es)?\b/i];
+
+/** A person in the directory, as much of them as this page needs. */
+export interface LeaderCandidate extends NamedPerson {
+  id: string;
+  is_active: boolean;
+}
+
+/** A group, and who is in it now. */
+export interface LeaderGroup {
+  name: string;
+  /** In the order they print: by surname, then by the name they go by. */
+  members: { personId: string; name: string }[];
+}
+
+/**
+ * Every group and the active people in it, the way the page lists them.
+ *
+ * Groups belong to people - a family is only in one through its members -
+ * so this reads person_tags alone, exactly as the directory does when it
+ * prints a group's people on their own. Somebody marked as no longer
+ * printing in the directory is left out here too.
+ */
+export function leadershipGroups(
+  tags: { id: string; name: string }[],
+  personTags: { person_id: string; tag_id: string }[],
+  people: LeaderCandidate[],
+): Map<string, LeaderGroup> {
+  const byId = new Map(people.map((person) => [person.id, person]));
+  const groups = new Map<string, LeaderGroup>();
+  const lists = new Map<string, LeaderCandidate[]>();
+  for (const tag of tags) lists.set(tag.id, []);
+  for (const link of personTags) {
+    const person = byId.get(link.person_id);
+    const list = lists.get(link.tag_id);
+    if (!person || !list || !person.is_active || list.includes(person)) continue;
+    list.push(person);
+  }
+  const fold = (text: string) =>
+    text
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+  for (const tag of tags) {
+    const members = (lists.get(tag.id) ?? [])
+      .map((person) => ({
+        personId: person.id,
+        name: leaderName(person),
+        key: `${fold(person.last_name)} ${fold(leaderName(person))}`,
+      }))
+      .sort((a, b) => a.key.localeCompare(b.key))
+      .map(({ personId, name }) => ({ personId, name }));
+    groups.set(tag.id, { name: tag.name, members });
+  }
+  return groups;
+}
+
+/**
+ * The sections as they print now: every group listing whoever is in it,
+ * under its current name, and every picked person under the name their
+ * record has. A group that has been deleted keeps what it was saved with.
+ * Hands back the same array when nothing changed.
+ */
+export function currentLeadership(
+  sections: LeadershipSection[],
+  personById: ReadonlyMap<string, NamedPerson>,
+  groups: ReadonlyMap<string, LeaderGroup>,
+): LeadershipSection[] {
+  let changed = false;
+  const next = withCurrentNames(sections, personById).map((section) => {
+    const group = section.groupId ? groups.get(section.groupId) : undefined;
+    if (!group) return section;
+    const same =
+      group.name === section.groupName &&
+      group.members.length === section.people.length &&
+      group.members.every(
+        (member, i) =>
+          member.personId === section.people[i].personId && member.name === section.people[i].name,
+      );
+    if (same) return section;
+    changed = true;
+    return { ...section, groupName: group.name, people: group.members };
+  });
+  return changed || next.some((section, i) => section !== sections[i]) ? next : sections;
+}

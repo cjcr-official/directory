@@ -63,7 +63,7 @@ import { tagsPerSheet } from "@/lib/layout/tags";
 import { TYPEFACE_LABELS, loadMetrics, type Metrics } from "@/lib/layout/metrics";
 import { PhotoInput } from "@/components/PhotoInput";
 import { LeadershipEditor } from "@/components/LeadershipEditor";
-import { withCurrentNames } from "@/lib/layout/leadership";
+import { currentLeadership, leadershipGroups } from "@/lib/layout/leadership";
 
 /*
  * Stand-in storage paths for a picture that has been chosen but not yet
@@ -114,7 +114,7 @@ export function ProjectEditPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { canEdit } = useAuth();
-  const { entries, tags, authorName, reload, personById } = useDirectory();
+  const { entries, tags, authorName, reload, personById, people, personTags } = useDirectory();
   const isNew = !id;
 
   const [name, setName] = useState("Church Directory");
@@ -247,14 +247,19 @@ export function ProjectEditPage() {
   // store "0 records to a sheet".
   const safeSettings = useMemo(() => normalizeSettings(settings), [settings]);
   /*
-   * The offices, with each person's name as their record has it now - what the
-   * list shows, what the page is drawn with, and what Save writes. A name
-   * changed on somebody's record since this directory was saved is carried
-   * across without anybody having to come here and pick them again.
+   * The offices, with each group listing whoever is in it now and each
+   * person's name as their record has it now - what the list shows, what the
+   * page is drawn with, and what Save writes. A deacon added to the group, or
+   * a name changed on somebody's record, is carried across without anybody
+   * having to come here.
    */
+  const groups = useMemo(
+    () => leadershipGroups(tags, personTags, people),
+    [tags, personTags, people],
+  );
   const leadership = useMemo(
-    () => withCurrentNames(settings.leadership, personById),
-    [settings.leadership, personById],
+    () => currentLeadership(settings.leadership, personById, groups),
+    [settings.leadership, personById, groups],
   );
   const sheets = Math.ceil(included.length / recordsPerSheet(safeSettings));
 
@@ -314,9 +319,9 @@ export function ProjectEditPage() {
         : coverBlobs.photo
           ? PENDING_PHOTO
           : safeSettings.coverPhotoPath,
-      leadership: withCurrentNames(safeSettings.leadership, personById),
+      leadership: currentLeadership(safeSettings.leadership, personById, groups),
     }),
-    [safeSettings, coverBlobs, coverRemoved, personById],
+    [safeSettings, coverBlobs, coverRemoved, personById, groups],
   );
 
   /*
@@ -630,7 +635,7 @@ export function ProjectEditPage() {
       const saved = {
         ...safeSettings,
         ...cover,
-        leadership: withCurrentNames(safeSettings.leadership, personById),
+        leadership: currentLeadership(safeSettings.leadership, personById, groups),
       };
 
       const payload = {
@@ -1073,6 +1078,7 @@ export function ProjectEditPage() {
             <LeadershipEditor
               settings={settings}
               sections={leadership}
+              groups={groups}
               disabled={!canEdit}
               onFocus={() => setStage("leadership")}
               onChange={(patch) => {

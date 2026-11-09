@@ -4,11 +4,13 @@ import { Checkbox, Field } from "@/components/ui";
 import { sortKey } from "@/lib/format";
 import {
   LEADERS_PER_SECTION_MAX,
+  LEADERSHIP_GROUP_NAMES,
   LEADERSHIP_SECTIONS_MAX,
   STARTER_SECTIONS,
   leaderName,
   newSectionId,
   type Leader,
+  type LeaderGroup,
   type LeadershipSection,
 } from "@/lib/layout/leadership";
 import type { ProjectSettings } from "@/lib/layout/settings";
@@ -27,47 +29,89 @@ function shift<T>(list: T[], from: number, by: -1 | 1): T[] {
   return next;
 }
 
+const office = (title: string): LeadershipSection => ({
+  id: newSectionId(),
+  title,
+  groupId: null,
+  groupName: "",
+  people: [],
+});
+
+const groupSection = (id: string, group: LeaderGroup): LeadershipSection => ({
+  id: newSectionId(),
+  title: "",
+  groupId: id,
+  groupName: group.name,
+  people: group.members,
+});
+
 /**
- * The leadership page, as a list of offices to fill in.
+ * The leadership page, as groups to tick and offices to fill in.
  *
- * An office is a name for it and the people who hold it. People are picked
- * from the directory by typing a few letters of their name - the same search
- * as putting someone in a family - so a deacon is the person on record rather
- * than a second spelling of them. An office held by a team rather than a
- * person ("Deaconess Team") is typed in as it should print, from the same
- * box. A whole group can be added at once, for the offices the directory
- * already has a group for.
+ * Elders, deacons and deaconesses are groups the directory already keeps, so
+ * they are ticked rather than typed: the page lists whoever is in the group
+ * when it prints, and who is in it is changed where groups are changed. That
+ * is the point - the office adding a deacon to the Deacons group should not
+ * have to remember a second list on this screen.
  *
- * The order on screen is the order on paper, for the offices and for the
- * names in each, and the arrows are how it is changed: a list this short
- * does not need dragging, and arrows work the same with a thumb.
+ * Everything else is an office filled in here: a name for it and who holds
+ * it, picked from the directory by typing a few letters of their name - the
+ * same search as putting someone in a family - or typed in for an office
+ * held by a team rather than a person ("Deaconess Team").
+ *
+ * Groups and offices share one list, in the order they print, and the arrows
+ * change it: a list this short does not need dragging, and arrows work the
+ * same with a thumb.
  */
 export function LeadershipEditor({
   settings,
   sections,
+  groups,
   disabled,
   onChange,
   onFocus,
 }: {
   settings: ProjectSettings;
-  /** The offices, with every picked person's name as the directory has it now. */
+  /** The sections as they print now: groups as they are, names as they are. */
   sections: LeadershipSection[];
+  /** Every group in the directory and who is in it. */
+  groups: ReadonlyMap<string, LeaderGroup>;
   disabled: boolean;
   onChange: (patch: Patch) => void;
   /** Focus has come into the card - the form shows this page beside it. */
   onFocus?: () => void;
 }) {
-  const setSections = (next: LeadershipSection[]) => onChange({ leadership: next });
+  const setSections = (next: LeadershipSection[]) =>
+    onChange({ leadership: next.slice(0, LEADERSHIP_SECTIONS_MAX) });
   const update = (id: string, change: (section: LeadershipSection) => LeadershipSection) =>
     setSections(sections.map((section) => (section.id === id ? change(section) : section)));
 
-  const addOffices = (titles: string[]) =>
-    setSections(
-      [...sections, ...titles.map((title) => ({ id: newSectionId(), title, people: [] }))].slice(
-        0,
-        LEADERSHIP_SECTIONS_MAX,
-      ),
-    );
+  const onPage = new Set(sections.map((section) => section.groupId).filter(Boolean));
+  const groupList = [...groups.entries()].sort(([, a], [, b]) => a.name.localeCompare(b.name));
+
+  /** A group goes in after the groups already on the page, which print first. */
+  const tick = (id: string, on: boolean) => {
+    if (!on) {
+      setSections(sections.filter((section) => section.groupId !== id));
+      return;
+    }
+    const group = groups.get(id);
+    if (!group) return;
+    let at = 0;
+    sections.forEach((section, i) => {
+      if (section.groupId) at = i + 1;
+    });
+    setSections([...sections.slice(0, at), groupSection(id, group), ...sections.slice(at)]);
+  };
+
+  /** Pastor, then the leadership groups the directory has, then the offices. */
+  const start = () => {
+    const matched = LEADERSHIP_GROUP_NAMES.flatMap((pattern) =>
+      groupList.filter(([, group]) => pattern.test(group.name)),
+    ).filter(([id], i, all) => all.findIndex(([other]) => other === id) === i);
+    const [first, ...rest] = STARTER_SECTIONS.map(office);
+    setSections([first, ...matched.map(([id, group]) => groupSection(id, group)), ...rest]);
+  };
 
   return (
     <section className="card" aria-labelledby="book-leadership" onFocus={onFocus}>
@@ -111,28 +155,70 @@ export function LeadershipEditor({
               </Field>
             </div>
 
+            {groupList.length ? (
+              <fieldset className="leader-groups">
+                <legend>Groups on this page</legend>
+                <p className="hint">
+                  Each prints under its name with whoever is in it, by surname. Change who is in a
+                  group on the Groups page and the page follows.
+                </p>
+                <div className="leader-group-list">
+                  {groupList.map(([id, group]) => (
+                    <Checkbox
+                      key={id}
+                      label={group.name}
+                      hint={
+                        group.members.length === 0
+                          ? "Nobody in it yet"
+                          : `${group.members.length} ${group.members.length === 1 ? "person" : "people"}`
+                      }
+                      checked={onPage.has(id)}
+                      disabled={disabled}
+                      onChange={(on) => tick(id, on)}
+                    />
+                  ))}
+                </div>
+              </fieldset>
+            ) : null}
+
             <p className="hint leader-explain">
-              An office held by one person prints on a line of its own — “Treasurer ……… Kim Feiro”.
-              Two or more print under a heading, in two columns. An office with nobody in it is left
-              off the page.
+              Offices that aren't a group — Treasurer, Facilities Manager — are added below. One
+              person prints on a line of its own, “Treasurer ……… Kim Feiro”; two or more print under
+              a heading, in two columns. Anything with nobody in it is left off the page.
             </p>
 
             {sections.length ? (
               <ol className="leader-sections">
-                {sections.map((section, index) => (
-                  <OfficeEditor
-                    key={section.id}
-                    section={section}
-                    first={index === 0}
-                    last={index === sections.length - 1}
-                    disabled={disabled}
-                    onChange={(change) => update(section.id, change)}
-                    onMove={(by) => setSections(shift(sections, index, by))}
-                    onRemove={() =>
-                      setSections(sections.filter((other) => other.id !== section.id))
-                    }
-                  />
-                ))}
+                {sections.map((section, index) =>
+                  section.groupId ? (
+                    <GroupRow
+                      key={section.id}
+                      section={section}
+                      exists={groups.has(section.groupId)}
+                      first={index === 0}
+                      last={index === sections.length - 1}
+                      disabled={disabled}
+                      onChange={(change) => update(section.id, change)}
+                      onMove={(by) => setSections(shift(sections, index, by))}
+                      onRemove={() =>
+                        setSections(sections.filter((other) => other.id !== section.id))
+                      }
+                    />
+                  ) : (
+                    <OfficeEditor
+                      key={section.id}
+                      section={section}
+                      first={index === 0}
+                      last={index === sections.length - 1}
+                      disabled={disabled}
+                      onChange={(change) => update(section.id, change)}
+                      onMove={(by) => setSections(shift(sections, index, by))}
+                      onRemove={() =>
+                        setSections(sections.filter((other) => other.id !== section.id))
+                      }
+                    />
+                  ),
+                )}
               </ol>
             ) : null}
 
@@ -142,16 +228,12 @@ export function LeadershipEditor({
                   type="button"
                   className="btn"
                   disabled={sections.length >= LEADERSHIP_SECTIONS_MAX}
-                  onClick={() => addOffices([""])}
+                  onClick={() => setSections([...sections, office("")])}
                 >
                   + Add an office
                 </button>
                 {sections.length === 0 ? (
-                  <button
-                    type="button"
-                    className="btn ghost"
-                    onClick={() => addOffices(STARTER_SECTIONS)}
-                  >
+                  <button type="button" className="btn ghost" onClick={start}>
                     Start with the usual ones
                   </button>
                 ) : null}
@@ -161,6 +243,104 @@ export function LeadershipEditor({
         ) : null}
       </div>
     </section>
+  );
+}
+
+/**
+ * A group on the page: its heading, which may be typed over, and who is in
+ * it - shown, not edited, because who is in a group is changed on the group.
+ */
+function GroupRow({
+  section,
+  exists,
+  first,
+  last,
+  disabled,
+  onChange,
+  onMove,
+  onRemove,
+}: {
+  section: LeadershipSection;
+  exists: boolean;
+  first: boolean;
+  last: boolean;
+  disabled: boolean;
+  onChange: (change: (section: LeadershipSection) => LeadershipSection) => void;
+  onMove: (by: -1 | 1) => void;
+  onRemove: () => void;
+}) {
+  const label = section.title.trim() || section.groupName || "this group";
+  const names = section.people.map((leader) => leader.name);
+  return (
+    <li className="leader-section is-group">
+      <div className="leader-head">
+        <input
+          type="text"
+          className="leader-title"
+          aria-label={`Heading for the ${section.groupName} group`}
+          value={section.title}
+          placeholder={section.groupName}
+          disabled={disabled}
+          onChange={(event) => {
+            const title = event.target.value;
+            onChange((current) => ({ ...current, title }));
+          }}
+        />
+        {disabled ? null : (
+          <div className="leader-tools">
+            <button
+              type="button"
+              className="btn ghost small"
+              aria-label={`Move ${label} up`}
+              title="Move up"
+              disabled={first}
+              onClick={() => onMove(-1)}
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              className="btn ghost small"
+              aria-label={`Move ${label} down`}
+              title="Move down"
+              disabled={last}
+              onClick={() => onMove(1)}
+            >
+              ↓
+            </button>
+            <button
+              type="button"
+              className="btn ghost small danger-hover"
+              aria-label={`Take ${label} off the page`}
+              onClick={onRemove}
+            >
+              Remove
+            </button>
+          </div>
+        )}
+      </div>
+      <p className="small leader-group-source">
+        {exists ? (
+          <span className="muted">
+            From the {section.groupName} group
+            {names.length
+              ? ` — ${names.length} ${names.length === 1 ? "person" : "people"}, by surname`
+              : ""}
+          </span>
+        ) : (
+          <span className="leader-gone">
+            This group no longer exists — prints the names it had when this directory was saved.
+          </span>
+        )}
+      </p>
+      {names.length ? (
+        <p className="leader-group-names">{names.join(" · ")}</p>
+      ) : (
+        <p className="muted small leader-empty">
+          Nobody in this group yet — it is left off the page.
+        </p>
+      )}
+    </li>
   );
 }
 
@@ -182,7 +362,7 @@ function OfficeEditor({
   onMove: (by: -1 | 1) => void;
   onRemove: () => void;
 }) {
-  const { people, personById, householdById, tags, personTags } = useDirectory();
+  const { people, personById, householdById } = useDirectory();
   const [query, setQuery] = useState("");
   const label = section.title.trim() || "this office";
   const full = section.people.length >= LEADERS_PER_SECTION_MAX;
@@ -224,19 +404,6 @@ function OfficeEditor({
     }
     return found;
   }, [people, query, section.people]);
-
-  /** Groups with people tagged in them directly, for adding a whole one. */
-  const groups = useMemo(() => {
-    const counts = new Map<string, string[]>();
-    for (const row of personTags) {
-      const list = counts.get(row.tag_id) ?? [];
-      list.push(row.person_id);
-      counts.set(row.tag_id, list);
-    }
-    return tags
-      .map((tag) => ({ tag, ids: counts.get(tag.id) ?? [] }))
-      .filter((group) => group.ids.length > 0);
-  }, [tags, personTags]);
 
   return (
     <li className="leader-section">
@@ -405,34 +572,6 @@ function OfficeEditor({
                 </button>
               </li>
             </ul>
-          ) : null}
-
-          {groups.length ? (
-            <select
-              className="leader-group"
-              aria-label={`Add everyone in a group to ${label}`}
-              value=""
-              onChange={(event) => {
-                const group = groups.find((each) => each.tag.id === event.target.value);
-                if (!group) return;
-                const found = group.ids
-                  .map((id) => personById.get(id))
-                  .filter((person): person is PersonRow => !!person)
-                  .sort((a, b) =>
-                    sortKey(a.last_name, a.first_name).localeCompare(
-                      sortKey(b.last_name, b.first_name),
-                    ),
-                  );
-                add(found.map((person) => ({ personId: person.id, name: leaderName(person) })));
-              }}
-            >
-              <option value="">Or add everyone in a group…</option>
-              {groups.map(({ tag, ids }) => (
-                <option key={tag.id} value={tag.id}>
-                  {tag.name} ({ids.length} {ids.length === 1 ? "person" : "people"})
-                </option>
-              ))}
-            </select>
           ) : null}
         </div>
       )}

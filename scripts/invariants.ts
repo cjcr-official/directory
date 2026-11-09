@@ -42,7 +42,12 @@ import {
 import { buildDemoData, demoLeadership } from "../src/lib/demo";
 import {
   LEADERS_PER_SECTION_MAX,
+  currentLeadership,
+  leaderName,
+  leadershipGroups,
   normalizeLeadership,
+  printedSections,
+  sectionTitle,
   withCurrentNames,
 } from "../src/lib/layout/leadership";
 import type { HouseholdRow, PersonRow } from "../src/lib/database.types";
@@ -1181,7 +1186,7 @@ async function main() {
   {
     const data = buildDemoData(30, 4);
     const entries = buildEntries(data);
-    const sections = demoLeadership(data.people);
+    const sections = demoLeadership(data);
     const leadershipOf = (book: ReturnType<typeof composeBook>) =>
       book.sheets
         .flatMap((sheet) => sheet.pages)
@@ -1297,7 +1302,8 @@ async function main() {
       );
       const texts = pages.flatMap((page) => page.runs.map((run) => run.text));
       for (const section of sections) {
-        const heading = section.people.length > 1 ? section.title.toUpperCase() : section.title;
+        const title = sectionTitle(section);
+        const heading = section.people.length > 1 ? title.toUpperCase() : title;
         ok(texts.includes(heading), `${label}: the office "${section.title}" is not on the page`);
       }
       const stray = pages.reduce((sum, page) => sum + offPaper(page), 0);
@@ -1422,6 +1428,8 @@ async function main() {
         {
           id: "a",
           title: "Elders",
+          groupId: null,
+          groupName: "",
           people: [
             { personId: bill.id, name: "Old Name" },
             { personId: "gone", name: "Departed Deacon" },
@@ -1442,6 +1450,76 @@ async function main() {
       ok(live[0].people[2].name === "Deaconess Team", "a typed-in name was changed");
       const settled = withCurrentNames(live, byId);
       ok(settled === live, "refreshing names that had not changed made a new list");
+    }
+
+    // A group on the page is whoever is in the group: added, taken out, or
+    // renamed there, the page follows with nobody touching it.
+    {
+      const people = data.people.slice(0, 6);
+      const tags = [
+        { id: "g-deacons", name: "Deacons" },
+        { id: "g-elders", name: "Elders" },
+      ];
+      const links = [
+        { person_id: people[3].id, tag_id: "g-deacons" },
+        { person_id: people[1].id, tag_id: "g-deacons" },
+        { person_id: people[1].id, tag_id: "g-deacons" },
+        { person_id: people[2].id, tag_id: "g-elders" },
+      ];
+      const byId = new Map(people.map((person) => [person.id, person]));
+      const saved = [
+        { id: "d", title: "", groupId: "g-deacons", groupName: "Deacons", people: [] },
+        { id: "e", title: "Our Elders", groupId: "g-elders", groupName: "Elders", people: [] },
+      ];
+      const fileAs = (person: (typeof people)[number]) =>
+        `${person.last_name} ${leaderName(person)}`.toLowerCase();
+      const want = [people[3], people[1]].sort((a, b) => fileAs(a).localeCompare(fileAs(b)));
+
+      const first = currentLeadership(saved, byId, leadershipGroups(tags, links, people));
+      ok(
+        JSON.stringify(first[0].people.map((leader) => leader.personId)) ===
+          JSON.stringify(want.map((person) => person.id)),
+        "a group on the page is not its members, once each, by surname",
+      );
+      ok(sectionTitle(first[0]) === "Deacons", "a group's heading is not its name");
+      ok(sectionTitle(first[1]) === "Our Elders", "a heading typed over a group's name was lost");
+
+      const joined = leadershipGroups(
+        [{ id: "g-deacons", name: "Deacon Board" }, tags[1]],
+        [...links, { person_id: people[4].id, tag_id: "g-deacons" }],
+        people.map((person, i) => (i === 3 ? { ...person, is_active: false } : person)),
+      );
+      const later = currentLeadership(first, byId, joined);
+      const ids = later[0].people.map((leader) => leader.personId);
+      ok(ids.includes(people[4].id), "somebody added to the group is not on the page");
+      ok(
+        !ids.includes(people[3].id),
+        "somebody no longer printing in the directory is still on it",
+      );
+      ok(sectionTitle(later[0]) === "Deacon Board", "a renamed group kept its old heading");
+
+      const gone = currentLeadership(later, byId, new Map());
+      ok(gone === later, "a deleted group's section changed");
+      ok(
+        printedSections(gone).some((section) => section.title === "Deacon Board"),
+        "a deleted group stopped printing the names it was saved with",
+      );
+      ok(
+        currentLeadership(later, byId, joined) === later,
+        "redrawing a group that had not changed made a new list",
+      );
+
+      const book = composeBook(
+        entries,
+        normalizeSettings({ includeLeadership: true, leadership: later }),
+        metrics,
+      );
+      const texts = leadershipOf(book).flatMap((page) => page.runs.map((run) => run.text));
+      ok(texts.includes("DEACON BOARD"), "a group's heading did not print");
+      ok(
+        later[0].people.every((leader) => texts.includes(leader.name)),
+        "a group's members did not all print",
+      );
     }
 
     console.log(
@@ -1467,7 +1545,7 @@ async function main() {
       { bookletOrder: true, includeCover: false },
       { includeIndex: false, showPhotos: false, cardStyle: "box" },
       { notePages: 3, runningHeader: false },
-      { includeLeadership: true, leadership: demoLeadership(data.people) },
+      { includeLeadership: true, leadership: demoLeadership(data) },
       { memberStyle: "detailed", showBirthdays: true, showAnniversary: true, textScale: "large" },
       { pageSize: "a4", showLetterTabs: false, runningHeader: false, showPageNumbers: false },
       { pageSize: "legal", footerText: "For the congregation", photoFit: "fit" },
