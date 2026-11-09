@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useDirectory } from "@/data/DirectoryContext";
 import { Checkbox, Field } from "@/components/ui";
+import { TagPicker } from "@/components/TagPicker";
 import { sortKey } from "@/lib/format";
 import {
   LEADERS_PER_SECTION_MAX,
@@ -88,6 +89,9 @@ export function LeadershipEditor({
 
   const onPage = new Set(sections.map((section) => section.groupId).filter(Boolean));
   const groupList = [...groups.entries()].sort(([, a], [, b]) => a.name.localeCompare(b.name));
+  const { tags } = useDirectory();
+  /** The directory's groups as pills, in the same order as the list above. */
+  const pickable = useMemo(() => tags.filter((tag) => groups.has(tag.id)), [tags, groups]);
 
   /** A group goes in after the groups already on the page, which print first. */
   const tick = (id: string, on: boolean) => {
@@ -159,25 +163,28 @@ export function LeadershipEditor({
               <fieldset className="leader-groups">
                 <legend>Groups on this page</legend>
                 <p className="hint">
-                  Each prints under its name with whoever is in it, by surname. Change who is in a
-                  group on the Groups page and the page follows.
+                  Tap a group to put it on the page, and again to take it off. Each prints under its
+                  name with whoever is in it, by surname.
                 </p>
-                <div className="leader-group-list">
-                  {groupList.map(([id, group]) => (
-                    <Checkbox
-                      key={id}
-                      label={group.name}
-                      hint={
-                        group.members.length === 0
-                          ? "Nobody in it yet"
-                          : `${group.members.length} ${group.members.length === 1 ? "person" : "people"}`
-                      }
-                      checked={onPage.has(id)}
-                      disabled={disabled}
-                      onChange={(on) => tick(id, on)}
-                    />
-                  ))}
-                </div>
+                {/* The same pills a group is picked with everywhere else in
+                    the app: a church has a dozen groups or more, and a
+                    checkbox and a count for each was a screen of scrolling
+                    to find the three that matter here. Who is in each is
+                    shown below, once it is on the page. */}
+                <TagPicker
+                  tags={pickable}
+                  selected={sections.flatMap((section) =>
+                    section.groupId && groups.has(section.groupId) ? [section.groupId] : [],
+                  )}
+                  disabled={disabled}
+                  onChange={(next) => {
+                    const wanted = new Set(next);
+                    const added = next.find((id) => !onPage.has(id));
+                    const removed = [...onPage].find((id) => id && !wanted.has(id));
+                    if (added) tick(added, true);
+                    else if (removed) tick(removed, false);
+                  }}
+                />
               </fieldset>
             ) : null}
 

@@ -62,6 +62,7 @@ export function TagPicker({ tags, selected, onChange, allowCreate, onCreated, di
               key={tag.id}
               type="button"
               className="pill"
+              aria-pressed={on}
               disabled={disabled}
               onClick={() => toggle(tag.id)}
               style={{
