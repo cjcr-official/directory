@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useDirectory } from "@/data/DirectoryContext";
-import { Caret, Checkbox, Field } from "@/components/ui";
+import { Caret, Checkbox, Disclosure, Field } from "@/components/ui";
 import { PersonPicker, leaderGone, shift } from "@/components/LeadershipEditor";
 import { leaderName, type Leader, type LeaderGroup } from "@/lib/layout/leadership";
 import { LEADERS_PER_SECTION_MAX as PEOPLE_MAX } from "@/lib/layout/leadership";
@@ -71,177 +71,179 @@ export function BackCoverEditor({
   };
   const tooLong = settings.backQrLink.trim() !== "" && settings.backQr.length === 0;
 
+  const summary = settings.includeBack
+    ? [
+        `${staff.length} staff`,
+        settings.backMotto.trim() !== "" && "motto",
+        settings.backQr.length > 0 && "QR code",
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "Not printed";
+
   return (
-    <section className="card" aria-labelledby="book-back" onFocus={onFocus}>
-      <div className="card-head column">
-        <h2 id="book-back">Back cover</h2>
-        <span className="muted small">
-          The last page: office hours, staff, and how to reach the church
-        </span>
-      </div>
-      <div className="card-body">
-        <Checkbox
-          label="Print a back cover"
-          hint="On the very last page, the outside of the folded book."
-          checked={settings.includeBack}
-          disabled={disabled}
-          onChange={(value) => onChange({ includeBack: value })}
-        />
+    <Disclosure title="Back cover" summary={summary} onFocus={onFocus}>
+      <Checkbox
+        label="Print a back cover"
+        hint="On the very last page, the outside of the folded book."
+        checked={settings.includeBack}
+        disabled={disabled}
+        onChange={(value) => onChange({ includeBack: value })}
+      />
 
-        {settings.includeBack ? (
-          <>
-            <div style={{ marginTop: 14 }}>
-              <Field
-                label="Name at the top"
-                hint="Leave empty to use the church's name from the cover."
-                htmlFor="back_title"
-              >
-                <input
-                  id="back_title"
-                  type="text"
-                  value={settings.backTitle}
-                  placeholder={settings.churchName.trim() || "Plains Alliance Church"}
-                  disabled={disabled}
-                  onChange={(event) => onChange({ backTitle: event.target.value })}
-                />
-              </Field>
-            </div>
-            <div>
-              <Field
-                label="Hours heading"
-                hint="Over the staff. Each person's office hours go with them below."
-                htmlFor="back_hours_heading"
-              >
-                <input
-                  id="back_hours_heading"
-                  type="text"
-                  value={settings.backHoursHeading}
-                  placeholder="Staff Office Hours"
-                  disabled={disabled}
-                  onChange={(event) => onChange({ backHoursHeading: event.target.value })}
-                />
-              </Field>
-            </div>
-
-            <div className="field">
-              <span className="field-label-like">Staff</span>
-              <span className="hint">
-                A role and who holds it, with their email, phone and office hours underneath. Tap a
-                line to change it.
-              </span>
-            </div>
-
-            {staff.length ? (
-              <ol className="leader-sections">
-                {staff.map((entry, index) =>
-                  openId === entry.id ? (
-                    <StaffEditor
-                      key={entry.id}
-                      entry={entry}
-                      groups={groups}
-                      fresh={entry.id === freshId}
-                      first={index === 0}
-                      last={index === staff.length - 1}
-                      disabled={disabled}
-                      onChange={(change) => update(entry.id, change)}
-                      onMove={(by) => setStaff(shift(staff, index, by))}
-                      onRemove={() => {
-                        setOpenId(null);
-                        setStaff(staff.filter((other) => other.id !== entry.id));
-                      }}
-                      onDone={() => setOpenId(null)}
-                    />
-                  ) : (
-                    <StaffLine
-                      key={entry.id}
-                      entry={entry}
-                      groups={groups}
-                      onOpen={() => {
-                        setFreshId(null);
-                        setOpenId(entry.id);
-                      }}
-                    />
-                  ),
-                )}
-              </ol>
-            ) : null}
-
-            {disabled ? null : (
-              <div className="row tight" style={{ marginTop: 12 }}>
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={staff.length >= STAFF_MAX}
-                  onClick={() => {
-                    const made: StaffEntry = {
-                      id: newStaffId(),
-                      role: "",
-                      people: [],
-                      lines: "",
-                      hours: "",
-                    };
-                    setFreshId(made.id);
-                    setOpenId(made.id);
-                    setStaff([...staff, made]);
-                  }}
-                >
-                  + Add staff
-                </button>
-              </div>
-            )}
-
-            <div style={{ marginTop: 16 }}>
-              <Checkbox
-                label="The logo at the foot of the box"
-                hint={
-                  settings.coverLogoPath
-                    ? "The same logo as the cover."
-                    : "Add a logo under Cover and it shows here too."
-                }
-                checked={settings.backShowLogo}
+      {settings.includeBack ? (
+        <>
+          <div style={{ marginTop: 14 }}>
+            <Field
+              label="Name at the top"
+              hint="Leave empty to use the church's name from the cover."
+              htmlFor="back_title"
+            >
+              <input
+                id="back_title"
+                type="text"
+                value={settings.backTitle}
+                placeholder={settings.churchName.trim() || "Plains Alliance Church"}
                 disabled={disabled}
-                onChange={(value) => onChange({ backShowLogo: value })}
+                onChange={(event) => onChange({ backTitle: event.target.value })}
               />
-            </div>
+            </Field>
+          </div>
+          <div>
+            <Field
+              label="Hours heading"
+              hint="Over the staff. Each person's office hours go with them below."
+              htmlFor="back_hours_heading"
+            >
+              <input
+                id="back_hours_heading"
+                type="text"
+                value={settings.backHoursHeading}
+                placeholder="Staff Office Hours"
+                disabled={disabled}
+                onChange={(event) => onChange({ backHoursHeading: event.target.value })}
+              />
+            </Field>
+          </div>
 
-            <div className="grid two" style={{ marginTop: 14 }}>
-              <Field label="Motto" hint="Under the box, in italics." htmlFor="back_motto">
-                <input
-                  id="back_motto"
-                  type="text"
-                  value={settings.backMotto}
-                  placeholder="“All of Jesus for All the World”"
-                  disabled={disabled}
-                  onChange={(event) => onChange({ backMotto: event.target.value })}
-                />
-              </Field>
-              <Field
-                label="QR code link"
-                hint={
-                  tooLong
-                    ? "Too long for a QR code — use a shorter address."
-                    : "Prints a QR code that opens it. Leave empty for none."
-                }
-                htmlFor="back_qr"
+          <div className="field">
+            <span className="field-label-like">Staff</span>
+            <span className="hint">
+              A role and who holds it, with their email, phone and office hours underneath. Tap a
+              line to change it.
+            </span>
+          </div>
+
+          {staff.length ? (
+            <ol className="leader-sections">
+              {staff.map((entry, index) =>
+                openId === entry.id ? (
+                  <StaffEditor
+                    key={entry.id}
+                    entry={entry}
+                    groups={groups}
+                    fresh={entry.id === freshId}
+                    first={index === 0}
+                    last={index === staff.length - 1}
+                    disabled={disabled}
+                    onChange={(change) => update(entry.id, change)}
+                    onMove={(by) => setStaff(shift(staff, index, by))}
+                    onRemove={() => {
+                      setOpenId(null);
+                      setStaff(staff.filter((other) => other.id !== entry.id));
+                    }}
+                    onDone={() => setOpenId(null)}
+                  />
+                ) : (
+                  <StaffLine
+                    key={entry.id}
+                    entry={entry}
+                    groups={groups}
+                    onOpen={() => {
+                      setFreshId(null);
+                      setOpenId(entry.id);
+                    }}
+                  />
+                ),
+              )}
+            </ol>
+          ) : null}
+
+          {disabled ? null : (
+            <div className="row tight" style={{ marginTop: 12 }}>
+              <button
+                type="button"
+                className="btn"
+                disabled={staff.length >= STAFF_MAX}
+                onClick={() => {
+                  const made: StaffEntry = {
+                    id: newStaffId(),
+                    role: "",
+                    people: [],
+                    lines: "",
+                    hours: "",
+                  };
+                  setFreshId(made.id);
+                  setOpenId(made.id);
+                  setStaff([...staff, made]);
+                }}
               >
-                <input
-                  id="back_qr"
-                  type="url"
-                  inputMode="url"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  value={settings.backQrLink}
-                  placeholder="https://yourchurch.org"
-                  disabled={disabled}
-                  onChange={(event) => setLink(event.target.value)}
-                />
-              </Field>
+                + Add staff
+              </button>
             </div>
-          </>
-        ) : null}
-      </div>
-    </section>
+          )}
+
+          <div style={{ marginTop: 16 }}>
+            <Checkbox
+              label="The logo at the foot of the box"
+              hint={
+                settings.coverLogoPath
+                  ? "The same logo as the cover."
+                  : "Add a logo under Cover and it shows here too."
+              }
+              checked={settings.backShowLogo}
+              disabled={disabled}
+              onChange={(value) => onChange({ backShowLogo: value })}
+            />
+          </div>
+
+          <div className="grid two" style={{ marginTop: 14 }}>
+            <Field label="Motto" hint="Under the box, in italics." htmlFor="back_motto">
+              <input
+                id="back_motto"
+                type="text"
+                value={settings.backMotto}
+                placeholder="“All of Jesus for All the World”"
+                disabled={disabled}
+                onChange={(event) => onChange({ backMotto: event.target.value })}
+              />
+            </Field>
+            <Field
+              label="QR code link"
+              hint={
+                tooLong
+                  ? "Too long for a QR code — use a shorter address."
+                  : "Prints a QR code that opens it. Leave empty for none."
+              }
+              htmlFor="back_qr"
+            >
+              <input
+                id="back_qr"
+                type="url"
+                inputMode="url"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                value={settings.backQrLink}
+                placeholder="https://yourchurch.org"
+                disabled={disabled}
+                onChange={(event) => setLink(event.target.value)}
+              />
+            </Field>
+          </div>
+        </>
+      ) : null}
+    </Disclosure>
   );
 }
 

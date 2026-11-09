@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDirectory } from "@/data/DirectoryContext";
 import { useAuth } from "@/auth/AuthProvider";
 import {
+  Caret,
   ChangedNote,
   Checkbox,
   ConfirmButton,
@@ -23,8 +24,9 @@ import {
   setProjectEntries,
   setProjectTags,
   updateProject,
+  type ProjectWithSelection,
 } from "@/lib/queries";
-import type { ProjectKind, ProjectRow, SelectionMode } from "@/lib/database.types";
+import type { EntryType, ProjectKind, ProjectRow, SelectionMode } from "@/lib/database.types";
 import { directoryKinds, mainDirectoryId, type DirectoryKind } from "@/lib/directoryKind";
 import {
   COVER_PARTS,
@@ -72,20 +74,18 @@ import { currentStaff } from "@/lib/layout/backCover";
 import { currentLeadership, leadershipGroups } from "@/lib/layout/leadership";
 
 /*
- * Stand-in storage paths for a picture that has been chosen but not yet
- * uploaded. The composer draws a photograph by its path, and a Blob picked a
- * second ago does not have one, so these carry it as far as the canvas. They
- * never reach the database: Save uploads the Blob and writes the real path.
- * Prefixed so they cannot collide with anything storage would hand back.
+ * Stand-in storage paths for cover artwork that has been chosen but not yet
+ * uploaded. The composer draws a picture by its path, so these carry a fresh
+ * Blob as far as the canvas. They never reach the database: Save uploads the
+ * Blob and writes the real path.
  */
 const PENDING_LOGO = "pending:cover-logo";
 const PENDING_PHOTO = "pending:cover-photo";
 
 /**
- * The five lines on a cover that come from a setting, and the grey words each
- * holds its place with while it is being typed in. Named after what belongs
- * there, because they are read on the cover by somebody who has never seen the
- * field they came from.
+ * The cover's lines that come from a setting, and the grey words each shows
+ * while it is empty and being typed in. Named for what belongs on the paper,
+ * because they are read on the cover rather than beside a field.
  */
 const COVER_PLACEHOLDER: Record<string, string> = {
   churchName: "Your church's name",
@@ -95,16 +95,12 @@ const COVER_PLACEHOLDER: Record<string, string> = {
   coverContact: "The address, and how to reach the office",
 };
 
-/** The two of them that may hold more than one line. */
+/** The cover lines that may run to more than one line. */
 const COVER_MULTILINE = new Set(["coverStatement", "coverContact", "coverTitle", "coverSubtitle"]);
 
 /**
- * What each part of the cover is called when a handle has to name it.
- *
- * Read aloud by a screen reader as "Move the church's name", so they are the
- * words for the thing on the paper rather than the words on the field that
- * fills it in - somebody moving the address about is not thinking about a
- * textarea labelled Contact details.
+ * What each part of the cover is called when a handle names it - read aloud
+ * as "Move the church's name", so they are words for the thing on the paper.
  */
 const COVER_PART_LABELS: Record<CoverPart, string> = {
   coverLogo: "the logo",
@@ -116,6 +112,51 @@ const COVER_PART_LABELS: Record<CoverPart, string> = {
   coverContact: "the contact details",
 };
 
+/** The pages the preview can show, in the order they print. */
+type Stage = "cover" | "leadership" | "back";
+const STAGE_LABELS: Record<Stage, string> = {
+  cover: "Cover",
+  leadership: "Leadership",
+  back: "Back",
+};
+
+/** The settings that are a plain on/off switch. */
+type Flag = {
+  [K in keyof ProjectSettings]: ProjectSettings[K] extends boolean ? K : never;
+}[keyof ProjectSettings];
+
+/** A hand-picked record is held as "household:id" or "person:id". */
+function splitKey(key: string): { entry_type: EntryType; ref_id: string } {
+  const [entry_type, ref_id] = key.split(":");
+  return { entry_type: entry_type as EntryType, ref_id };
+}
+
+/**
+ * The parts of a panel's summary that apply, separated the same way in every
+ * panel so they read as a set.
+ */
+function listOr(parts: (string | false)[], none: string): string {
+  return parts.filter(Boolean).join(" · ") || none;
+}
+
+/** What "Print as" does, given who is included. */
+function printAsHint(wholeFamily: boolean, mode: SelectionMode): string {
+  const what = wholeFamily
+    ? "One card per family, with the family's details. Someone with no family gets a card of their own."
+    : "One card per person, with only their own details. Without a photo of their own, the family photo is used.";
+  const how =
+    mode === "tags"
+      ? wholeFamily
+        ? "Anyone in a group brings their whole family. Groups stay live: anyone added to one prints next time."
+        : "Only the people in the groups print. Groups stay live: anyone added to one prints next time."
+      : mode === "manual"
+        ? wholeFamily
+          ? "To pick people one at a time, for name tags say, print as individuals."
+          : "Only the people ticked print, each with a card and a name tag of their own."
+        : "";
+  return how ? `${what} ${how}` : what;
+}
+
 export function ProjectEditPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -125,10 +166,7 @@ export function ProjectEditPage() {
 
   const [name, setName] = useState("Church Directory");
   const [kind, setKind] = useState<DirectoryKind>("group");
-  /**
-   * Every directory, for which one is the main one. There is only one, so
-   * choosing Main here says which directory stops being it.
-   */
+  /** Every directory, to know which one is the main one. */
   const [directories, setDirectories] = useState<ProjectRow[] | null>(null);
   const [description, setDescription] = useState("");
   const [mode, setMode] = useState<SelectionMode>("all");
@@ -136,11 +174,8 @@ export function ProjectEditPage() {
   const [picked, setPicked] = useState<string[]>([]);
   const [settings, setSettings] = useState<ProjectSettings>(DEFAULT_SETTINGS);
   /**
-   * Cover artwork chosen but not yet uploaded.
-   *
-   * Nothing reaches storage until the directory is saved, so backing out of a
-   * half-made change leaves no orphan file behind - the same bargain the family
-   * and person forms make with their portraits.
+   * Cover artwork chosen but not yet uploaded. Nothing reaches storage until
+   * the directory is saved, so backing out leaves no orphan file behind.
    */
   const [coverBlobs, setCoverBlobs] = useState<{ photo?: Blob | null; logo?: Blob | null }>({});
   const [coverRemoved, setCoverRemoved] = useState<{ photo?: boolean; logo?: boolean }>({});
@@ -150,26 +185,35 @@ export function ProjectEditPage() {
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   /**
-   * The version this form was opened on, as a fingerprint for the save.
-   *
-   * Held separately from the loaded row on purpose: a reload refreshes that,
-   * and what is wanted here is the version that was on screen when the editing
-   * started.
+   * The version the editing started from, as a fingerprint for the save. Kept
+   * apart from `changed`, which follows whatever the last write returned.
    */
   const [openedAt, setOpenedAt] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
-  /**
-   * When this directory was last written and by whom.
-   *
-   * Held apart from openedAt, which is a fingerprint for the save and must go
-   * on naming the version the editing started from. This pair is only ever
-   * read, and follows whatever the last write actually returned.
-   *
-   * A directory is loaded straight from the database on this screen rather
-   * than read out of the shared context, so it carries its own copy where the
-   * family and person forms can use the row the context already holds.
-   */
+  /** When this directory was last written, and by whom. */
   const [changed, setChanged] = useState<{ at: string; by: string | null } | null>(null);
+
+  const set = useCallback((patch: Partial<ProjectSettings>) => {
+    setSettings((current) => ({ ...current, ...patch }));
+  }, []);
+
+  /** Puts a directory, as the database has it, onto the form. */
+  const applyLoaded = useCallback(
+    (projectId: string, loaded: ProjectWithSelection, all: ProjectRow[]) => {
+      setDirectories(all);
+      setName(loaded.project.name);
+      setKind(directoryKinds(all).get(projectId) ?? "group");
+      setDescription(loaded.project.description ?? "");
+      setMode(loaded.project.selection_mode);
+      setTagIds(loaded.tagIds);
+      setPicked(loaded.entries.map((row) => `${row.entry_type}:${row.ref_id}`));
+      setSettings(normalizeSettings(loaded.project.settings));
+      setOpenedAt(loaded.project.updated_at);
+      setChanged({ at: loaded.project.updated_at, by: loaded.project.updated_by ?? null });
+      setStale(false);
+    },
+    [],
+  );
 
   // A new directory is the main one when there is none yet, and a group one
   // otherwise.
@@ -194,25 +238,14 @@ export function ProjectEditPage() {
     setLoading(true);
     Promise.all([fetchProject(id), fetchProjects()])
       .then(([loaded, all]) => {
-        if (!active) return;
-        setDirectories(all);
-        setName(loaded.project.name);
-        setKind(directoryKinds(all).get(id) ?? "group");
-        setDescription(loaded.project.description ?? "");
-        setMode(loaded.project.selection_mode);
-        setTagIds(loaded.tagIds);
-        setPicked(loaded.entries.map((row) => `${row.entry_type}:${row.ref_id}`));
-        setSettings(normalizeSettings(loaded.project.settings));
-        setOpenedAt(loaded.project.updated_at);
-        setChanged({ at: loaded.project.updated_at, by: loaded.project.updated_by ?? null });
-        setStale(false);
+        if (active) applyLoaded(id, loaded, all);
       })
       .catch((cause) => setError(message(cause)))
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [id, applyLoaded]);
 
   /** The directory that is the main one now, and what it is called. */
   const currentMain = directories ? mainDirectoryId(directories) : null;
@@ -224,15 +257,11 @@ export function ProjectEditPage() {
       mode,
       tagIds,
       wholeFamily: settings.groupWholeFamily,
-      entries: picked.map((key, position) => {
-        const [entry_type, ref_id] = key.split(":");
-        return {
-          project_id: id ?? "",
-          entry_type: entry_type as "household" | "person",
-          ref_id,
-          position,
-        };
-      }),
+      entries: picked.map((key, position) => ({
+        project_id: id ?? "",
+        ...splitKey(key),
+        position,
+      })),
     }),
     [mode, tagIds, picked, id, settings.groupWholeFamily],
   );
@@ -240,24 +269,19 @@ export function ProjectEditPage() {
   const included = useMemo(() => resolveEntries(entries, selection), [entries, selection]);
 
   // The checklist is the one place a family is picked by its name alone, so it
-  // is the one place the office label belongs. It is added here rather than in
-  // buildEntries because `title` is also what the printed card and the index
-  // are composed from - putting it there would print the office's filing note
-  // in the congregation's book.
+  // carries the office's label. Not added in buildEntries, because `title` is
+  // also what the printed card and the index are composed from.
   const pickable = useMemo(
     () => pickList(entries, settings.groupWholeFamily, labelledHouseholdName),
     [entries, settings.groupWholeFamily],
   );
   // The rows/columns inputs can hold a half-typed or empty value; the summary
-  // and the saved record both use the clamped version so neither can show or
-  // store "0 records to a sheet".
+  // and the saved record both use the clamped version.
   const safeSettings = useMemo(() => normalizeSettings(settings), [settings]);
   /*
-   * The offices, with each group listing whoever is in it now and each
-   * person's name as their record has it now - what the list shows, what the
-   * page is drawn with, and what Save writes. A deacon added to the group, or
-   * a name changed on somebody's record, is carried across without anybody
-   * having to come here.
+   * The offices, with each group's members and each person's name as their
+   * records have them now - what the list shows, the page draws and Save
+   * writes.
    */
   const groups = useMemo(
     () => leadershipGroups(tags, personTags, people),
@@ -267,20 +291,18 @@ export function ProjectEditPage() {
     () => currentLeadership(settings.leadership, personById, groups),
     [settings.leadership, personById, groups],
   );
-  /** The back cover's staff the same way. */
   const backStaff = useMemo(
     () => currentStaff(settings.backStaff, personById, groups),
     [settings.backStaff, personById, groups],
   );
-  const sheets = Math.ceil(included.length / recordsPerSheet(safeSettings));
+  const perSheet = recordsPerSheet(safeSettings);
+  const sheets = Math.ceil(included.length / perSheet);
 
-  // --- the cover, drawn ------------------------------------------------------
+  // --- the pages, drawn -------------------------------------------------------
 
   /**
-   * Font metrics for the typeface the book is set in. The composer needs them
-   * to break a line where the PDF will break it - without them the canvas would
-   * be a drawing of a cover rather than a proof of one - and they are fetched,
-   * so the canvas appears a moment after the card does.
+   * Font metrics for the book's typeface, so the canvas breaks lines where the
+   * PDF will. Fetched, so the drawing appears a moment after the card.
    */
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   useEffect(() => {
@@ -293,12 +315,7 @@ export function ProjectEditPage() {
     };
   }, [safeSettings.typeface]);
 
-  /**
-   * A photograph chosen a moment ago has been read into a Blob and not yet
-   * uploaded, so it has no storage path to be drawn by. These stand in as one
-   * until Save gives it a real one, which is what lets a logo appear on the
-   * canvas when it is picked rather than only after the record is written.
-   */
+  /** Object URLs for artwork picked but not yet uploaded. */
   const pendingCoverUrls = useMemo(() => {
     const urls = new Map<string, string>();
     if (coverBlobs.logo) urls.set(PENDING_LOGO, URL.createObjectURL(coverBlobs.logo));
@@ -310,13 +327,7 @@ export function ProjectEditPage() {
     [pendingCoverUrls],
   );
 
-  /**
-   * The settings as they would print this second, artwork and all.
-   *
-   * The cover and the name tag are both drawn from these, and both carry the
-   * same mark, so the substitution of a picture chosen a moment ago for one
-   * that has been saved belongs here rather than in each of them.
-   */
+  /** The settings as they would print this second, artwork and all. */
   const drawnSettings = useMemo(
     () => ({
       ...safeSettings,
@@ -337,15 +348,9 @@ export function ProjectEditPage() {
   );
 
   /*
-   * A line being typed in keeps its place even when it has been emptied.
-   *
-   * Composed, a setting with nothing in it is not on the cover at all - which
-   * is right on paper and a trap on screen: clear the subtitle and the box you
-   * were typing in vanishes under the cursor. So an emptied line stands in with
-   * grey words for exactly as long as it has the caret, and no longer. A
-   * placeholder that outstayed the caret would have the screen laying the cover
-   * out around type the paper never sees - and on a cover that matters more
-   * than on a tag, because everything below a line moves when it goes.
+   * The cover line being typed in. An emptied line is not on the cover at all,
+   * which would make the box vanish under the caret - so while it has the
+   * caret it stands in with grey words, and no longer than that.
    */
   const [editing, setEditing] = useState<string | null>(null);
 
@@ -367,7 +372,6 @@ export function ProjectEditPage() {
     );
   }, [metrics, safeSettings.includeCover, drawnSettings, editing]);
 
-  /** The leadership page as it would print, when there is one. */
   const leadershipPreview = useMemo(
     () =>
       metrics && safeSettings.includeLeadership
@@ -375,51 +379,37 @@ export function ProjectEditPage() {
         : null,
     [metrics, safeSettings.includeLeadership, drawnSettings],
   );
-  /**
-   * Which page the drawing on the right is of. It follows whichever card is
-   * being worked in - typing a deacon's name shows the leadership page - and
-   * the buttons over it change it by hand.
-   */
-  /** The back cover as it would print, when there is one. */
   const backPreview = useMemo(
     () => (metrics && safeSettings.includeBack ? composeBackPreview(drawnSettings, metrics) : null),
     [metrics, safeSettings.includeBack, drawnSettings],
   );
-  const [stage, setStage] = useState<"cover" | "leadership" | "back">("cover");
-  const showing =
-    stage === "leadership" && leadershipPreview
-      ? "leadership"
-      : stage === "back" && backPreview
-        ? "back"
-        : "cover";
+
+  /**
+   * Which page the preview shows. It follows the panel being worked in, and
+   * the switch over it changes it by hand.
+   */
+  const [stage, setStage] = useState<Stage>("cover");
+  const stages: Stage[] = [
+    "cover",
+    ...(leadershipPreview ? (["leadership"] as const) : []),
+    ...(backPreview ? (["back"] as const) : []),
+  ];
+  const showing: Stage = stages.includes(stage) ? stage : "cover";
 
   /*
-   * Where each part of the cover actually ended up.
-   *
-   * The composer keeps everything on the paper, so what it used is not always
-   * what is stored - and a drag has to be measured against what is on screen
-   * or it stops feeling like dragging. Held in a ref rather than read from
-   * `coverPage` directly so that the handlers below never need rebuilding: a
-   * new one of those on every frame of a drag is a new prop on the drawing
-   * sixty times a second.
+   * Where each part of the cover actually ended up, and what its ink covers.
+   * A drag is measured against what is on screen, and held in refs so the
+   * handlers below never need rebuilding mid-drag.
    */
   const placedRef = useRef<CoverPlacements>({});
   placedRef.current = coverPage?.placed ?? {};
-  /* The same, for what each part's ink covers - what the guides centre. */
   const boxesRef = useRef<NonNullable<typeof coverPage>["boxes"]>({});
   boxesRef.current = coverPage?.boxes ?? {};
 
   /** Whether the centring guides are drawn, and pull a dragged part onto them. */
   const [guides, setGuides] = useState(readGuides);
 
-  /**
-   * One part of the cover, moved or resized from where it is drawn now.
-   *
-   * The rule itself lives with the settings, because what it does with a part
-   * that has been dragged past the edge of the paper is not an opinion this
-   * screen is entitled to have. Held in a callback that never changes, so that
-   * a drag is not handing the drawing a new set of props sixty times a second.
-   */
+  /** One part of the cover, moved or resized from where it is drawn now. */
   const place = useCallback((part: string, change: (from: CoverPlacement) => CoverPlacement) => {
     setSettings((current) => ({
       ...current,
@@ -432,13 +422,7 @@ export function ProjectEditPage() {
     }));
   }, []);
 
-  /*
-   * The cover, handing its parts back to be moved.
-   *
-   * Only where this browser may actually change the directory: a reader gets
-   * the drawing and none of the handles, exactly as they get the type and no
-   * way to type over it.
-   */
+  /** The cover's handles - only where this person may change the directory. */
   const movableCover = useMemo<MovableParts | undefined>(
     () =>
       canEdit
@@ -460,41 +444,32 @@ export function ProjectEditPage() {
   );
 
   /*
-   * The cover, handing its own type back.
-   *
-   * Writing goes through the same set() the pane's own fields use, so the two
-   * are never out of step and Save means what it always did.
+   * The cover's own type, edited where it is drawn. Writes go through the same
+   * set() the form's fields use, so the two never disagree.
    */
   const editableCover = useMemo(
     () => ({
-      value: (field: string) => (settings?.[field as keyof typeof settings] as string) ?? "",
+      value: (field: string) => (settings[field as keyof ProjectSettings] as string) ?? "",
       placeholder: (field: string) => COVER_PLACEHOLDER[field] ?? "",
       multiline: (field: string) => COVER_MULTILINE.has(field),
       onChange: (field: string, value: string) => set({ [field]: value }),
       onFocus: (field: string) => setEditing(field),
       onBlur: (field: string) => setEditing((current) => (current === field ? null : current)),
       /*
-       * The church's name is the one line the composer does not draw as it was
-       * typed: it sets it in capitals with a space between every letter, which
-       * is a shape no field can hold. So the box that edits it wears the shape
-       * instead - capitals and tracking in CSS - and holds the name as it was
-       * written. The tracking is added after the last letter as well, which
-       * pushes a centred line left by half of it; half of it back as an indent
-       * puts it where the composed line sits. The same correction the code
-       * field on Settings makes, for the same reason.
-       *
-       * It is near rather than exact - CSS spaces letters, the composer spaces
-       * them with spaces - and it is only worn while the caret is in the box.
+       * The church's name prints in spaced capitals, which no field can hold,
+       * so its box wears that shape in CSS. The tracking also follows the last
+       * letter and pushes a centred line left; half of it back as an indent
+       * puts it where the composed line sits.
        */
       style: (field: string) =>
         field === "churchName"
           ? ({ textTransform: "uppercase", letterSpacing: "0.28em", textIndent: "0.14em" } as const)
           : undefined,
     }),
-    [settings],
+    [settings, set],
   );
 
-  // Saved photographs, fetched once per set of paths rather than per keystroke.
+  // Saved artwork, fetched once per set of paths rather than per keystroke.
   const [savedCoverUrls, setSavedCoverUrls] = useState<Map<string, string>>(new Map());
   const storedCoverPaths = [safeSettings.coverLogoPath, safeSettings.coverPhotoPath]
     .filter(Boolean)
@@ -516,69 +491,81 @@ export function ProjectEditPage() {
     [savedCoverUrls, pendingCoverUrls],
   );
 
-  // What the three panels below come to, said in a few words so they are worth
-  // reading shut. A list of what is on beats a count of how many, and every one
-  // of them is separated the same way - the panels read as a set, and a comma
-  // inside an item would not be told apart from the one between two of them.
-  const listOr = (parts: (string | false)[], none: string) =>
-    parts.filter(Boolean).join(" · ") || none;
+  // --- what each panel comes to, said on its lid ------------------------------
 
-  const pageSummary = listOr(
-    [
-      `${paperName(safeSettings.pageSize)} landscape`,
-      `${recordsPerSheet(safeSettings)} to a sheet`,
-      TYPEFACE_LABELS[safeSettings.typeface].toLowerCase(),
-      safeSettings.textScale === "large" ? "large text" : "normal text",
-    ],
-    "",
-  );
-
-  // What the name tags currently come to, for the card that leads to them.
-  const tagSummary = listOr(
-    [
-      TAG_SIZES[safeSettings.tagSize].label,
-      `${tagsPerSheet(safeSettings)} to a sheet`,
-      TAG_STYLES[safeSettings.tagStyle].label.toLowerCase(),
-      TYPEFACE_LABELS[safeSettings.tagNameFont].toLowerCase(),
-      `${safeSettings.tagNamePt}pt names`,
-      safeSettings.tagLine.trim() !== "" && "a line underneath",
-    ],
-    "",
-  );
-
-  const cardSummary = listOr(
-    [
-      safeSettings.showPhotos && "photographs",
-      safeSettings.showMembers && "members' names",
-      safeSettings.showAddress && "address",
-      safeSettings.showPhone && "phone",
-      safeSettings.showEmail && "email",
-      safeSettings.showBirthdays && "birthdays",
-      safeSettings.showAnniversary && "anniversaries",
-    ],
-    "names only",
-  );
-
-  const bookSummary = listOr(
-    [
-      safeSettings.includeLeadership && "leadership page",
-      safeSettings.includeIndex && "index",
-      safeSettings.includeBack && "back cover",
-      safeSettings.notePages > 0 &&
-        `${safeSettings.notePages} note ${safeSettings.notePages === 1 ? "page" : "pages"}`,
-      safeSettings.runningHeader && "running header",
-      safeSettings.showLetterTabs && "letter tabs",
-      safeSettings.showPageNumbers && "page numbers",
-      safeSettings.footerText.trim() !== "" && "footer note",
-    ],
-    "nothing extra",
+  const summary = useMemo(
+    () => ({
+      cover: safeSettings.includeCover
+        ? listOr(
+            [
+              safeSettings.coverTitle.trim(),
+              safeSettings.coverSubtitle.trim(),
+              drawnSettings.coverLogoPath !== "" && "logo",
+              drawnSettings.coverPhotoPath !== "" && "photograph",
+            ],
+            "Blank cover",
+          )
+        : "Not printed",
+      tags: listOr(
+        [
+          TAG_SIZES[safeSettings.tagSize].label,
+          `${tagsPerSheet(safeSettings)} to a sheet`,
+          TAG_STYLES[safeSettings.tagStyle].label.toLowerCase(),
+          TYPEFACE_LABELS[safeSettings.tagNameFont].toLowerCase(),
+          `${safeSettings.tagNamePt}pt names`,
+          safeSettings.tagLine.trim() !== "" && "a line underneath",
+        ],
+        "",
+      ),
+      page: listOr(
+        [
+          `${paperName(safeSettings.pageSize)} landscape`,
+          `${recordsPerSheet(safeSettings)} to a sheet`,
+          TYPEFACE_LABELS[safeSettings.typeface].toLowerCase(),
+          safeSettings.textScale === "large" ? "large text" : "normal text",
+        ],
+        "",
+      ),
+      record: listOr(
+        [
+          safeSettings.showPhotos && "photographs",
+          safeSettings.showMembers && "members' names",
+          safeSettings.showAddress && "address",
+          safeSettings.showPhone && "phone",
+          safeSettings.showEmail && "email",
+          safeSettings.showBirthdays && "birthdays",
+          safeSettings.showAnniversary && "anniversaries",
+        ],
+        "names only",
+      ),
+      book: listOr(
+        [
+          safeSettings.includeIndex && "index",
+          safeSettings.notePages > 0 &&
+            `${safeSettings.notePages} note ${safeSettings.notePages === 1 ? "page" : "pages"}`,
+          safeSettings.runningHeader && "running header",
+          safeSettings.showLetterTabs && "letter tabs",
+          safeSettings.showPageNumbers && "page numbers",
+          safeSettings.footerText.trim() !== "" && "footer note",
+        ],
+        "nothing extra",
+      ),
+    }),
+    [safeSettings, drawnSettings.coverLogoPath, drawnSettings.coverPhotoPath],
   );
 
   if (loading) return <LoadingScreen label="Loading directory…" />;
 
-  function set(patch: Partial<ProjectSettings>) {
-    setSettings((current) => ({ ...current, ...patch }));
-  }
+  /** An on/off setting as a checkbox. */
+  const flag = (key: Flag, label: string, hint?: string) => (
+    <Checkbox
+      label={label}
+      hint={hint}
+      checked={settings[key]}
+      disabled={!canEdit}
+      onChange={(value) => set({ [key]: value })}
+    />
+  );
 
   async function save(event?: React.FormEvent) {
     event?.preventDefault();
@@ -587,25 +574,14 @@ export function ProjectEditPage() {
 
   /**
    * Throws this browser's changes away and shows the directory as somebody
-   * else left it. Reading it again is what makes the form honest - the values
-   * on screen were worked out from a version that is no longer current.
+   * else left it - the values on screen came from a version no longer current.
    */
   async function discardMine() {
     if (!id) return;
     setSaving(true);
     try {
       const [loaded, all] = await Promise.all([fetchProject(id), fetchProjects()]);
-      setDirectories(all);
-      setName(loaded.project.name);
-      setKind(directoryKinds(all).get(id) ?? "group");
-      setDescription(loaded.project.description ?? "");
-      setMode(loaded.project.selection_mode);
-      setTagIds(loaded.tagIds);
-      setPicked(loaded.entries.map((row) => `${row.entry_type}:${row.ref_id}`));
-      setSettings(normalizeSettings(loaded.project.settings));
-      setOpenedAt(loaded.project.updated_at);
-      setChanged({ at: loaded.project.updated_at, by: loaded.project.updated_by ?? null });
-      setStale(false);
+      applyLoaded(id, loaded, all);
       setError(null);
     } catch (cause) {
       setError(message(cause));
@@ -615,8 +591,8 @@ export function ProjectEditPage() {
   }
 
   /**
-   * Writes the directory. `force` drops the check that it has not moved since
-   * it was opened - only reached from the button offered when it has, so
+   * Writes the directory. `force` drops the check that it has not changed since
+   * it was opened - reached only from the button offered when it has, so
    * overwriting somebody is a decision rather than an accident.
    */
   async function store(force: boolean) {
@@ -625,12 +601,9 @@ export function ProjectEditPage() {
     setError(null);
     try {
       /*
-       * Upload before deleting, and delete after writing the row - never any
-       * other way round. This runs on a phone on church wifi, so removing
-       * first meant a failed upload took the existing artwork with it; and the
-       * write below is allowed to fail by design, because a stale write is an
-       * outcome this screen has a whole button for, so removing before it meant
-       * a conflict destroyed the cover and left the directory pointing at it.
+       * Upload before deleting, and delete only after the row is written: a
+       * failed upload or a stale write must never take the existing artwork
+       * with it.
        */
       const discard: string[] = [];
       const settle = async (current: string, blob: Blob | null | undefined, gone?: boolean) => {
@@ -670,16 +643,13 @@ export function ProjectEditPage() {
         settings: saved as unknown as Record<string, unknown>,
       };
 
-      // There is one main directory. Choosing Main here hands the role over:
-      // the directory that has it becomes a group one first, because the
-      // database refuses two at once. If this save then fails - somebody else
-      // saved this directory meanwhile - the role goes back where it was, so
-      // the church is never left without a main directory by a failed save.
+      // There is one main directory. Choosing Main hands the role over: the
+      // current one becomes a group directory first, because the database
+      // refuses two at once, and gets it back if this save then fails.
       //
-      // A database that has not run 0012 knows only "directory" and "event",
-      // refuses the new kinds by name, and has no main directory to hand
-      // over. There the directory is saved with the old kind it does accept,
-      // so saving keeps working until the migration is run.
+      // A database that has not run 0012 knows only "directory" and "event"
+      // and has no main directory to hand over, so there the directory is
+      // saved with the old kind it accepts.
       const beforeKinds = (cause: unknown) => /projects_kind_check/.test(message(cause));
       let handingOver = kind === "main" && currentMain && currentMain !== id ? currentMain : null;
       if (handingOver) {
@@ -690,15 +660,15 @@ export function ProjectEditPage() {
           handingOver = null;
         }
       }
-      const save = (body: typeof payload) =>
+      const write = (body: typeof payload) =>
         id ? updateProject(id, body, force ? null : openedAt) : createProject(body);
       let project: ProjectRow;
       try {
         try {
-          project = await save(payload);
+          project = await write(payload);
         } catch (cause) {
           if (!beforeKinds(cause)) throw cause;
-          project = await save({ ...payload, kind: kind === "event" ? "event" : "directory" });
+          project = await write({ ...payload, kind: kind === "event" ? "event" : "directory" });
         }
       } catch (cause) {
         if (handingOver) await restoreMainDirectory(handingOver).catch(() => undefined);
@@ -708,15 +678,7 @@ export function ProjectEditPage() {
       for (const path of discard) await removePhoto(path);
 
       await setProjectTags(project.id, mode === "tags" ? tagIds : []);
-      await setProjectEntries(
-        project.id,
-        mode === "manual"
-          ? picked.map((key) => {
-              const [entry_type, ref_id] = key.split(":");
-              return { entry_type: entry_type as "household" | "person", ref_id };
-            })
-          : [],
-      );
+      await setProjectEntries(project.id, mode === "manual" ? picked.map(splitKey) : []);
 
       setSettings((current) => ({ ...current, ...cover }));
       setCoverBlobs({});
@@ -747,9 +709,8 @@ export function ProjectEditPage() {
           </Link>
           <h1>{isNew ? "New directory" : name}</h1>
           <div className="sub">
-            {included.length} record{included.length === 1 ? "" : "s"} ·{" "}
-            {recordsPerSheet(safeSettings)} to a sheet · about {sheets} sheet
-            {sheets === 1 ? "" : "s"} of paper
+            {included.length} record{included.length === 1 ? "" : "s"} · {perSheet} to a sheet ·
+            about {sheets} sheet{sheets === 1 ? "" : "s"} of paper
           </div>
           {changed ? <ChangedNote updatedAt={changed.at} author={authorName(changed.by)} /> : null}
         </div>
@@ -800,25 +761,14 @@ export function ProjectEditPage() {
       {savedAt ? <Notice kind="ok">Saved.</Notice> : null}
 
       <form onSubmit={save}>
-        {/* Everything that sets the book on the left, the book itself on the
-            right. The settings scroll inside their own column and the drawing
-            stays where it is - which is the whole point of drawing it here,
-            since every field on this form is described in words ("the big
-            line", "the foot of the cover") and words are a poor way to know
-            whether a title has come out too long for its own page.
+        {/* The settings on the left, the page they make on the right. On a
+            phone the two stack and the preview leads (see .desk-stage).
 
-            The three panels that open are kept together and kept last: opening
-            one then only lengthens the column below what has already been
-            read, rather than moving anything beside it.
-
-            On a phone the two stack and the cover leads: the stylesheet lifts
-            it, so that a form this long does not have to be scrolled past to
-            reach the picture of what it is making. */}
+            Who it is for and who is in it stay open; everything else is a
+            panel that opens, in the order the book prints, each saying on its
+            lid what it is currently set to. */}
         <div className="desk">
           <div className="desk-settings">
-            {/* Said once, on the head, rather than under all three fields:
-                none of them prints, and the cover's own title is a field of
-                its own further down. */}
             <section className="card" aria-labelledby="book-details">
               <div className="card-head column">
                 <h2 id="book-details">Details</h2>
@@ -862,11 +812,12 @@ export function ProjectEditPage() {
                   </Field>
                 </div>
 
-                <Field label="Description" hint="Optional." htmlFor="project_description">
+                <Field label="Description" htmlFor="project_description">
                   <textarea
                     id="project_description"
                     rows={2}
                     value={description}
+                    placeholder="Optional"
                     disabled={!canEdit}
                     onChange={(event) => setDescription(event.target.value)}
                   />
@@ -879,7 +830,15 @@ export function ProjectEditPage() {
                 <h2 id="book-people">People</h2>
               </div>
               <div className="card-body">
-                <Field label="Include" htmlFor="mode">
+                <Field
+                  label="Include"
+                  htmlFor="mode"
+                  hint={
+                    mode === "all"
+                      ? "Everyone marked “include in printed directories” prints, in alphabetical order."
+                      : undefined
+                  }
+                >
                   <select
                     id="mode"
                     value={mode}
@@ -911,35 +870,11 @@ export function ProjectEditPage() {
                   />
                 ) : null}
 
-                {mode === "all" ? (
-                  <p className="hint">
-                    Everyone marked “include in printed directories” prints, in alphabetical order.
-                  </p>
-                ) : null}
-
-                {/* Families or individuals, whoever is included. The options
-                    stay one word so they fit a phone's select box; what the
-                    chosen one does is said underneath. */}
-                <div style={{ marginTop: 14 }}>
+                <div className="form-decision">
                   <Field
                     label="Print as"
                     htmlFor="print_as"
-                    hint={[
-                      settings.groupWholeFamily
-                        ? "One card per family, with the family's details. Someone with no family gets a card of their own."
-                        : "One card per person, with only their own details. Without a photo of their own, the family photo is used.",
-                      mode === "tags"
-                        ? settings.groupWholeFamily
-                          ? "Anyone in a group brings their whole family. Groups stay live: anyone added to one prints next time."
-                          : "Only the people in the groups print. Groups stay live: anyone added to one prints next time."
-                        : mode === "manual"
-                          ? settings.groupWholeFamily
-                            ? "To pick people one at a time, for name tags say, print as individuals."
-                            : "Only the people ticked print, each with a card and a name tag of their own."
-                          : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
+                    hint={printAsHint(settings.groupWholeFamily, mode)}
                   >
                     <select
                       id="print_as"
@@ -957,148 +892,121 @@ export function ProjectEditPage() {
               </div>
             </section>
 
-            <section
-              className="card"
-              aria-labelledby="book-cover"
-              onFocus={() => setStage("cover")}
-            >
-              <div className="card-head">
-                <h2 id="book-cover">Cover</h2>
-              </div>
-              {/* In the order it prints, top of the cover to the bottom, so
-                  filling the form in reads down the page it makes. The one
-                  thing out of that order is the switch that decides whether
-                  any of it prints at all, which leads. */}
-              <div className="card-body">
-                <Checkbox
-                  label="Print a cover page"
-                  hint="Off starts the book at the first record."
-                  checked={settings.includeCover}
-                  disabled={!canEdit}
-                  onChange={(value) => set({ includeCover: value })}
-                />
+            {/* Top of the cover to the bottom, so the form reads down the page
+                it makes - after the switch that decides whether it prints. */}
+            <Disclosure title="Cover" summary={summary.cover} onFocus={() => setStage("cover")}>
+              {flag(
+                "includeCover",
+                "Print a cover page",
+                "Off starts the book at the first record.",
+              )}
 
-                {/* A row each rather than a pair of columns: the wide slot
-                    for the photograph and the square one for the logo are
-                    different widths, so side by side one of them wrapped its
-                    button under its picture and the other did not.
-
-                    One hint apiece: PhotoInput carries its own, so a hint on
-                    the Field as well just stacks two paragraphs under every
-                    picture. They end without a full stop because the component
-                    adds one after the size of the picture chosen. */}
-                <div className="form-decision">
-                  <Field label="Logo">
-                    <PhotoInput
-                      path={coverRemoved.logo ? null : settings.coverLogoPath || null}
-                      initials=""
-                      shape="square"
-                      hint="At the very top, any shape — fitted whole, never cropped"
-                      disabled={!canEdit}
-                      onChange={(blob, removed) => {
-                        setCoverBlobs((current) => ({ ...current, logo: blob }));
-                        setCoverRemoved((current) => ({ ...current, logo: removed }));
-                      }}
-                    />
-                  </Field>
-                  <Field label="Photograph">
-                    <PhotoInput
-                      path={coverRemoved.photo ? null : settings.coverPhotoPath || null}
-                      initials=""
-                      shape="wide"
-                      hint="Under the title — the building, or the sign. Landscape prints best"
-                      disabled={!canEdit}
-                      onChange={(blob, removed) => {
-                        setCoverBlobs((current) => ({ ...current, photo: blob }));
-                        setCoverRemoved((current) => ({ ...current, photo: removed }));
-                      }}
-                    />
-                  </Field>
-                </div>
-
-                {/* The church's name is the width of the card and the two
-                    short lines share a row: three across came out as two and
-                    an orphan in a column this wide, and the name is the
-                    longest of the three anyway. */}
-                <Field
-                  label="Church name"
-                  hint="Above the title, and along the top of every page inside."
-                  htmlFor="church_name"
-                >
-                  <input
-                    id="church_name"
-                    type="text"
-                    value={settings.churchName}
-                    placeholder="Fairhaven Community Church"
+              {/* PhotoInput carries its own hint, ending without a full stop
+                  because it adds one after the size of the picture chosen. */}
+              <div className="form-decision">
+                <Field label="Logo">
+                  <PhotoInput
+                    path={coverRemoved.logo ? null : settings.coverLogoPath || null}
+                    initials=""
+                    shape="square"
+                    hint="At the very top, any shape — fitted whole, never cropped"
                     disabled={!canEdit}
-                    onChange={(event) => set({ churchName: event.target.value })}
+                    onChange={(blob, removed) => {
+                      setCoverBlobs((current) => ({ ...current, logo: blob }));
+                      setCoverRemoved((current) => ({ ...current, logo: removed }));
+                    }}
+                  />
+                </Field>
+                <Field label="Photograph">
+                  <PhotoInput
+                    path={coverRemoved.photo ? null : settings.coverPhotoPath || null}
+                    initials=""
+                    shape="wide"
+                    hint="Under the title — the building, or the sign. Landscape prints best"
+                    disabled={!canEdit}
+                    onChange={(blob, removed) => {
+                      setCoverBlobs((current) => ({ ...current, photo: blob }));
+                      setCoverRemoved((current) => ({ ...current, photo: removed }));
+                    }}
+                  />
+                </Field>
+              </div>
+
+              <Field
+                label="Church name"
+                hint="Above the title, and along the top of every page inside."
+                htmlFor="church_name"
+              >
+                <input
+                  id="church_name"
+                  type="text"
+                  value={settings.churchName}
+                  placeholder="Fairhaven Community Church"
+                  disabled={!canEdit}
+                  onChange={(event) => set({ churchName: event.target.value })}
+                />
+              </Field>
+
+              <div className="grid two">
+                <Field label="Title" hint="The big line." htmlFor="cover_title">
+                  <input
+                    id="cover_title"
+                    type="text"
+                    value={settings.coverTitle}
+                    placeholder="Church Directory"
+                    disabled={!canEdit}
+                    onChange={(event) => set({ coverTitle: event.target.value })}
+                  />
+                </Field>
+                <Field label="Subtitle" hint="A season or a year." htmlFor="cover_subtitle">
+                  <input
+                    id="cover_subtitle"
+                    type="text"
+                    value={settings.coverSubtitle}
+                    placeholder="Spring 2026"
+                    disabled={!canEdit}
+                    onChange={(event) => set({ coverSubtitle: event.target.value })}
+                  />
+                </Field>
+              </div>
+
+              <div className="grid two">
+                <Field
+                  label="Mission or welcome"
+                  hint="Its own paragraph, under the photograph."
+                  htmlFor="cover_statement"
+                >
+                  <textarea
+                    id="cover_statement"
+                    rows={5}
+                    value={settings.coverStatement}
+                    placeholder={
+                      "OUR MISSION\nTo worship together, serve our community, and welcome everyone."
+                    }
+                    disabled={!canEdit}
+                    onChange={(event) => set({ coverStatement: event.target.value })}
                   />
                 </Field>
 
-                <div className="grid two">
-                  <Field label="Title" hint="The big line." htmlFor="cover_title">
-                    <input
-                      id="cover_title"
-                      type="text"
-                      value={settings.coverTitle}
-                      placeholder="Church Directory"
-                      disabled={!canEdit}
-                      onChange={(event) => set({ coverTitle: event.target.value })}
-                    />
-                  </Field>
-                  <Field label="Subtitle" hint="A season or a year." htmlFor="cover_subtitle">
-                    <input
-                      id="cover_subtitle"
-                      type="text"
-                      value={settings.coverSubtitle}
-                      placeholder="Spring 2026"
-                      disabled={!canEdit}
-                      onChange={(event) => set({ coverSubtitle: event.target.value })}
-                    />
-                  </Field>
-                </div>
-
-                {/* The two paragraphs, which want the room the short
-                    lines above do not. */}
-                <div className="grid two">
-                  <Field
-                    label="Mission or welcome"
-                    hint="Its own paragraph, under the photograph."
-                    htmlFor="cover_statement"
-                  >
-                    <textarea
-                      id="cover_statement"
-                      rows={5}
-                      value={settings.coverStatement}
-                      placeholder={
-                        "OUR MISSION\nTo worship together, serve our community, and welcome everyone."
-                      }
-                      disabled={!canEdit}
-                      onChange={(event) => set({ coverStatement: event.target.value })}
-                    />
-                  </Field>
-
-                  <Field
-                    label="Contact details"
-                    hint="The foot of the cover, line for line."
-                    htmlFor="cover_contact"
-                  >
-                    <textarea
-                      id="cover_contact"
-                      rows={5}
-                      value={settings.coverContact}
-                      placeholder={
-                        "123 Main Street\nPO Box 100\nFairhaven, OH 44092\n(216) 555-0142\noffice@example.org"
-                      }
-                      disabled={!canEdit}
-                      onChange={(event) => set({ coverContact: event.target.value })}
-                    />
-                  </Field>
-                </div>
+                <Field
+                  label="Contact details"
+                  hint="The foot of the cover, line for line."
+                  htmlFor="cover_contact"
+                >
+                  <textarea
+                    id="cover_contact"
+                    rows={5}
+                    value={settings.coverContact}
+                    placeholder={
+                      "123 Main Street\nPO Box 100\nFairhaven, OH 44092\n(216) 555-0142\noffice@example.org"
+                    }
+                    disabled={!canEdit}
+                    onChange={(event) => set({ coverContact: event.target.value })}
+                  />
+                </Field>
               </div>
-            </section>
+            </Disclosure>
 
-            {/* The page after the cover, so the card after the cover's. */}
             <LeadershipEditor
               settings={settings}
               sections={leadership}
@@ -1111,7 +1019,6 @@ export function ProjectEditPage() {
               }}
             />
 
-            {/* The last page, so the last of the cards that set a page. */}
             <BackCoverEditor
               settings={settings}
               staff={backStaff}
@@ -1124,35 +1031,9 @@ export function ProjectEditPage() {
               }}
             />
 
-            {/* Name tags are set under Name tags, not here.
-
-                They were a panel on this form, which meant the one screen in
-                the app that is only ever opened to print badges sent you to
-                the book's form to change how a badge looks - past the cover,
-                the index and the page count, none of which a tag has. The
-                settings live on this same row either way, so what is left here
-                is what they currently come to and the way over. */}
-            {!isNew && id ? (
-              <section className="card" aria-labelledby="book-tags">
-                <div className="card-head column">
-                  <h2 id="book-tags">Name tags</h2>
-                  <span className="muted small">
-                    One each for everyone in this directory, set under Name tags
-                  </span>
-                </div>
-                <div className="card-body">
-                  <p className="muted small">{tagSummary}</p>
-                  <Link className="btn" to={`/tags/${id}`}>
-                    Set up name tags
-                  </Link>
-                </div>
-              </section>
-            ) : null}
-
-            <Disclosure title="Page setup" summary={pageSummary}>
-              {/* Named for both of the things it sets. A book of half-pages is
-                  printed on landscape paper whichever size is picked, and
-                  "Paper" alone left that to be discovered in the options. */}
+            <Disclosure title="Page setup" summary={summary.page}>
+              {/* A book of half-pages prints on landscape paper whichever size
+                  is picked, so the label names both. */}
               <Field label="Paper &amp; orientation" htmlFor="page_size">
                 <select
                   id="page_size"
@@ -1168,7 +1049,7 @@ export function ProjectEditPage() {
                 </select>
               </Field>
 
-              <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div className="grid pair">
                 <Field label="Records per half-page" htmlFor="rows">
                   <input
                     id="rows"
@@ -1194,8 +1075,8 @@ export function ProjectEditPage() {
               </div>
 
               <Notice>
-                <strong>{recordsPerSheet(safeSettings)} to a sheet</strong> — {safeSettings.rows}{" "}
-                down each half, {safeSettings.columns} across. Folded down the middle, that is a{" "}
+                <strong>{perSheet} to a sheet</strong> — {safeSettings.rows} down each half,{" "}
+                {safeSettings.columns} across. Folded down the middle, that is a{" "}
                 {safeSettings.pageSize === "a4" ? "A5" : "half-letter"} booklet
                 {safeSettings.columns === 2
                   ? " — and it prints as one: the pages are put in folding order when you print, with Flat there beside it for a PDF to email."
@@ -1229,13 +1110,8 @@ export function ProjectEditPage() {
               </Field>
             </Disclosure>
 
-            <Disclosure title="Each record" summary={cardSummary}>
-              <Checkbox
-                label="Photographs"
-                checked={settings.showPhotos}
-                disabled={!canEdit}
-                onChange={(value) => set({ showPhotos: value })}
-              />
+            <Disclosure title="Each record" summary={summary.record}>
+              {flag("showPhotos", "Photographs")}
               {settings.showPhotos ? (
                 <div className="check-child">
                   <Field
@@ -1255,12 +1131,7 @@ export function ProjectEditPage() {
                   </Field>
                 </div>
               ) : null}
-              <Checkbox
-                label="Family members' names"
-                checked={settings.showMembers}
-                disabled={!canEdit}
-                onChange={(value) => set({ showMembers: value })}
-              />
+              {flag("showMembers", "Family members' names")}
               {settings.showMembers ? (
                 <div className="check-child">
                   <Field label="Listed as" htmlFor="member_style">
@@ -1278,36 +1149,11 @@ export function ProjectEditPage() {
                   </Field>
                 </div>
               ) : null}
-              <Checkbox
-                label="Address"
-                checked={settings.showAddress}
-                disabled={!canEdit}
-                onChange={(value) => set({ showAddress: value })}
-              />
-              <Checkbox
-                label="Phone numbers"
-                checked={settings.showPhone}
-                disabled={!canEdit}
-                onChange={(value) => set({ showPhone: value })}
-              />
-              <Checkbox
-                label="Email addresses"
-                checked={settings.showEmail}
-                disabled={!canEdit}
-                onChange={(value) => set({ showEmail: value })}
-              />
-              <Checkbox
-                label="Birthdays"
-                checked={settings.showBirthdays}
-                disabled={!canEdit}
-                onChange={(value) => set({ showBirthdays: value })}
-              />
-              <Checkbox
-                label="Family anniversaries"
-                checked={settings.showAnniversary}
-                disabled={!canEdit}
-                onChange={(value) => set({ showAnniversary: value })}
-              />
+              {flag("showAddress", "Address")}
+              {flag("showPhone", "Phone numbers")}
+              {flag("showEmail", "Email addresses")}
+              {flag("showBirthdays", "Birthdays")}
+              {flag("showAnniversary", "Family anniversaries")}
               <div className="form-decision">
                 <Field label="Separator" htmlFor="card_style">
                   <select
@@ -1324,17 +1170,12 @@ export function ProjectEditPage() {
               </div>
             </Disclosure>
 
-            {/* In the order the summary reads them, and the typed field
-                last: what goes in the back, the furniture that is on or off,
-                then the one line somebody has to write. */}
-            <Disclosure title="Inside the book" summary={bookSummary}>
-              <Checkbox
-                label="Alphabetical index at the back"
-                hint="Every person by surname, with the page their family is on."
-                checked={settings.includeIndex}
-                disabled={!canEdit}
-                onChange={(value) => set({ includeIndex: value })}
-              />
+            <Disclosure title="Inside the book" summary={summary.book}>
+              {flag(
+                "includeIndex",
+                "Alphabetical index at the back",
+                "Every person by surname, with the page their family is on.",
+              )}
               <div className="form-decision">
                 <Field
                   label="Note pages at the back"
@@ -1355,25 +1196,9 @@ export function ProjectEditPage() {
                   </select>
                 </Field>
               </div>
-              <Checkbox
-                label="Church name in the running header"
-                checked={settings.runningHeader}
-                disabled={!canEdit}
-                onChange={(value) => set({ runningHeader: value })}
-              />
-              <Checkbox
-                label="Letter tabs (A, B, C…)"
-                checked={settings.showLetterTabs}
-                disabled={!canEdit}
-                onChange={(value) => set({ showLetterTabs: value })}
-              />
-              <Checkbox
-                label="Page numbers"
-                checked={settings.showPageNumbers}
-                disabled={!canEdit}
-                onChange={(value) => set({ showPageNumbers: value })}
-              />
-
+              {flag("runningHeader", "Church name in the running header")}
+              {flag("showLetterTabs", "Letter tabs (A, B, C…)")}
+              {flag("showPageNumbers", "Page numbers")}
               <div className="form-decision">
                 <Field
                   label="Footer note"
@@ -1392,10 +1217,19 @@ export function ProjectEditPage() {
               </div>
             </Disclosure>
 
+            {/* Name tags are set on their own screen; this row says what they
+                come to and leads there. */}
+            {id ? (
+              <Link className="card link-panel" to={`/tags/${id}`}>
+                <span className="disclosure-titles">
+                  <span className="disclosure-title">Name tags</span>
+                  <span className="disclosure-summary">{summary.tags}</span>
+                </span>
+                <Caret className="link-panel-mark" />
+              </Link>
+            ) : null}
+
             {canEdit ? (
-              /* Preview & print is not repeated here - it is in the head,
-                 and a screen with two of the same button has one of them too
-                 many. */
               <div className="row" style={{ marginTop: 18 }}>
                 <button type="submit" className="btn primary" disabled={saving}>
                   {saving ? "Saving…" : isNew ? "Create directory" : "Save changes"}
@@ -1410,9 +1244,8 @@ export function ProjectEditPage() {
               </Notice>
             )}
 
-            {/* Deleting is not one of the ways to leave this page, so it does
-                not sit in the row that saves and goes back. */}
-            {canEdit && !isNew && id ? (
+            {/* Not one of the ways to leave the page, so kept apart from them. */}
+            {canEdit && id ? (
               <div className="form-decision">
                 <ConfirmButton
                   label="Delete directory"
@@ -1430,24 +1263,11 @@ export function ProjectEditPage() {
           <div className="desk-stage">
             <section className="card" aria-labelledby="book-preview">
               <div className="card-head">
-                <h2 id="book-preview">
-                  {showing === "leadership"
-                    ? "Leadership page"
-                    : showing === "back"
-                      ? "Back cover"
-                      : "Cover preview"}
-                </h2>
-                {/* Only once there is a second page to show: a switch with
-                    one position is a label pretending to be a control. */}
-                {leadershipPreview || backPreview ? (
+                <h2 id="book-preview">Preview</h2>
+                {/* A switch only once there is a second page to show. */}
+                {stages.length > 1 ? (
                   <div className="row tight stage-switch" role="group" aria-label="Page to show">
-                    {(
-                      [
-                        "cover",
-                        ...(leadershipPreview ? ["leadership" as const] : []),
-                        ...(backPreview ? ["back" as const] : []),
-                      ] as const
-                    ).map((view) => (
+                    {stages.map((view) => (
                       <button
                         key={view}
                         type="button"
@@ -1455,21 +1275,9 @@ export function ProjectEditPage() {
                         aria-pressed={showing === view}
                         onClick={() => setStage(view)}
                       >
-                        {view === "cover" ? "Cover" : view === "back" ? "Back" : "Leadership"}
+                        {STAGE_LABELS[view]}
                       </button>
                     ))}
-                  </div>
-                ) : null}
-                {canEdit && coverPage && showing === "cover" ? (
-                  <div className="cover-guides-toggle">
-                    <Checkbox
-                      label="Centring guides"
-                      checked={guides}
-                      onChange={(on) => {
-                        setGuides(on);
-                        rememberGuides(on);
-                      }}
-                    />
                   </div>
                 ) : null}
               </div>
@@ -1507,34 +1315,41 @@ export function ProjectEditPage() {
                       movable={movableCover}
                       guides={guides}
                     />
-                    {/* Two facts rather than a sentence: which paper, and the
-                        face it is set in. That it redraws as you type is
-                        something the drawing itself says. */}
                     <figcaption className="hint">
                       {paperName(safeSettings.pageSize)} landscape ·{" "}
                       {TYPEFACE_LABELS[safeSettings.typeface].toLowerCase()}
                       {canEdit ? (
-                        <span className="tag-figure-tip">
-                          Click a line to change its words, or drag it to move it — on a phone, hold
-                          it a moment first. Pictures move the same way, and a picture's corner
-                          makes it bigger. The handle beside a part moves it too, and answers the
-                          arrow keys. With the centring guides on, a part dragged near the middle of
-                          the page snaps onto it.
-                        </span>
-                      ) : null}
-                      {canEdit && moved.length ? (
-                        <span className="tag-figure-tip cover-moved">
-                          <span>
-                            Moved: {moved.map((part) => COVER_PART_LABELS[part]).join(", ")}.
+                        <>
+                          <span className="tag-figure-tip">
+                            Click a line to change it. Drag a line or picture to move it — on a
+                            phone, hold it first — or use its handle and the arrow keys. Drag a
+                            picture&rsquo;s corner to resize it.
                           </span>
-                          <button
-                            type="button"
-                            className="btn ghost small"
-                            onClick={() => set({ coverPlacements: {} })}
-                          >
-                            Put it all back
-                          </button>
-                        </span>
+                          <span className="cover-tools">
+                            <Checkbox
+                              label="Centring guides"
+                              checked={guides}
+                              onChange={(on) => {
+                                setGuides(on);
+                                rememberGuides(on);
+                              }}
+                            />
+                            {moved.length ? (
+                              <span className="cover-moved">
+                                <span>
+                                  Moved: {moved.map((part) => COVER_PART_LABELS[part]).join(", ")}.
+                                </span>
+                                <button
+                                  type="button"
+                                  className="btn ghost small"
+                                  onClick={() => set({ coverPlacements: {} })}
+                                >
+                                  Put it all back
+                                </button>
+                              </span>
+                            ) : null}
+                          </span>
+                        </>
                       ) : null}
                     </figcaption>
                   </figure>
@@ -1553,10 +1368,8 @@ export function ProjectEditPage() {
 }
 
 /**
- * The leadership page, drawn beside the list that fills it in, through the
- * same canvas as the cover. A list long enough to turn onto a second page
- * gets a button for each, rather than a column of shrunken pages nobody can
- * read.
+ * The leadership page, drawn through the same canvas as the cover. A list long
+ * enough to run onto a second page gets a button for each page.
  */
 function LeadershipFigure({ preview }: { preview: ReturnType<typeof composeLeadershipPreview> }) {
   const [chosen, setChosen] = useState(0);
@@ -1605,12 +1418,8 @@ function LeadershipFigure({ preview }: { preview: ReturnType<typeof composeLeade
 const NO_PHOTOS = new Map<string, string>();
 
 /**
- * One line of the checklist.
- *
- * Memoised, with a toggle that never changes identity, so ticking one box
- * re-renders that box rather than the whole congregation. Without both halves
- * a directory of a thousand records re-created a thousand checkboxes on every
- * tick, and picking a booklet by hand is nothing but ticks.
+ * One line of the checklist. Memoised, with a toggle that never changes
+ * identity, so ticking one box re-renders that box rather than every record.
  */
 const PickerRow = memo(function PickerRow({
   entryKey,
@@ -1637,8 +1446,7 @@ const PickerRow = memo(function PickerRow({
 
 /**
  * Checklist of every record, for the hand-picked mode: the families, or -
- * printed as individuals - every person, so a run of name tags can be for
- * just the people ticked.
+ * printed as individuals - every person.
  */
 function ManualPicker({
   rows,
@@ -1665,9 +1473,7 @@ function ManualPicker({
     return rows.filter((row) => row.title.toLowerCase().includes(needle));
   }, [rows, query]);
 
-  // Held in refs so the callback below can read the current selection without
-  // being rebuilt when it changes - a new callback every render would be a new
-  // prop on every row, and the memo above would never once hold.
+  // Read through refs so the toggle keeps one identity and the rows' memo holds.
   const pickedRef = useRef(picked);
   pickedRef.current = picked;
   const byKey = useMemo(() => new Map(rows.map((row) => [row.key, row])), [rows]);
@@ -1689,6 +1495,7 @@ function ManualPicker({
           className="search"
           type="search"
           placeholder={people ? "Search people…" : "Search records…"}
+          aria-label={people ? "Search people" : "Search records"}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />

@@ -883,6 +883,11 @@ p:last-child {
 .grid.three {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
+/* Two short fields side by side at every width - a pair of numbers. */
+.grid.pair {
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
 
 /*
  * A pair of fields inside the settings column is measured against that
@@ -2257,6 +2262,32 @@ th.num {
 .project-grid {
   grid-template-columns: minmax(0, 1fr);
 }
+/* Each directory is one link, the whole card pressable. */
+.project-card {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+.project-card:hover {
+  border-color: var(--line-strong);
+}
+.project-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.project-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.project-card-head h2 {
+  flex: 1;
+  min-width: 0;
+}
+.project-card-facts {
+  margin-top: 8px;
+}
 @media (min-width: 700px) {
   .project-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2625,6 +2656,27 @@ th.num {
 .disclosure-summary {
   font-size: 0.8rem;
   color: var(--ink-3);
+}
+
+/* A card that leads to another screen, drawn like a closed disclosure so a
+   column of panels reads as one set - the caret turned to point where it goes. */
+.link-panel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  color: inherit;
+  text-decoration: none;
+}
+.link-panel:hover {
+  background: var(--canvas);
+}
+.link-panel:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.link-panel-mark {
+  transform: rotate(-90deg);
 }
 
 /* --- family members -------------------------------------------------------
@@ -3304,25 +3356,26 @@ th.num {
   border-color: var(--sheet-accent);
 }
 
-/* The switch for them, at the far end of the card's heading. */
-.cover-guides-toggle {
-  margin-left: auto;
+/* Under the cover: the switch for the guides, and - once anything has been
+   dragged - what has moved and the way to take it all back. Undoing a drag is
+   the one thing that cannot be done on the drawing itself, so it gets a row of
+   its own rather than a place in the middle of a sentence. It wraps, because
+   on a phone the list of parts is most of the line on its own. */
+.cover-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  margin-top: 8px;
 }
-.cover-guides-toggle .check {
+.cover-tools .check {
   margin: 0;
 }
-
-/* What has been moved, and the way to take it all back.
-   A row rather than a sentence with a button inside it: undoing a drag is the
-   one thing on this screen that cannot be done on the drawing itself, so it
-   should not have to be found in the middle of a paragraph. It wraps, because
-   on a phone the list of parts is most of the line on its own. */
 .cover-moved {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 10px;
-  margin-top: 7px;
 }
 
 /* While something is being dragged, nothing anywhere is being selected: the
