@@ -1102,3 +1102,33 @@ console.log("\na directory's leadership page comes back with it");
     leadership,
   );
 }
+
+console.log("\na directory's back cover comes back with it");
+{
+  const settings = {
+    includeBack: true,
+    backHours: "9-3pm, Monday-Friday",
+    backStaff: [
+      {
+        id: "t1",
+        role: "Senior Pastor",
+        people: [{ personId: "p1", name: "Ann Smith" }],
+        lines: "pastor@example.org\n(406) 555-0100",
+      },
+    ],
+    backQrLink: "https://example.org",
+    backQr: ["111", "101", "111"],
+  };
+  const file = backup({
+    projects: [{ project: { ...project("pr1"), settings }, tagIds: [], entries: [] }],
+  });
+  for (const mode of ["missing", "replace"] as const) {
+    const written = selectRows(file, EMPTY, mode).projects[0]?.settings as typeof settings;
+    same(`${mode}: the staff, their roles and their lines`, written?.backStaff, settings.backStaff);
+    same(
+      `${mode}: the QR code's link and pattern`,
+      [written?.backQrLink, written?.backQr],
+      [settings.backQrLink, settings.backQr],
+    );
+  }
+}

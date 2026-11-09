@@ -793,9 +793,13 @@ const Page = memo(function Page({
  * pages that make a booklet up to a multiple of four.
  */
 function bookletPages(positions: number[], pages: BookPage[]): string {
-  const blank = pages.map((page) => page.kind === "blank");
-  if (!blank.some(Boolean)) return `pages ${positions.join(" and ")}`;
-  return positions.map((n, i) => (blank[i] ? "blank" : `page ${n}`)).join(" and ");
+  const plain = pages.every((page) => page.kind !== "blank" && page.kind !== "back");
+  if (plain) return `pages ${positions.join(" and ")}`;
+  return positions
+    .map((n, i) =>
+      pages[i].kind === "blank" ? "blank" : pages[i].kind === "back" ? "back cover" : `page ${n}`,
+    )
+    .join(" and ");
 }
 
 /**

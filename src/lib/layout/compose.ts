@@ -27,6 +27,7 @@ import {
 } from "./settings";
 import { truncate, wrapText, type FontWeight, type Metrics } from "./metrics";
 import { printedSections } from "./leadership";
+import { staffLines } from "./backCover";
 
 // ---------------------------------------------------------------------------
 // Model
@@ -133,7 +134,7 @@ export interface FillModel {
 
 /** One page of the finished book - a half of a landscape sheet. */
 export interface BookPage {
-  kind: "cover" | "leadership" | "records" | "index" | "notes" | "blank";
+  kind: "cover" | "leadership" | "records" | "index" | "notes" | "back" | "blank";
   /** 1-based page number as printed. Blank filler pages carry 0. */
   number: number;
   box: Box;
@@ -864,7 +865,7 @@ function addFurniture(
   settings: ProjectSettings,
   geo: Geometry,
 ): void {
-  if (page.kind === "cover" || page.kind === "blank") return;
+  if (page.kind === "cover" || page.kind === "back" || page.kind === "blank") return;
 
   const scale = TEXT_SCALES[settings.textScale];
 
@@ -1790,6 +1791,245 @@ function composeLeadershipPages(
   return pages;
 }
 
+// ---------------------------------------------------------------------------
+// Back cover
+// ---------------------------------------------------------------------------
+
+/**
+ * How far the back cover may shrink to stay on its page, tried in order. A
+ * back cover is never continued: past the last of these it is cut short,
+ * which only a church with a dozen staff and a paragraph each would reach.
+ */
+const BACK_FIT = [1, 0.92, 0.85, 0.78, 0.7, 0.62];
+
+/** One line of the back cover, before it is placed. */
+interface BackLine {
+  text: string;
+  size: number;
+  weight: FontWeight;
+  color: string;
+  /** Air above it. */
+  gap: number;
+  /** A short rule under it, in the accent: the church's name. */
+  rule?: boolean;
+}
+
+/**
+ * The back cover: a framed box with the church's name, when the office is
+ * open, the staff and how to reach them, and the logo; under the box a line
+ * the church is known by and a QR code for its website.
+ *
+ * Laid out as a measured stack, like the cover, so an empty field takes no
+ * room at all - and centred down the page, a little above the middle, which
+ * is where a block of type looks centred. The whole of it shrinks together
+ * when it is too tall, rather than the staff list running off the foot.
+ */
+function composeBackPage(
+  settings: ProjectSettings,
+  geo: Geometry,
+  metrics: Metrics,
+): BookPage | null {
+  if (!settings.includeBack) return null;
+  const title = settings.backTitle.trim() || settings.churchName.trim();
+  const staff = settings.backStaff.map(staffLines).filter((e) => e.strong.length || e.plain.length);
+  const logo = settings.backShowLogo && settings.coverLogoPath ? settings.coverLogoPath : "";
+  const motto = settings.backMotto.trim();
+  const qr = settings.backQr;
+  const hoursHeading = settings.backHoursHeading.trim();
+  const hours = settings.backHours.trim();
+  if (!title && !hoursHeading && !hours && !staff.length && !logo && !motto && !qr.length) {
+    return null;
+  }
+
+  const W = geo.pageWidth;
+  const H = geo.pageHeight;
+  const frameX = 14;
+  const frameW = W - frameX * 2;
+  const frame = 1;
+
+  const lay = (f: number) => {
+    const pad = 18 * f;
+    const inner = frameW - pad * 2;
+    const boxed: BackLine[] = [];
+    const push = (text: string, line: Omit<BackLine, "text">) => {
+      wrapText(text, inner, line.size, line.weight, metrics).forEach((part, i) =>
+        boxed.push({ ...line, text: part, gap: i === 0 ? line.gap : 1.5 * f }),
+      );
+    };
+    if (title)
+      push(title, { size: 14.5 * f, weight: "bold", color: COLORS.strong, gap: 0, rule: true });
+    if (hoursHeading)
+      push(hoursHeading, { size: 12.5 * f, weight: "bold", color: COLORS.strong, gap: 18 * f });
+    if (hours)
+      push(hours, {
+        size: 9.5 * f,
+        weight: "regular",
+        color: COLORS.muted,
+        gap: hoursHeading ? 3 * f : 18 * f,
+      });
+    for (const entry of staff) {
+      entry.strong.forEach((text, i) =>
+        push(text, {
+          size: 10.2 * f,
+          weight: "bold",
+          color: COLORS.ink,
+          gap: i === 0 ? 17 * f : 4 * f,
+        }),
+      );
+      entry.plain.forEach((text, i) =>
+        push(text, {
+          size: 9.4 * f,
+          weight: "regular",
+          color: COLORS.muted,
+          gap: i === 0 && entry.strong.length ? 5 * f : 4 * f,
+        }),
+      );
+    }
+    // The first line of the box sits at its top padding, whatever it is.
+    if (boxed.length) boxed[0] = { ...boxed[0], gap: 0 };
+
+    const lineH = (line: BackLine) => metrics.lineHeight(line.size) + (line.rule ? 9 * f : 0);
+    let content = boxed.reduce((sum, line) => sum + line.gap + lineH(line), 0);
+    const logoH = logo ? 72 * f : 0;
+    if (logo) content += (boxed.length ? 20 * f : 0) + logoH;
+    const boxH = boxed.length || logo ? content + pad * 2 : 0;
+
+    const mottoLines = motto ? wrapText(motto, frameW, 11.5 * f, "italic", metrics) : [];
+    const mottoLine = metrics.lineHeight(11.5 * f) + 1;
+    const mottoH = mottoLines.length * mottoLine;
+    const qrSize = qr.length ? Math.min(78, Math.max(56, qr.length * 2.2)) * f : 0;
+    const below =
+      (mottoH ? (boxH ? 18 * f : 0) + mottoH : 0) +
+      (qrSize ? (boxH || mottoH ? 16 * f : 0) + qrSize : 0);
+    return {
+      f,
+      pad,
+      inner,
+      boxed,
+      lineH,
+      logoH,
+      boxH,
+      mottoLines,
+      mottoLine,
+      qrSize,
+      below,
+      total: boxH + below,
+    };
+  };
+
+  let layout = lay(BACK_FIT[BACK_FIT.length - 1]);
+  for (const f of BACK_FIT) {
+    const attempt = lay(f);
+    if (attempt.total <= H - 16) {
+      layout = attempt;
+      break;
+    }
+  }
+  const { f, pad, inner, boxed, lineH, logoH, below, mottoLines, mottoLine, qrSize } = layout;
+  // Still too tall at the smallest size: the box is cut to the room there
+  // is, and the lines that will not go in it are left off rather than
+  // printed over the logo or off the foot of the page.
+  const boxH = Math.max(0, Math.min(layout.boxH, H - 16 - below));
+  const total = boxH + below;
+
+  const page = blankPage(geo);
+  page.kind = "back";
+  let y = Math.max(8, (H - total) * 0.42);
+
+  if (boxH) {
+    const top = y;
+    page.fills.push(
+      { x: frameX, y: top, w: frameW, h: frame, color: COLORS.ink },
+      { x: frameX, y: top + boxH - frame, w: frameW, h: frame, color: COLORS.ink },
+      { x: frameX, y: top, w: frame, h: boxH, color: COLORS.ink },
+      { x: frameX + frameW - frame, y: top, w: frame, h: boxH, color: COLORS.ink },
+    );
+    let at = top + pad;
+    const limit = top + boxH - pad - (logoH ? logoH + 12 * f : 0) + 0.5;
+    for (const line of boxed) {
+      at += line.gap;
+      if (at + metrics.lineHeight(line.size) > limit) break;
+      page.runs.push({
+        x: frameX + pad,
+        y: at,
+        w: inner,
+        size: line.size,
+        weight: line.weight,
+        color: line.color,
+        align: "center",
+        text: line.text,
+      });
+      if (line.rule) {
+        page.rules.push({
+          x: frameX + frameW / 2 - 22 * f,
+          y: at + metrics.lineHeight(line.size) + 4 * f,
+          w: 44 * f,
+          color: COLORS.accent,
+        });
+      }
+      at += lineH(line);
+    }
+    if (logoH) {
+      page.photos.push({
+        box: { x: frameX + pad, y: top + boxH - pad - logoH, w: inner, h: logoH },
+        path: logo,
+        fit: "fit",
+        initials: "",
+      });
+    }
+    y = top + boxH;
+  }
+
+  if (mottoLines.length) {
+    y += boxH ? 18 * f : 0;
+    mottoLines.forEach((text, i) => {
+      page.runs.push({
+        x: frameX,
+        y: y + i * mottoLine,
+        w: frameW,
+        size: 11.5 * f,
+        weight: "italic",
+        color: COLORS.strong,
+        align: "center",
+        text,
+      });
+    });
+    y += mottoLines.length * mottoLine;
+  }
+
+  if (qrSize) {
+    y += boxH || mottoLines.length ? 16 * f : 0;
+    const module = qrSize / qr.length;
+    const left = (W - qrSize) / 2;
+    // Each run of dark modules along a row is one rectangle rather than one
+    // per module - a few hundred shapes instead of a thousand - and every one
+    // reaches a hair into its neighbours, so the screen does not draw a pale
+    // seam between two rows that should be one black block.
+    const bleed = Math.min(0.2, module * 0.1);
+    qr.forEach((row, r) => {
+      let c = 0;
+      while (c < row.length) {
+        if (row[c] !== "1") {
+          c += 1;
+          continue;
+        }
+        let end = c;
+        while (end < row.length && row[end] === "1") end += 1;
+        page.fills.push({
+          x: left + c * module,
+          y: y + r * module,
+          w: (end - c) * module + (end < row.length ? bleed : 0),
+          h: module + (r < qr.length - 1 ? bleed : 0),
+          color: "#000000",
+        });
+        c = end;
+      }
+    });
+  }
+
+  return page;
+}
+
 /**
  * How far apart the lines on a note page are, before they are spread to fill
  * the page evenly: a little over a quarter inch, between college and wide rule,
@@ -1874,15 +2114,27 @@ function bookletOrder(pageCount: number): number[] {
   return order;
 }
 
-function assembleSheets(pages: BookPage[], settings: ProjectSettings, geo: Geometry): SheetModel[] {
+function assembleSheets(
+  pages: BookPage[],
+  settings: ProjectSettings,
+  geo: Geometry,
+  back: BookPage | null = null,
+): SheetModel[] {
   const perSheet = geo.columns;
   // Booklet folding only makes sense with two pages to a side; anything else
   // prints in straight reading order.
   const useBooklet = settings.bookletOrder && perSheet === 2;
 
+  // The back cover goes after the blanks, not before them: folded, it has to
+  // be the outside of the last leaf, and the blanks that make the booklet up
+  // to a multiple of four belong inside.
   const padded = [...pages];
   const multiple = useBooklet ? 4 : perSheet;
-  while (padded.length % multiple !== 0) padded.push(blankPage(geo));
+  while ((padded.length + (back ? 1 : 0)) % multiple !== 0) padded.push(blankPage(geo));
+  if (back) {
+    back.number = padded.length + 1;
+    padded.push(back);
+  }
 
   const positions = useBooklet ? bookletOrder(padded.length) : padded.map((_, i) => i + 1);
   const ordered = positions.map((position) => padded[position - 1]);
@@ -1996,6 +2248,7 @@ export function composeBook(
 
   const indexPages = composeIndexPages(indexRecords, settings, geo, metrics);
   const notePages = composeNotePages(settings.notePages, geo, metrics);
+  const back = composeBackPage(settings, geo, metrics);
 
   // --- assemble -----------------------------------------------------------
   const pages: BookPage[] = [];
@@ -2020,13 +2273,16 @@ export function composeBook(
       if (photo.path) photoPaths.add(photo.path);
     }
   }
+  for (const photo of back?.photos ?? []) {
+    if (photo.path) photoPaths.add(photo.path);
+  }
 
   return {
     typeface: settings.typeface,
     width: geo.width,
     height: geo.height,
-    sheets: assembleSheets(pages, settings, geo),
-    pageCount: pages.length,
+    sheets: assembleSheets(pages, settings, geo, back),
+    pageCount: pages.length + (back ? 1 : 0),
     recordCount: entries.length,
     index: indexRecords,
     photoPaths: [...photoPaths],
@@ -2117,6 +2373,34 @@ export function composeLeadershipPreview(
     pages: pages.map((page) => translate(page, geo.margin, geo.margin)),
     width: geo.pageWidth + geo.margin * 2,
     height: geo.pageHeight + geo.margin * 2,
+    typeface: settings.typeface,
+  };
+}
+
+/**
+ * The back cover on its own, in page coordinates, with the paper's margin
+ * round it - for the editor to draw beside the fields that fill it in. The
+ * same composer the book uses.
+ */
+export function composeBackPreview(
+  settings: ProjectSettings,
+  metrics: Metrics,
+): {
+  page: BookPage | null;
+  width: number;
+  height: number;
+  photoPaths: string[];
+  typeface: Typeface;
+} {
+  const geo = computeGeometry(settings);
+  const page = composeBackPage({ ...settings, includeBack: true }, geo, metrics);
+  return {
+    page: page ? translate(page, geo.margin, geo.margin) : null,
+    width: geo.pageWidth + geo.margin * 2,
+    height: geo.pageHeight + geo.margin * 2,
+    photoPaths: (page?.photos ?? [])
+      .map((slot) => slot.path)
+      .filter((path): path is string => !!path),
     typeface: settings.typeface,
   };
 }

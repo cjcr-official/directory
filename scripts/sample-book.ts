@@ -6,7 +6,8 @@ import { composeBook } from "../src/lib/layout/compose";
 import { composeTags, tagsPerSheet } from "../src/lib/layout/tags";
 import { pdfMetrics, renderPdf } from "../src/lib/layout/pdf";
 import { DEFAULT_SETTINGS, normalizeSettings, recordsPerSheet } from "../src/lib/layout/settings";
-import { buildDemoData, demoLeadership } from "../src/lib/demo";
+import { buildDemoData, demoLeadership, demoStaff } from "../src/lib/demo";
+import { qrModules } from "../src/lib/layout/qrCode";
 import { STANDARD_FONTS } from "../src/lib/layout/metrics";
 import { placeholderPortrait } from "./png";
 
@@ -55,6 +56,14 @@ async function main() {
     leadershipTitle: "Church Leadership",
     leadershipNote: "Please be praying for these individuals as they serve this year.",
     leadership: demoLeadership(demo),
+    // And a back cover, so the sample shows the last page as well.
+    includeBack: true,
+    backHoursHeading: "Staff Office Hours",
+    backHours: "9am - 3pm, Monday - Friday",
+    backStaff: demoStaff(demo),
+    backMotto: "Welcome home - all are welcome here.",
+    backQrLink: "https://example.org",
+    backQr: qrModules("https://example.org"),
     showBirthdays: true,
     showAnniversary: true,
     // Read only by the tag sheet below, and set here so that CI renders a tag

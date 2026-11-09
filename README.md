@@ -76,7 +76,8 @@ a phone it is a screen of its own. Your own typing is not counted back at you.
 **Printing.** A preview that matches the PDF line for line, then either a
 downloaded PDF or a straight browser print. Optional cover page, a leadership
 page after it, alphabetical index, A–Z letter tabs, page numbers, ruled note
-pages at the back, and booklet page ordering for folding and stapling.
+pages at the back, a back cover, and booklet page ordering for folding and
+stapling.
 
 **The leadership page.** Deacons, elders, the treasurer — the church's offices
 and who holds them, on a page of their own straight after the cover. Elders,
@@ -89,6 +90,16 @@ words in for an office held by a team ("Deaconess Team"). One person prints on
 a line of their own — "Treasurer . . . . Kim Feiro" — and several print under a
 heading in two columns. Set under **Leadership page** on a directory, with the
 page drawn beside the list as you fill it in.
+
+**The back cover.** The church's name, the office hours, the staff and how to
+reach them, the logo, a motto and a QR code for the website — on the very last
+page, which folded is the outside of the book, however many blank pages a
+booklet needs before it. Staff are picked from the directory the same way as
+the leadership page, with a role and lines underneath for an email, a phone or
+the days they are in. One person prints as "Jason Siebert, Senior Pastor"; two
+sharing a role print their names together with the role underneath. The QR
+code is made from the link typed in and checked in the build by reading it
+back off the page.
 
 Want to see it? Run the app and open **/sample** — a complete sample directory
 built from invented families, with no account and no database.

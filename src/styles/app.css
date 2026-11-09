@@ -1156,7 +1156,8 @@ a.stat:hover {
      given, which is what "1fr" was asking for. */
   min-width: 0;
 }
-.field > label {
+.field > label,
+.field > .field-label-like {
   font-size: 0.82rem;
   font-weight: 600;
   color: var(--ink-2);

@@ -7,6 +7,7 @@ import {
   leadershipGroups,
   type LeadershipSection,
 } from "./layout/leadership";
+import type { StaffEntry } from "./layout/backCover";
 
 /**
  * A believable congregation.
@@ -405,4 +406,28 @@ export function demoLeadership(demo: DemoData): LeadershipSection[] {
     new Map(demo.people.map((person) => [person.id, person])),
     leadershipGroups(demo.tags, demo.personTags, demo.people),
   );
+}
+
+/**
+ * The staff on the sample's back cover: a pastor on his own, two who share
+ * the office, and the lines under each - enough to show both ways a staff
+ * entry prints.
+ */
+export function demoStaff(demo: DemoData): StaffEntry[] {
+  const adults = demo.people.filter((person) => person.household_role !== "child");
+  const pick = (i: number) => ({ personId: adults[i].id, name: leaderName(adults[i]) });
+  return [
+    {
+      id: "demo-pastor",
+      role: "Senior Pastor",
+      people: [pick(0)],
+      lines: "pastor@example.org\n(216) 555-0142\n(Monday - Thursday)",
+    },
+    {
+      id: "demo-office",
+      role: "Office Assistants",
+      people: [pick(5), pick(9)],
+      lines: "office@example.org\n(216) 555-0142",
+    },
+  ];
 }

@@ -4,7 +4,7 @@ import { BookPreview } from "@/components/BookPreview";
 import { PreviewZoom, usePreviewZoom } from "@/components/PreviewZoom";
 import { PrintAs, PrintAsNotice, SheetCount, usePrintAll, usePrintAs } from "@/components/PrintAs";
 import { LoadingScreen, Notice } from "@/components/ui";
-import { buildDemoData, demoLeadership } from "@/lib/demo";
+import { buildDemoData, demoLeadership, demoStaff } from "@/lib/demo";
 import { makeDemoPortrait } from "@/lib/demoPortraits";
 import { buildEntries, type DirectoryEntry } from "@/lib/entries";
 import { failureMessage } from "@/lib/staleBuild";
@@ -70,6 +70,10 @@ export function SamplePage({ tags = false }: { tags?: boolean }) {
           personTags: demo.personTags,
         });
 
+        // The QR encoder is fetched rather than bundled: the sample is the one
+        // screen a first visit can land on that would otherwise carry it.
+        const { qrModules } = await import("@/lib/layout/qrCode");
+        if (!active) return;
         const settings = normalizeSettings({
           ...DEFAULT_SETTINGS,
           churchName: "Fairhaven Community Church",
@@ -82,6 +86,14 @@ export function SamplePage({ tags = false }: { tags?: boolean }) {
           leadershipTitle: "Church Leadership",
           leadershipNote: "Please be praying for these individuals as they serve this year.",
           leadership: demoLeadership(demo),
+          // And a back cover, so the sample shows the last page as well.
+          includeBack: true,
+          backHoursHeading: "Staff Office Hours",
+          backHours: "9am - 3pm, Monday - Friday",
+          backStaff: demoStaff(demo),
+          backMotto: "Welcome home - all are welcome here.",
+          backQrLink: "https://example.org",
+          backQr: qrModules("https://example.org"),
           showBirthdays: true,
           showAnniversary: true,
           // Only the tag sheet reads these, and only the sample sets them: a

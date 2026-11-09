@@ -14,6 +14,7 @@ import { normalizeSettings, recordsPerSheet, type ProjectSettings } from "@/lib/
 import { composeTags, tagsPerSheet } from "@/lib/layout/tags";
 import { resolveEntries } from "@/lib/projectEntries";
 import { currentLeadership, leadershipGroups } from "@/lib/layout/leadership";
+import { currentStaff } from "@/lib/layout/backCover";
 import { BATCH_PARAM, batchFromParam, onlyBatch } from "@/lib/tagBatch";
 import type { DirectoryEntry } from "@/lib/entries";
 import type { ProjectRow } from "@/lib/database.types";
@@ -101,13 +102,11 @@ export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
         // The leadership page prints people under the names their records
         // have now, not the ones they had when the directory was saved.
         const stored = normalizeSettings(fetched.project.settings);
+        const groups = leadershipGroups(groupTags, personTags, people);
         const settings = {
           ...stored,
-          leadership: currentLeadership(
-            stored.leadership,
-            personById,
-            leadershipGroups(groupTags, personTags, people),
-          ),
+          leadership: currentLeadership(stored.leadership, personById, groups),
+          backStaff: currentStaff(stored.backStaff, personById, groups),
         };
         const included = onlyBatch(
           resolveEntries(entries, {

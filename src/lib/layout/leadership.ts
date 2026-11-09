@@ -99,20 +99,7 @@ export function normalizeLeadership(raw: unknown): LeadershipSection[] {
     while (seen.has(id)) id = newSectionId();
     seen.add(id);
 
-    const people: Leader[] = [];
-    if (Array.isArray(source.people)) {
-      for (const entry of source.people.slice(0, LEADERS_PER_SECTION_MAX)) {
-        if (!entry || typeof entry !== "object") continue;
-        const leader = entry as Record<string, unknown>;
-        const personId =
-          typeof leader.personId === "string" && leader.personId ? leader.personId : null;
-        const groupId =
-          !personId && typeof leader.groupId === "string" && leader.groupId ? leader.groupId : null;
-        const name = typeof leader.name === "string" ? leader.name.slice(0, TEXT_MAX) : "";
-        if (!personId && !groupId && !name.trim()) continue;
-        people.push(groupId ? { personId, groupId, name } : { personId, name });
-      }
-    }
+    const people = normalizeLeaders(source.people);
 
     sections.push({
       id,
@@ -123,6 +110,28 @@ export function normalizeLeadership(raw: unknown): LeadershipSection[] {
     });
   }
   return sections;
+}
+
+/**
+ * A list of names under an office, as stored: each a person, a group, or
+ * words typed in, and anything that is none of those dropped. Shared with the
+ * staff on the back cover, which are picked the same way.
+ */
+export function normalizeLeaders(raw: unknown): Leader[] {
+  const people: Leader[] = [];
+  if (!Array.isArray(raw)) return people;
+  for (const entry of raw.slice(0, LEADERS_PER_SECTION_MAX)) {
+    if (!entry || typeof entry !== "object") continue;
+    const leader = entry as Record<string, unknown>;
+    const personId =
+      typeof leader.personId === "string" && leader.personId ? leader.personId : null;
+    const groupId =
+      !personId && typeof leader.groupId === "string" && leader.groupId ? leader.groupId : null;
+    const name = typeof leader.name === "string" ? leader.name.slice(0, TEXT_MAX) : "";
+    if (!personId && !groupId && !name.trim()) continue;
+    people.push(groupId ? { personId, groupId, name } : { personId, name });
+  }
+  return people;
 }
 
 /** What a person is printed as on the page: "Bill Smith", by the name they go by. */

@@ -23,7 +23,7 @@ type Patch = Partial<
 >;
 
 /** Moves one item of a list by one place, or hands the list back when it cannot. */
-function shift<T>(list: T[], from: number, by: -1 | 1): T[] {
+export function shift<T>(list: T[], from: number, by: -1 | 1): T[] {
   const to = from + by;
   if (to < 0 || to >= list.length) return list;
   const next = [...list];
@@ -385,7 +385,7 @@ function GroupRow({
 }
 
 /** A person, or a group, an office was given that the directory no longer has. */
-function leaderGone(
+export function leaderGone(
   leader: Leader,
   personById: ReadonlyMap<string, unknown>,
   groups: ReadonlyMap<string, LeaderGroup>,
@@ -617,7 +617,7 @@ const PICKER_LIMIT = 80;
  * by a team - and that choice sits at the foot of the list once something has
  * been typed, after everybody it might have meant.
  */
-function PersonPicker({
+export function PersonPicker({
   label,
   taken,
   groups,
