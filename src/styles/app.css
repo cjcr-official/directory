@@ -5755,6 +5755,11 @@ body.moving-a-part {
   margin: 0;
   padding: 0;
   display: grid;
+  /* minmax(0, 1fr), not the default auto: a closed line's names are one
+     unbroken line cut short with an ellipsis, and an auto track grows to fit
+     the whole of it - which took every office past the right edge of a phone,
+     Done and the arrows with it. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
 
@@ -5898,4 +5903,137 @@ body.moving-a-part {
 }
 .person-option-more {
   padding: 8px 10px;
+}
+
+/* An office closed down to a line: its name over who holds it, the whole line
+   a button. Closed is how the list sits; only the office being changed is
+   open, so a church's dozen offices are a dozen lines rather than screens. */
+.leader-sections > .leader-line {
+  list-style: none;
+}
+.leader-line-button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 9px 12px;
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.leader-line.is-group .leader-line-button {
+  border-left: 3px solid var(--accent-line);
+}
+.leader-line-button:hover {
+  border-color: var(--accent-line);
+}
+.leader-line-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.leader-line-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.leader-line-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+/* One line of names, cut short with an ellipsis: the whole list is a tap away. */
+.leader-line-names {
+  font-size: 0.86rem;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.leader-line-names.muted {
+  color: var(--ink-3);
+}
+.leader-line-names.leader-gone {
+  color: var(--warn-deep);
+}
+.leader-line-mark {
+  flex: none;
+  color: var(--ink-3);
+  transform: rotate(-90deg);
+}
+.leader-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 1px 7px;
+  border-radius: 999px;
+  color: var(--accent-deep);
+  background: var(--accent-soft);
+}
+
+/* The office that is open, set apart from the closed lines around it. */
+.leader-section.is-open {
+  border-color: var(--accent-line);
+  background: var(--raised);
+  box-shadow: 0 1px 3px rgb(20 32 31 / 8%);
+}
+
+/* Who holds an open office, as bubbles with a cross to take them off. */
+.leader-chips {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+}
+.leader-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 4px 3px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--canvas);
+  font-weight: 560;
+}
+.leader-chip.typed {
+  border-style: dashed;
+}
+.leader-chip.gone {
+  border-color: var(--warn-line);
+  background: var(--warn-soft);
+  color: var(--warn-deep);
+}
+.leader-chip button {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--ink-3);
+  background: none;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.leader-chip button:hover {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.leader-done {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
 }
