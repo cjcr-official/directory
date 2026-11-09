@@ -133,8 +133,8 @@ export function BackCoverEditor({
             <div className="field">
               <span className="field-label-like">Staff</span>
               <span className="hint">
-                A role and who holds it, with lines underneath for an email, a phone number or the
-                days they are in. Tap a line to change it.
+                A role and who holds it, with their email, phone and office hours underneath. Tap a
+                line to change it.
               </span>
             </div>
 
@@ -180,7 +180,13 @@ export function BackCoverEditor({
                   className="btn"
                   disabled={staff.length >= STAFF_MAX}
                   onClick={() => {
-                    const made: StaffEntry = { id: newStaffId(), role: "", people: [], lines: "" };
+                    const made: StaffEntry = {
+                      id: newStaffId(),
+                      role: "",
+                      people: [],
+                      lines: "",
+                      hours: "",
+                    };
                     setFreshId(made.id);
                     setOpenId(made.id);
                     setStaff([...staff, made]);
@@ -439,15 +445,15 @@ function StaffEditor({
 
       <div style={{ marginTop: 10 }}>
         <Field
-          label="Lines under the name"
-          hint="One per line. Filled with their email and phone when you pick them — change anything."
+          label="Email and phone"
+          hint="One per line, under the name. Filled from their record when you pick them — change anything."
           htmlFor={`staff_lines_${entry.id}`}
         >
           <textarea
             id={`staff_lines_${entry.id}`}
-            rows={3}
+            rows={2}
             value={entry.lines}
-            placeholder={"pastor@yourchurch.org\n(406) 555-0142\n(Monday – Thursday)"}
+            placeholder={"pastor@yourchurch.org\n(406) 555-0142"}
             disabled={disabled}
             onChange={(event) => {
               const lines = event.target.value;
@@ -474,6 +480,23 @@ function StaffEditor({
             ))}
           </div>
         )}
+        <Field
+          label="Office hours"
+          hint="Under the email and phone. Leave empty for none."
+          htmlFor={`staff_hours_${entry.id}`}
+        >
+          <input
+            id={`staff_hours_${entry.id}`}
+            type="text"
+            value={entry.hours}
+            placeholder="(Monday – Thursday)"
+            disabled={disabled}
+            onChange={(event) => {
+              const hours = event.target.value;
+              onChange((current) => ({ ...current, hours }));
+            }}
+          />
+        </Field>
       </div>
 
       <div className="leader-done">

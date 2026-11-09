@@ -24,8 +24,14 @@ export interface StaffEntry {
   /** "Senior Pastor", "Office Assistants". */
   role: string;
   people: Leader[];
-  /** Printed one under another beneath the name: email, phone, days. */
+  /** Printed one under another beneath the name: email, phone. */
   lines: string;
+  /**
+   * When they are in - "Monday – Thursday" - printed under the lines above.
+   * Its own box so that filling the lines from somebody's record, which
+   * replaces them, leaves the days alone.
+   */
+  hours: string;
 }
 
 /** Far more staff than a back cover has room for. */
@@ -55,6 +61,7 @@ export function normalizeStaff(raw: unknown): StaffEntry[] {
       role: typeof source.role === "string" ? source.role.slice(0, TEXT_MAX) : "",
       people: normalizeLeaders(source.people),
       lines: typeof source.lines === "string" ? source.lines.slice(0, LINES_MAX) : "",
+      hours: typeof source.hours === "string" ? source.hours.slice(0, TEXT_MAX) : "",
     });
   }
   return staff;
@@ -119,7 +126,7 @@ export function staffLines(entry: StaffEntry): { strong: string[]; plain: string
         : role
           ? [joined, role]
           : [joined];
-  const plain = entry.lines
+  const plain = `${entry.lines}\n${entry.hours}`
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
