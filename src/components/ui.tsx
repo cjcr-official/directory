@@ -98,16 +98,26 @@ export function Disclosure({
   title,
   summary,
   open,
+  onFocus,
   children,
 }: {
   title: string;
   /** What the settings inside currently add up to, in a few words. */
   summary: string;
   open?: boolean;
+  /** Called when anything inside takes focus, and when the panel is opened. */
+  onFocus?: () => void;
   children: ReactNode;
 }) {
   return (
-    <details className="card disclosure" open={open}>
+    <details
+      className="card disclosure"
+      open={open}
+      onFocus={onFocus}
+      onToggle={(event) => {
+        if (event.currentTarget.open) onFocus?.();
+      }}
+    >
       <summary className="disclosure-head">
         <span className="disclosure-titles">
           <span className="disclosure-title">{title}</span>

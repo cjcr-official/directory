@@ -10,60 +10,49 @@ import { tagsPerSheet } from "@/lib/layout/tags";
 import { message } from "@/lib/format";
 import { KIND_NAMES, directoryKinds } from "@/lib/directoryKind";
 
-const WORDS = {
-  book: {
-    title: "Directories",
-    sub: "A saved book: who is in it, and how it prints. The records stay live, so next year is one click.",
-    add: "New directory",
-    empty: "No directories yet",
-    first: "Create the main directory",
-    loading: "Loading directories…",
-  },
-  tags: {
-    title: "Name tags",
-    sub: "A tag each for the people in a directory. Change who is in the directory and the tags follow.",
-    add: "New directory",
-    empty: "No directories yet",
-    first: "Create the main directory",
-    loading: "Loading directories…",
-  },
-} as const;
-
+/**
+ * The saved directories, as books (Directories) or as name tags (Name tags).
+ * The same list either way; only what a card says and where it leads differ.
+ */
 export function ProjectsPage({ tags = false }: { tags?: boolean }) {
   const { entries } = useDirectory();
   const { canEdit } = useAuth();
   const [projects, setProjects] = useState<ProjectRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const words = WORDS[tags ? "tags" : "book"];
 
   useEffect(() => {
+    let active = true;
     fetchProjects()
-      .then(setProjects)
-      .catch((cause) => setError(message(cause)));
+      .then((rows) => active && setProjects(rows))
+      .catch((cause) => active && setError(message(cause)));
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Worked out over the whole list, because which one is the main directory
   // is a question about all of them.
   const kinds = useMemo(() => directoryKinds(projects ?? []), [projects]);
 
-  const summary = useMemo(() => {
-    const settings = normalizeSettings({});
-    const sheets = Math.ceil(entries.length / recordsPerSheet(settings));
-    return { sheets, perSheet: recordsPerSheet(settings) };
-  }, [entries.length]);
+  if (!projects && !error) return <LoadingScreen label="Loading directories…" />;
 
-  if (!projects && !error) return <LoadingScreen label={words.loading} />;
+  const perSheet = recordsPerSheet(normalizeSettings({}));
+  const sheets = Math.ceil(entries.length / perSheet);
 
   return (
     <div className="page">
       <div className="page-head">
         <div className="grow">
-          <h1>{words.title}</h1>
-          <div className="sub">{words.sub}</div>
+          <h1>{tags ? "Name tags" : "Directories"}</h1>
+          <div className="sub">
+            {tags
+              ? "A tag each for the people in a directory. Change who is in the directory and the tags follow."
+              : "A saved book: who is in it, and how it prints. The records stay live, so next year is one click."}
+          </div>
         </div>
         {canEdit ? (
           <Link className="btn primary" to="/projects/new">
-            {words.add}
+            New directory
           </Link>
         ) : null}
       </div>
@@ -74,37 +63,27 @@ export function ProjectsPage({ tags = false }: { tags?: boolean }) {
         <div className="grid project-grid">
           {projects.map((project) => {
             const settings = normalizeSettings(project.settings);
+            const kind = kinds.get(project.id) ?? "group";
             return (
               <Link
                 key={project.id}
                 to={tags ? `/tags/${project.id}` : `/projects/${project.id}`}
-                className="card"
-                style={{ textDecoration: "none", color: "inherit", display: "block" }}
+                className="card project-card"
               >
                 <div className="card-body">
-                  <div className="row" style={{ marginBottom: 6 }}>
-                    <h2 style={{ flex: 1 }}>{project.name}</h2>
-                    <span
-                      className={`pill${kinds.get(project.id) === "main" ? " tone-owner" : ""}`}
-                    >
-                      {KIND_NAMES[kinds.get(project.id) ?? "group"]}
+                  <div className="project-card-head">
+                    <h2>{project.name}</h2>
+                    <span className={`pill${kind === "main" ? " tone-owner" : ""}`}>
+                      {KIND_NAMES[kind]}
                     </span>
                   </div>
                   {project.description ? (
                     <p className="muted small">{project.description}</p>
                   ) : null}
-                  <p className="muted small" style={{ marginTop: 8 }}>
-                    {tags ? (
-                      <>
-                        {TAG_SIZES[settings.tagSize].label} · {tagsPerSheet(settings)} to a sheet ·{" "}
-                        {paperName(settings.pageSize)} portrait
-                      </>
-                    ) : (
-                      <>
-                        {paperName(settings.pageSize)} landscape · {recordsPerSheet(settings)} to a
-                        sheet
-                      </>
-                    )}
+                  <p className="muted small project-card-facts">
+                    {tags
+                      ? `${TAG_SIZES[settings.tagSize].label} · ${tagsPerSheet(settings)} to a sheet · ${paperName(settings.pageSize)} portrait`
+                      : `${paperName(settings.pageSize)} landscape · ${recordsPerSheet(settings)} to a sheet`}
                   </p>
                 </div>
               </Link>
@@ -114,26 +93,18 @@ export function ProjectsPage({ tags = false }: { tags?: boolean }) {
       ) : (
         <div className="card">
           <EmptyState
-            title={words.empty}
+            title="No directories yet"
             action={
               canEdit ? (
                 <Link className="btn primary" to="/projects/new">
-                  {words.first}
+                  Create the main directory
                 </Link>
               ) : null
             }
           >
-            {tags ? (
-              <>
-                One tag per person, off whichever people you choose — a family gets one each rather
-                than one between them.
-              </>
-            ) : (
-              <>
-                You have {entries.length} records, which is about {summary.sheets} sheet
-                {summary.sheets === 1 ? "" : "s"} of paper at {summary.perSheet} to a sheet.
-              </>
-            )}
+            {tags
+              ? "One tag per person, off whichever people you choose — a family gets one each rather than one between them."
+              : `You have ${entries.length} records, which is about ${sheets} sheet${sheets === 1 ? "" : "s"} of paper at ${perSheet} to a sheet.`}
           </EmptyState>
         </div>
       )}

@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useDirectory } from "@/data/DirectoryContext";
-import { Caret, Checkbox, Field } from "@/components/ui";
+import { Caret, Checkbox, Disclosure, Field } from "@/components/ui";
 import { TagPicker } from "@/components/TagPicker";
 import { sortKey } from "@/lib/format";
 import {
@@ -126,155 +126,156 @@ export function LeadershipEditor({
     setSections([first, ...matched.map(([id, group]) => groupSection(id, group)), ...rest]);
   };
 
+  const summary = settings.includeLeadership
+    ? [
+        settings.leadershipTitle.trim(),
+        `${sections.length} ${sections.length === 1 ? "office" : "offices"}`,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "Not printed";
+
   return (
-    <section className="card" aria-labelledby="book-leadership" onFocus={onFocus}>
-      <div className="card-head column">
-        <h2 id="book-leadership">Leadership page</h2>
-        <span className="muted small">
-          The church's offices and who holds them, straight after the cover
-        </span>
-      </div>
-      <div className="card-body">
-        <Checkbox
-          label="Print a leadership page"
-          hint="Deacons, elders, the treasurer — before the first record."
-          checked={settings.includeLeadership}
-          disabled={disabled}
-          onChange={(value) => onChange({ includeLeadership: value })}
-        />
+    <Disclosure title="Leadership page" summary={summary} onFocus={onFocus}>
+      <Checkbox
+        label="Print a leadership page"
+        hint="Deacons, elders, the treasurer — before the first record."
+        checked={settings.includeLeadership}
+        disabled={disabled}
+        onChange={(value) => onChange({ includeLeadership: value })}
+      />
 
-        {settings.includeLeadership ? (
-          <>
-            <div className="grid two" style={{ marginTop: 14 }}>
-              <Field label="Heading" htmlFor="leadership_title">
-                <input
-                  id="leadership_title"
-                  type="text"
-                  value={settings.leadershipTitle}
-                  placeholder="Church Leadership"
-                  disabled={disabled}
-                  onChange={(event) => onChange({ leadershipTitle: event.target.value })}
-                />
-              </Field>
-              <Field label="Line under it" hint="Optional, in italics." htmlFor="leadership_note">
-                <input
-                  id="leadership_note"
-                  type="text"
-                  value={settings.leadershipNote}
-                  placeholder="Please be praying for these individuals this year."
-                  disabled={disabled}
-                  onChange={(event) => onChange({ leadershipNote: event.target.value })}
-                />
-              </Field>
-            </div>
+      {settings.includeLeadership ? (
+        <>
+          <div className="grid two" style={{ marginTop: 14 }}>
+            <Field label="Heading" htmlFor="leadership_title">
+              <input
+                id="leadership_title"
+                type="text"
+                value={settings.leadershipTitle}
+                placeholder="Church Leadership"
+                disabled={disabled}
+                onChange={(event) => onChange({ leadershipTitle: event.target.value })}
+              />
+            </Field>
+            <Field label="Line under it" hint="Optional, in italics." htmlFor="leadership_note">
+              <input
+                id="leadership_note"
+                type="text"
+                value={settings.leadershipNote}
+                placeholder="Please be praying for these individuals this year."
+                disabled={disabled}
+                onChange={(event) => onChange({ leadershipNote: event.target.value })}
+              />
+            </Field>
+          </div>
 
-            {groupList.length ? (
-              <fieldset className="leader-groups">
-                <legend>Groups on this page</legend>
-                <p className="hint">
-                  Tap a group to put it on the page, and again to take it off. Each prints under its
-                  name with whoever is in it, by surname.
-                </p>
-                {/* The same pills a group is picked with everywhere else in
+          {groupList.length ? (
+            <fieldset className="leader-groups">
+              <legend>Groups on this page</legend>
+              <p className="hint">
+                Tap a group to put it on the page, and again to take it off. Each prints under its
+                name with whoever is in it, by surname.
+              </p>
+              {/* The same pills a group is picked with everywhere else in
                     the app: a church has a dozen groups or more, and a
                     checkbox and a count for each was a screen of scrolling
                     to find the three that matter here. Who is in each is
                     shown below, once it is on the page. */}
-                <TagPicker
-                  tags={pickable}
-                  selected={sections.flatMap((section) =>
-                    section.groupId && groups.has(section.groupId) ? [section.groupId] : [],
-                  )}
-                  disabled={disabled}
-                  onChange={(next) => {
-                    const wanted = new Set(next);
-                    const added = next.find((id) => !onPage.has(id));
-                    const removed = [...onPage].find((id) => id && !wanted.has(id));
-                    if (added) tick(added, true);
-                    else if (removed) tick(removed, false);
-                  }}
-                />
-              </fieldset>
-            ) : null}
+              <TagPicker
+                tags={pickable}
+                selected={sections.flatMap((section) =>
+                  section.groupId && groups.has(section.groupId) ? [section.groupId] : [],
+                )}
+                disabled={disabled}
+                onChange={(next) => {
+                  const wanted = new Set(next);
+                  const added = next.find((id) => !onPage.has(id));
+                  const removed = [...onPage].find((id) => id && !wanted.has(id));
+                  if (added) tick(added, true);
+                  else if (removed) tick(removed, false);
+                }}
+              />
+            </fieldset>
+          ) : null}
 
-            <p className="hint leader-explain">
-              Tap a line to change it. Offices that aren't a group — Treasurer, Facilities Manager —
-              are added with the button underneath. One person prints on a line of its own; two or
-              more print under a heading. Anything with nobody in it is left off.
-            </p>
+          <p className="hint leader-explain">
+            Tap a line to change it. Offices that aren't a group — Treasurer, Facilities Manager —
+            are added with the button underneath. One person prints on a line of its own; two or
+            more print under a heading. Anything with nobody in it is left off.
+          </p>
 
-            {sections.length ? (
-              <ol className="leader-sections">
-                {sections.map((section, index) => {
-                  const common = {
-                    section,
-                    first: index === 0,
-                    last: index === sections.length - 1,
-                    disabled,
-                    onChange: (change: (section: LeadershipSection) => LeadershipSection) =>
-                      update(section.id, change),
-                    onMove: (by: -1 | 1) => setSections(shift(sections, index, by)),
-                    onRemove: () => {
-                      setOpenId(null);
-                      setSections(sections.filter((other) => other.id !== section.id));
-                    },
-                    onDone: () => setOpenId(null),
-                  };
-                  const exists = !section.groupId || groups.has(section.groupId);
-                  if (openId !== section.id) {
-                    return (
-                      <SectionLine
-                        key={section.id}
-                        section={section}
-                        exists={exists}
-                        groups={groups}
-                        onOpen={() => {
-                          setFreshId(null);
-                          setOpenId(section.id);
-                        }}
-                      />
-                    );
-                  }
-                  return section.groupId ? (
-                    <GroupRow key={section.id} {...common} exists={exists} />
-                  ) : (
-                    <OfficeEditor
+          {sections.length ? (
+            <ol className="leader-sections">
+              {sections.map((section, index) => {
+                const common = {
+                  section,
+                  first: index === 0,
+                  last: index === sections.length - 1,
+                  disabled,
+                  onChange: (change: (section: LeadershipSection) => LeadershipSection) =>
+                    update(section.id, change),
+                  onMove: (by: -1 | 1) => setSections(shift(sections, index, by)),
+                  onRemove: () => {
+                    setOpenId(null);
+                    setSections(sections.filter((other) => other.id !== section.id));
+                  },
+                  onDone: () => setOpenId(null),
+                };
+                const exists = !section.groupId || groups.has(section.groupId);
+                if (openId !== section.id) {
+                  return (
+                    <SectionLine
                       key={section.id}
-                      {...common}
+                      section={section}
+                      exists={exists}
                       groups={groups}
-                      fresh={section.id === freshId}
+                      onOpen={() => {
+                        setFreshId(null);
+                        setOpenId(section.id);
+                      }}
                     />
                   );
-                })}
-              </ol>
-            ) : null}
+                }
+                return section.groupId ? (
+                  <GroupRow key={section.id} {...common} exists={exists} />
+                ) : (
+                  <OfficeEditor
+                    key={section.id}
+                    {...common}
+                    groups={groups}
+                    fresh={section.id === freshId}
+                  />
+                );
+              })}
+            </ol>
+          ) : null}
 
-            {disabled ? null : (
-              <div className="row tight" style={{ marginTop: 14 }}>
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={sections.length >= LEADERSHIP_SECTIONS_MAX}
-                  onClick={() => {
-                    const made = office("");
-                    setFreshId(made.id);
-                    setOpenId(made.id);
-                    setSections([...sections, made]);
-                  }}
-                >
-                  + Add an office
+          {disabled ? null : (
+            <div className="row tight" style={{ marginTop: 14 }}>
+              <button
+                type="button"
+                className="btn"
+                disabled={sections.length >= LEADERSHIP_SECTIONS_MAX}
+                onClick={() => {
+                  const made = office("");
+                  setFreshId(made.id);
+                  setOpenId(made.id);
+                  setSections([...sections, made]);
+                }}
+              >
+                + Add an office
+              </button>
+              {sections.length === 0 ? (
+                <button type="button" className="btn ghost" onClick={start}>
+                  Start with the usual ones
                 </button>
-                {sections.length === 0 ? (
-                  <button type="button" className="btn ghost" onClick={start}>
-                    Start with the usual ones
-                  </button>
-                ) : null}
-              </div>
-            )}
-          </>
-        ) : null}
-      </div>
-    </section>
+              ) : null}
+            </div>
+          )}
+        </>
+      ) : null}
+    </Disclosure>
   );
 }
 
