@@ -19,8 +19,6 @@ import { FamilyEditPage } from "@/pages/FamilyEditPage";
 import { PeoplePage } from "@/pages/PeoplePage";
 import { PersonEditPage } from "@/pages/PersonEditPage";
 import { GroupsPage } from "@/pages/GroupsPage";
-import { MailchimpPage } from "@/pages/MailchimpPage";
-import { ComposePage } from "@/pages/ComposePage";
 import { ProjectsPage } from "@/pages/ProjectsPage";
 import { ProjectEditPage } from "@/pages/ProjectEditPage";
 import { ProjectPreviewPage } from "@/pages/ProjectPreviewPage";
@@ -39,6 +37,21 @@ import { SettingsPage } from "@/pages/SettingsPage";
  */
 const BackupPage = lazy(() =>
   import("@/pages/BackupPage").then((module) => ({ default: module.BackupPage })),
+);
+
+/**
+ * The two Mailchimp screens, the same way and for the same reason.
+ *
+ * Between them they carry the audience matching, the merge-field mapping and
+ * the campaign client - opened when a mailing goes out, not when somebody
+ * looks up a phone number. Moved out when the cover's centring guides took
+ * the first load 0.3 kB over its budget, with the deploy refusing to go.
+ */
+const MailchimpPage = lazy(() =>
+  import("@/pages/MailchimpPage").then((module) => ({ default: module.MailchimpPage })),
+);
+const ComposePage = lazy(() =>
+  import("@/pages/ComposePage").then((module) => ({ default: module.ComposePage })),
 );
 
 /**
@@ -138,8 +151,22 @@ function Protected() {
               <Route path="people/new" element={<PersonEditPage />} />
               <Route path="people/:id" element={<PersonEditPage />} />
               <Route path="groups" element={<GroupsPage />} />
-              <Route path="mailchimp" element={<MailchimpPage />} />
-              <Route path="mailchimp/:tagId" element={<ComposePage />} />
+              <Route
+                path="mailchimp"
+                element={
+                  <Suspense fallback={<LoadingScreen label="Opening Mailchimp…" />}>
+                    <MailchimpPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="mailchimp/:tagId"
+                element={
+                  <Suspense fallback={<LoadingScreen label="Opening Mailchimp…" />}>
+                    <ComposePage />
+                  </Suspense>
+                }
+              />
               <Route path="projects" element={<ProjectsPage />} />
               <Route path="tags" element={<ProjectsPage tags />} />
               <Route path="tags/:id" element={<TagsEditPage />} />
