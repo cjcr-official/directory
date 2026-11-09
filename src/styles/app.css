@@ -5853,3 +5853,49 @@ body.moving-a-part {
   margin: 0;
   line-height: 1.5;
 }
+
+/* Search and select, for adding somebody to an office: the directory as a
+   list under the box. In the flow of the page rather than floating over it,
+   so it can never be clipped by the card it is in or slide under a phone's
+   keyboard. Scrolls in itself past about six rows, so a directory of two
+   hundred does not push the rest of the form a screen away. */
+.person-options {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  max-height: 300px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--raised);
+}
+.person-option {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  /* A thumb's worth of row: the whole row is what is tapped. */
+  min-height: 44px;
+  justify-content: center;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.person-option + .person-option {
+  margin-top: 1px;
+}
+.person-option:hover,
+.person-option.active {
+  background: var(--accent-soft);
+}
+.person-option-name {
+  font-weight: 600;
+  color: var(--ink);
+}
+.person-option.typed {
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 6px 6px;
+}
+.person-option-more {
+  padding: 8px 10px;
+}
