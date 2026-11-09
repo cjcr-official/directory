@@ -16,6 +16,7 @@ import {
   type LeaderGroup,
   type NamedPerson,
 } from "./leadership";
+import { formatPhone } from "../format";
 
 /** One person, or several sharing a role, and how to reach them. */
 export interface StaffEntry {
@@ -123,4 +124,23 @@ export function staffLines(entry: StaffEntry): { strong: string[]; plain: string
     .map((line) => line.trim())
     .filter(Boolean);
   return { strong, plain };
+}
+
+/**
+ * What goes under a member of staff's name when they are picked: their email
+ * and their phone number, as the directory has them.
+ *
+ * Their own where they have one, and the family's where they have not - the
+ * same fall-back the directory's cards make, since the house number is very
+ * often only typed against the house. Written into the box rather than kept
+ * live, because a church's office address is usually not the one on the
+ * pastor's own record, and what is typed over it has to stay typed.
+ */
+export function contactLines(
+  person: { email: string | null; phone: string | null },
+  household?: { email: string | null; phone: string | null } | null,
+): string {
+  const email = person.email?.trim() || household?.email?.trim() || "";
+  const phone = formatPhone(person.phone?.trim() || household?.phone?.trim() || "");
+  return [email, phone].filter(Boolean).join("\n");
 }

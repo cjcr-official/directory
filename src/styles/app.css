@@ -6081,3 +6081,8 @@ body.moving-a-part {
 .leader-chip .leader-badge {
   margin-left: 6px;
 }
+
+/* "Fill from …'s record", under a staff entry's lines. */
+.staff-fill {
+  margin-top: -6px;
+}

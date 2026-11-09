@@ -4,7 +4,13 @@ import { Caret, Checkbox, Field } from "@/components/ui";
 import { PersonPicker, leaderGone, shift } from "@/components/LeadershipEditor";
 import { leaderName, type Leader, type LeaderGroup } from "@/lib/layout/leadership";
 import { LEADERS_PER_SECTION_MAX as PEOPLE_MAX } from "@/lib/layout/leadership";
-import { STAFF_MAX, newStaffId, staffLines, type StaffEntry } from "@/lib/layout/backCover";
+import {
+  STAFF_MAX,
+  contactLines,
+  newStaffId,
+  staffLines,
+  type StaffEntry,
+} from "@/lib/layout/backCover";
 import { qrModules } from "@/lib/layout/qrCode";
 import type { ProjectSettings } from "@/lib/layout/settings";
 
@@ -297,16 +303,32 @@ function StaffEditor({
   onRemove: () => void;
   onDone: () => void;
 }) {
-  const { personById } = useDirectory();
+  const { personById, householdById } = useDirectory();
   const label = entry.role.trim() || "this staff entry";
-  const add = (leader: Leader) =>
-    onChange((current) => {
-      if (leader.personId && current.people.some((other) => other.personId === leader.personId))
-        return current;
-      if (leader.groupId && current.people.some((other) => other.groupId === leader.groupId))
-        return current;
-      return { ...current, people: [...current.people, leader].slice(0, PEOPLE_MAX) };
-    });
+
+  /** A picked person's email and phone, as their record has them. */
+  const contactOf = (personId: string | null) => {
+    const person = personId ? personById.get(personId) : undefined;
+    if (!person) return "";
+    return contactLines(
+      person,
+      person.household_id ? householdById.get(person.household_id) : null,
+    );
+  };
+  /** The people here whose record has something the box does not say already. */
+  const fillable = entry.people.filter((leader) => {
+    const lines = contactOf(leader.personId);
+    return lines !== "" && lines !== entry.lines.trim();
+  });
+  /** The entry with one more person in it, unless they are in it already. */
+  const withLeader = (current: StaffEntry, leader: Leader): StaffEntry => {
+    if (leader.personId && current.people.some((other) => other.personId === leader.personId))
+      return current;
+    if (leader.groupId && current.people.some((other) => other.groupId === leader.groupId))
+      return current;
+    return { ...current, people: [...current.people, leader].slice(0, PEOPLE_MAX) };
+  };
+  const add = (leader: Leader) => onChange((current) => withLeader(current, leader));
 
   return (
     <li className="leader-section is-open">
@@ -396,7 +418,20 @@ function StaffEditor({
           label={label}
           taken={entry.people}
           groups={groups}
-          onPick={(person) => add({ personId: person.id, name: leaderName(person) })}
+          onPick={(person) => {
+            // One change, not two: the person and their email and phone go in
+            // together. Two in a row would each start from the entry as it was
+            // before either, and the second would undo the first.
+            //
+            // The email and phone only go into an empty box. Anything already
+            // there was typed on purpose - the office's own address, or the
+            // first person's details when a second is added to share the role.
+            const contact = contactOf(person.id);
+            onChange((current) => {
+              const next = withLeader(current, { personId: person.id, name: leaderName(person) });
+              return contact && !next.lines.trim() ? { ...next, lines: contact } : next;
+            });
+          }}
           onPickGroup={(id, group) => add({ personId: null, groupId: id, name: group.name })}
           onType={(name) => add({ personId: null, name })}
         />
@@ -405,7 +440,7 @@ function StaffEditor({
       <div style={{ marginTop: 10 }}>
         <Field
           label="Lines under the name"
-          hint="One per line."
+          hint="One per line. Filled with their email and phone when you pick them — change anything."
           htmlFor={`staff_lines_${entry.id}`}
         >
           <textarea
@@ -420,6 +455,25 @@ function StaffEditor({
             }}
           />
         </Field>
+        {/* Back to what the directory says, for somebody whose record has
+            changed, or whose lines were typed over and should not have been. */}
+        {disabled || !fillable.length ? null : (
+          <div className="row tight staff-fill">
+            {fillable.map((leader) => (
+              <button
+                key={leader.personId}
+                type="button"
+                className="btn ghost small"
+                onClick={() => {
+                  const contact = contactOf(leader.personId);
+                  onChange((current) => ({ ...current, lines: contact }));
+                }}
+              >
+                Fill from {leader.name}’s record
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="leader-done">
