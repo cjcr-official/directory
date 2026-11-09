@@ -1,4 +1,5 @@
 import { TYPEFACES, type Typeface } from "./metrics";
+import { normalizeLeadership, type LeadershipSection } from "./leadership";
 
 export type PageSizeName = "letter" | "a4" | "legal";
 import type { PhotoFit } from "../database.types";
@@ -231,6 +232,17 @@ export type ProjectSettings = {
    */
   coverPlacements: CoverPlacements;
   includeCover: boolean;
+  /**
+   * A page of the church's offices and who holds them, straight after the
+   * cover. See leadership.ts.
+   */
+  includeLeadership: boolean;
+  /** The heading at the top of it: "Church Leadership". */
+  leadershipTitle: string;
+  /** A line under the heading, in italics: a request for prayer, a year. */
+  leadershipNote: string;
+  /** The offices, in the order they print. */
+  leadership: LeadershipSection[];
   includeIndex: boolean;
   /**
    * Plain ruled pages at the very back, headed "Notes", for whatever somebody
@@ -305,6 +317,10 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   coverLogoPath: "",
   coverPlacements: {},
   includeCover: true,
+  includeLeadership: false,
+  leadershipTitle: "Church Leadership",
+  leadershipNote: "",
+  leadership: [],
   includeIndex: true,
   notePages: 0,
   runningHeader: true,
@@ -337,6 +353,8 @@ export function normalizeSettings(raw: unknown): ProjectSettings {
   // rule above cannot check: `typeof` says "object" of anything at all,
   // including an array and including a map of parts that do not exist.
   merged.coverPlacements = normalizePlacements(input.coverPlacements);
+  // The same goes for the leadership list, which is an array of sections.
+  merged.leadership = normalizeLeadership(input.leadership);
 
   // Guard rails: the layout maths assumes at least one card per half.
   merged.rows = clamp(Math.round(merged.rows), 1, 8);

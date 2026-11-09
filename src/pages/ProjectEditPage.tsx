@@ -57,11 +57,13 @@ import {
 import { labelledHouseholdName, message } from "@/lib/format";
 import { getPhotoUrls, removePhoto, uploadPhoto } from "@/lib/photos";
 import { CoverCanvas, type MovableParts } from "@/components/BookPreview";
-import { composeCoverPage } from "@/lib/layout/compose";
+import { composeCoverPage, composeLeadershipPreview } from "@/lib/layout/compose";
 import { readGuides, rememberGuides } from "@/lib/layout/guides";
 import { tagsPerSheet } from "@/lib/layout/tags";
 import { TYPEFACE_LABELS, loadMetrics, type Metrics } from "@/lib/layout/metrics";
 import { PhotoInput } from "@/components/PhotoInput";
+import { LeadershipEditor } from "@/components/LeadershipEditor";
+import { withCurrentNames } from "@/lib/layout/leadership";
 
 /*
  * Stand-in storage paths for a picture that has been chosen but not yet
@@ -112,7 +114,7 @@ export function ProjectEditPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { canEdit } = useAuth();
-  const { entries, tags, authorName, reload } = useDirectory();
+  const { entries, tags, authorName, reload, personById } = useDirectory();
   const isNew = !id;
 
   const [name, setName] = useState("Church Directory");
@@ -244,6 +246,16 @@ export function ProjectEditPage() {
   // and the saved record both use the clamped version so neither can show or
   // store "0 records to a sheet".
   const safeSettings = useMemo(() => normalizeSettings(settings), [settings]);
+  /*
+   * The offices, with each person's name as their record has it now - what the
+   * list shows, what the page is drawn with, and what Save writes. A name
+   * changed on somebody's record since this directory was saved is carried
+   * across without anybody having to come here and pick them again.
+   */
+  const leadership = useMemo(
+    () => withCurrentNames(settings.leadership, personById),
+    [settings.leadership, personById],
+  );
   const sheets = Math.ceil(included.length / recordsPerSheet(safeSettings));
 
   // --- the cover, drawn ------------------------------------------------------
@@ -302,8 +314,9 @@ export function ProjectEditPage() {
         : coverBlobs.photo
           ? PENDING_PHOTO
           : safeSettings.coverPhotoPath,
+      leadership: withCurrentNames(safeSettings.leadership, personById),
     }),
-    [safeSettings, coverBlobs, coverRemoved],
+    [safeSettings, coverBlobs, coverRemoved, personById],
   );
 
   /*
@@ -336,6 +349,22 @@ export function ProjectEditPage() {
       metrics,
     );
   }, [metrics, safeSettings.includeCover, drawnSettings, editing]);
+
+  /** The leadership page as it would print, when there is one. */
+  const leadershipPreview = useMemo(
+    () =>
+      metrics && safeSettings.includeLeadership
+        ? composeLeadershipPreview(drawnSettings, metrics)
+        : null,
+    [metrics, safeSettings.includeLeadership, drawnSettings],
+  );
+  /**
+   * Which page the drawing on the right is of. It follows whichever card is
+   * being worked in - typing a deacon's name shows the leadership page - and
+   * the buttons over it change it by hand.
+   */
+  const [stage, setStage] = useState<"cover" | "leadership">("cover");
+  const showing = stage === "leadership" && leadershipPreview ? "leadership" : "cover";
 
   /*
    * Where each part of the cover actually ended up.
@@ -505,6 +534,7 @@ export function ProjectEditPage() {
 
   const bookSummary = listOr(
     [
+      safeSettings.includeLeadership && "leadership page",
       safeSettings.includeIndex && "index",
       safeSettings.notePages > 0 &&
         `${safeSettings.notePages} note ${safeSettings.notePages === 1 ? "page" : "pages"}`,
@@ -597,7 +627,11 @@ export function ProjectEditPage() {
         ),
         coverLogoPath: await settle(safeSettings.coverLogoPath, coverBlobs.logo, coverRemoved.logo),
       };
-      const saved = { ...safeSettings, ...cover };
+      const saved = {
+        ...safeSettings,
+        ...cover,
+        leadership: withCurrentNames(safeSettings.leadership, personById),
+      };
 
       const payload = {
         name: name.trim() || "Untitled directory",
@@ -894,7 +928,11 @@ export function ProjectEditPage() {
               </div>
             </section>
 
-            <section className="card" aria-labelledby="book-cover">
+            <section
+              className="card"
+              aria-labelledby="book-cover"
+              onFocus={() => setStage("cover")}
+            >
               <div className="card-head">
                 <h2 id="book-cover">Cover</h2>
               </div>
@@ -1030,6 +1068,18 @@ export function ProjectEditPage() {
                 </div>
               </div>
             </section>
+
+            {/* The page after the cover, so the card after the cover's. */}
+            <LeadershipEditor
+              settings={settings}
+              sections={leadership}
+              disabled={!canEdit}
+              onFocus={() => setStage("leadership")}
+              onChange={(patch) => {
+                set(patch);
+                if (patch.includeLeadership !== false) setStage("leadership");
+              }}
+            />
 
             {/* Name tags are set under Name tags, not here.
 
@@ -1337,8 +1387,27 @@ export function ProjectEditPage() {
           <div className="desk-stage">
             <section className="card" aria-labelledby="book-preview">
               <div className="card-head">
-                <h2 id="book-preview">Cover preview</h2>
-                {canEdit && coverPage ? (
+                <h2 id="book-preview">
+                  {showing === "leadership" ? "Leadership page" : "Cover preview"}
+                </h2>
+                {/* Only once there is a second page to show: a switch with
+                    one position is a label pretending to be a control. */}
+                {leadershipPreview ? (
+                  <div className="row tight stage-switch" role="group" aria-label="Page to show">
+                    {(["cover", "leadership"] as const).map((view) => (
+                      <button
+                        key={view}
+                        type="button"
+                        className={`btn small${showing === view ? " on" : ""}`}
+                        aria-pressed={showing === view}
+                        onClick={() => setStage(view)}
+                      >
+                        {view === "cover" ? "Cover" : "Leadership"}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                {canEdit && coverPage && showing === "cover" ? (
                   <div className="cover-guides-toggle">
                     <Checkbox
                       label="Centring guides"
@@ -1352,7 +1421,9 @@ export function ProjectEditPage() {
                 ) : null}
               </div>
               <div className="card-body">
-                {coverPage ? (
+                {showing === "leadership" && leadershipPreview ? (
+                  <LeadershipFigure preview={leadershipPreview} />
+                ) : coverPage ? (
                   <figure className="cover-figure">
                     <CoverCanvas
                       page={coverPage.page}
@@ -1408,6 +1479,58 @@ export function ProjectEditPage() {
     </div>
   );
 }
+
+/**
+ * The leadership page, drawn beside the list that fills it in, through the
+ * same canvas as the cover. A list long enough to turn onto a second page
+ * gets a button for each, rather than a column of shrunken pages nobody can
+ * read.
+ */
+function LeadershipFigure({ preview }: { preview: ReturnType<typeof composeLeadershipPreview> }) {
+  const [chosen, setChosen] = useState(0);
+  const index = Math.min(chosen, preview.pages.length - 1);
+  const page = preview.pages[index];
+  if (!page) {
+    return (
+      <p className="hint cover-figure">
+        Nothing to print yet. Give the page a heading, or put somebody in an office.
+      </p>
+    );
+  }
+  return (
+    <figure className="cover-figure">
+      <CoverCanvas
+        page={page}
+        width={preview.width}
+        height={preview.height}
+        photoUrls={NO_PHOTOS}
+        typeface={preview.typeface}
+      />
+      <figcaption className="hint">
+        {preview.pages.length > 1 ? (
+          <span className="row tight" role="group" aria-label="Leadership pages">
+            Runs to {preview.pages.length} pages:
+            {preview.pages.map((each, i) => (
+              <button
+                key={each.number}
+                type="button"
+                className={`btn small${i === index ? " on" : ""}`}
+                aria-pressed={i === index}
+                onClick={() => setChosen(i)}
+              >
+                Page {each.number}
+              </button>
+            ))}
+          </span>
+        ) : (
+          <>Page {page.number}, straight after the cover. Redraws as you type.</>
+        )}
+      </figcaption>
+    </figure>
+  );
+}
+
+const NO_PHOTOS = new Map<string, string>();
 
 /**
  * One line of the checklist.

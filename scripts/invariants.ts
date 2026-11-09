@@ -39,7 +39,12 @@ import {
   normalizeSettings,
   recordsPerSheet,
 } from "../src/lib/layout/settings";
-import { buildDemoData } from "../src/lib/demo";
+import { buildDemoData, demoLeadership } from "../src/lib/demo";
+import {
+  LEADERS_PER_SECTION_MAX,
+  normalizeLeadership,
+  withCurrentNames,
+} from "../src/lib/layout/leadership";
 import type { HouseholdRow, PersonRow } from "../src/lib/database.types";
 
 const fails: string[] = [];
@@ -1166,6 +1171,284 @@ async function main() {
     console.log(`note pages: ${checked} book shapes carry them ruled, at the back, on the paper`);
   }
 
+  // ---- 15. the leadership page --------------------------------------------
+  //
+  // The church's offices, straight after the cover. What can go wrong without
+  // a sound: a page that pushes the records along without the index and the
+  // letter tabs following, an office or a name left off, a name run off the
+  // edge of the paper, and a long list that breaks with a heading stranded
+  // at the foot of a page or a name printed twice across the turn.
+  {
+    const data = buildDemoData(30, 4);
+    const entries = buildEntries(data);
+    const sections = demoLeadership(data.people);
+    const leadershipOf = (book: ReturnType<typeof composeBook>) =>
+      book.sheets
+        .flatMap((sheet) => sheet.pages)
+        .filter((page) => page.kind === "leadership")
+        .sort((a, b) => a.number - b.number);
+
+    const off = composeBook(
+      entries,
+      normalizeSettings({ leadership: sections, includeLeadership: false }),
+      metrics,
+    );
+    ok(leadershipOf(off).length === 0, "a book with the leadership page off printed one");
+
+    /** Everything on a page is on the paper, and no line is wider than its box. */
+    const offPaper = (page: ReturnType<typeof leadershipOf>[number]) => {
+      const inside = (x: number, y: number, w: number, h: number) =>
+        x >= page.box.x - 0.01 &&
+        y >= page.box.y - 0.01 &&
+        x + w <= page.box.x + page.box.w + 0.01 &&
+        y + h <= page.box.y + page.box.h + 0.01;
+      return [
+        ...page.runs.filter(
+          (run) =>
+            !inside(run.x, run.y, run.w, metrics.lineHeight(run.size)) ||
+            metrics.widthOf(run.text, run.size, run.weight) > run.w + 0.01,
+        ),
+        ...page.rules.filter((rule) => !inside(rule.x, rule.y, rule.w, 0) || rule.w <= 0),
+      ].length;
+    };
+
+    /** The names as they were drawn, in drawing order. Names are set in ink. */
+    const namesDrawn = (pages: ReturnType<typeof leadershipOf>) =>
+      pages.flatMap((page) =>
+        page.runs
+          .filter((run) => run.color === COLORS.ink && run.weight === "regular")
+          .map((run) => run.text),
+      );
+
+    /** The same names in the same order, allowing one cut short to fit its column. */
+    const sameNames = (drawn: string[], expected: string[]) =>
+      drawn.length === expected.length &&
+      drawn.every(
+        (text, i) =>
+          text === expected[i] ||
+          (text.endsWith("...") && expected[i].startsWith(text.slice(0, -3).trimEnd())),
+      );
+
+    const shapes: Partial<typeof DEFAULT_SETTINGS>[] = [
+      {},
+      { includeCover: false },
+      { columns: 1, rows: 1 },
+      { columns: 3, rows: 8, textScale: "compact" },
+      { pageSize: "a4", typeface: "sans" },
+      { pageSize: "legal", textScale: "large", runningHeader: false, showPageNumbers: false },
+      { bookletOrder: true },
+      { includeIndex: false, footerText: "For church use only", showLetterTabs: false },
+    ];
+
+    let checked = 0;
+    for (const shape of shapes) {
+      const label = JSON.stringify(shape);
+      const without = composeBook(entries, normalizeSettings(shape), metrics);
+      const settings = normalizeSettings({
+        ...shape,
+        includeLeadership: true,
+        leadershipTitle: "Church Leadership",
+        leadershipNote: "Please be praying for these individuals as they serve this year.",
+        leadership: sections,
+      });
+      const book = composeBook(entries, settings, metrics);
+      const pages = leadershipOf(book);
+      const first = settings.includeCover ? 2 : 1;
+
+      ok(pages.length >= 1, `${label}: no leadership page`);
+      ok(
+        pages.every((page, i) => page.number === first + i),
+        `${label}: the leadership page is not straight after the cover`,
+      );
+      ok(
+        book.pageCount === without.pageCount + pages.length,
+        `${label}: ${book.pageCount} pages, expected ${without.pageCount + pages.length}`,
+      );
+      // Everything after it moves along by exactly as many pages, the index
+      // with it, so a name still leads to the page its family is on.
+      ok(
+        book.index.length === without.index.length &&
+          book.index.every(
+            (row, i) =>
+              row.name === without.index[i].name &&
+              row.page === without.index[i].page + pages.length,
+          ),
+        `${label}: the index did not follow the records along`,
+      );
+      // The records themselves, and their letter tabs, are untouched.
+      const records = (b: typeof book) =>
+        b.sheets
+          .flatMap((sheet) => sheet.pages)
+          .filter((page) => page.kind === "records")
+          .sort((x, y) => x.number - y.number)
+          .map((page) => ({
+            cards: page.cards.map((card) => card.entryId),
+            tabs: page.runs.filter((run) => run.color === "#ffffff").map((run) => run.text),
+          }));
+      ok(
+        JSON.stringify(records(book)) === JSON.stringify(records(without)),
+        `${label}: the records or their letter tabs changed when the leadership page went in`,
+      );
+
+      const expected = sections.flatMap((section) => section.people.map((leader) => leader.name));
+      ok(
+        sameNames(namesDrawn(pages), expected),
+        `${label}: the names printed are not every leader once, in order`,
+      );
+      const texts = pages.flatMap((page) => page.runs.map((run) => run.text));
+      for (const section of sections) {
+        const heading = section.people.length > 1 ? section.title.toUpperCase() : section.title;
+        ok(texts.includes(heading), `${label}: the office "${section.title}" is not on the page`);
+      }
+      const stray = pages.reduce((sum, page) => sum + offPaper(page), 0);
+      ok(stray === 0, `${label}: ${stray} thing(s) drawn off the leadership page`);
+      checked += 1;
+    }
+
+    // The sample's list is the length of a real church's, and fits one page.
+    ok(
+      leadershipOf(
+        composeBook(
+          entries,
+          normalizeSettings({ includeLeadership: true, leadership: sections }),
+          metrics,
+        ),
+      ).length === 1,
+      "a church-sized leadership list ran onto a second page",
+    );
+
+    // An office nobody holds yet is not a heading over nothing.
+    {
+      const book = composeBook(
+        entries,
+        normalizeSettings({
+          includeLeadership: true,
+          leadership: [
+            { id: "a", title: "Ushers", people: [] },
+            { id: "b", title: "Treasurer", people: [{ personId: null, name: "Kim Feiro" }] },
+          ],
+        }),
+        metrics,
+      );
+      const texts = leadershipOf(book).flatMap((page) => page.runs.map((run) => run.text));
+      ok(!texts.some((text) => /ushers/i.test(text)), "an empty office printed its heading");
+      ok(texts.includes("Kim Feiro"), "a typed-in name did not print");
+    }
+
+    // Nothing to say at all - no heading, no note, nobody - prints no page.
+    ok(
+      leadershipOf(
+        composeBook(
+          entries,
+          normalizeSettings({ includeLeadership: true, leadershipTitle: "", leadership: [] }),
+          metrics,
+        ),
+      ).length === 0,
+      "an empty leadership page was printed",
+    );
+
+    // A list far longer than a page runs on, each name once, nothing off the
+    // paper, and no heading left alone at the foot of a page.
+    {
+      const long = Array.from({ length: 14 }, (_, s) => ({
+        id: `long-${s}`,
+        title: `Committee ${s + 1}`,
+        people: Array.from({ length: s % 3 === 0 ? 1 : 9 }, (_, n) => ({
+          personId: null,
+          name: `Member ${s + 1}.${n + 1}`,
+        })),
+      }));
+      long.push({
+        id: "everyone",
+        title: "Everybody",
+        // As many as an office keeps, each too long for half the page, so
+        // they go down one column - taller than any page, on every shape.
+        people: Array.from({ length: LEADERS_PER_SECTION_MAX }, (_, n) => ({
+          personId: null,
+          name: `Person ${n + 1}, with a name long enough to need the whole width`,
+        })),
+      });
+      for (const shape of shapes) {
+        const settings = normalizeSettings({ ...shape, includeLeadership: true, leadership: long });
+        const pages = leadershipOf(composeBook(entries, settings, metrics));
+        const label = `long list ${JSON.stringify(shape)}`;
+        ok(pages.length > 1, `${label}: did not run onto a second page`);
+        const expected = long.flatMap((section) => section.people.map((leader) => leader.name));
+        ok(
+          sameNames(namesDrawn(pages), expected),
+          `${label}: names lost or repeated across the turn of the page`,
+        );
+        const stray = pages.reduce((sum, page) => sum + offPaper(page), 0);
+        ok(stray === 0, `${label}: ${stray} thing(s) drawn off the paper`);
+        // A heading is followed on its own page by at least one name.
+        for (const page of pages) {
+          const headings = page.runs.filter((run) => /^COMMITTEE|^EVERYBODY/.test(run.text));
+          for (const heading of headings) {
+            ok(
+              page.runs.some((run) => run.color === COLORS.ink && run.y > heading.y),
+              `${label}: "${heading.text}" was left at the foot of page ${page.number}`,
+            );
+          }
+        }
+      }
+    }
+
+    // Stored settings are JSON anybody can write; what comes back is sections.
+    {
+      const read = normalizeLeadership([
+        null,
+        "Deacons",
+        { title: "Elders", people: [{ personId: "p1", name: "A" }, { name: "  " }, 7] },
+        { id: "x", title: 5, people: "nobody" },
+        { id: "x", title: "Twin" },
+      ]);
+      ok(read.length === 3, `normalizeLeadership kept ${read.length} sections, expected 3`);
+      ok(read[0].people.length === 1, "normalizeLeadership kept a name with no words in it");
+      ok(new Set(read.map((s) => s.id)).size === 3, "normalizeLeadership left two ids the same");
+      ok(
+        read[1].title === "" && read[1].people.length === 0,
+        "a malformed section was not emptied",
+      );
+      ok(
+        normalizeSettings({ leadership: "x" }).leadership.length === 0,
+        "a string read as offices",
+      );
+    }
+
+    // Names follow the directory, and outlive a record that has gone.
+    {
+      const [bill, mary] = data.people;
+      const stored = [
+        {
+          id: "a",
+          title: "Elders",
+          people: [
+            { personId: bill.id, name: "Old Name" },
+            { personId: "gone", name: "Departed Deacon" },
+            { personId: null, name: "Deaconess Team" },
+          ],
+        },
+      ];
+      const byId = new Map([
+        [bill.id, { ...bill, preferred_name: "Billy" }],
+        [mary.id, mary],
+      ]);
+      const live = withCurrentNames(stored, byId);
+      ok(
+        live[0].people[0].name === `Billy ${bill.last_name}`,
+        "a leader's name did not follow their record",
+      );
+      ok(live[0].people[1].name === "Departed Deacon", "a deleted leader lost the saved name");
+      ok(live[0].people[2].name === "Deaconess Team", "a typed-in name was changed");
+      const settled = withCurrentNames(live, byId);
+      ok(settled === live, "refreshing names that had not changed made a new list");
+    }
+
+    console.log(
+      `leadership page: ${checked} book shapes put it after the cover, every leader once, on the paper`,
+    );
+  }
+
   // -------------------------------------------------------------------------
   // Measuring text is cached, and a cache that returns a wrong width would not
   // throw - it would set a line slightly off and print it that way. So compose
@@ -1184,6 +1467,7 @@ async function main() {
       { bookletOrder: true, includeCover: false },
       { includeIndex: false, showPhotos: false, cardStyle: "box" },
       { notePages: 3, runningHeader: false },
+      { includeLeadership: true, leadership: demoLeadership(data.people) },
       { memberStyle: "detailed", showBirthdays: true, showAnniversary: true, textScale: "large" },
       { pageSize: "a4", showLetterTabs: false, runningHeader: false, showPageNumbers: false },
       { pageSize: "legal", footerText: "For the congregation", photoFit: "fit" },

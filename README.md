@@ -74,9 +74,19 @@ have come due, and opens on both. On a desk that is a panel beside the bell; on
 a phone it is a screen of its own. Your own typing is not counted back at you.
 
 **Printing.** A preview that matches the PDF line for line, then either a
-downloaded PDF or a straight browser print. Optional cover page, alphabetical
-index, A–Z letter tabs, page numbers, ruled note pages at the back, and booklet
-page ordering for folding and stapling.
+downloaded PDF or a straight browser print. Optional cover page, a leadership
+page after it, alphabetical index, A–Z letter tabs, page numbers, ruled note
+pages at the back, and booklet page ordering for folding and stapling.
+
+**The leadership page.** Deacons, elders, the treasurer — the church's offices
+and who holds them, on a page of their own straight after the cover. Add an
+office, then fill it by typing a few letters of someone's name and picking them
+from the directory, adding a whole group at once, or typing words in for an
+office held by a team ("Deaconess Team"). An office of one prints on a line of
+its own — "Treasurer . . . . Kim Feiro" — and an office of several prints under
+a heading in two columns. Names follow the directory, so somebody who changes
+the name they go by is printed under the new one. Set under **Leadership page**
+on a directory, with the page drawn beside the list as you fill it in.
 
 Want to see it? Run the app and open **/sample** — a complete sample directory
 built from invented families, with no account and no database.

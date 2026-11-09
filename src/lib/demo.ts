@@ -1,6 +1,7 @@
 import type { HouseholdRow, PersonRow, TagRow } from "./database.types";
 import { suggestHouseholdName } from "./format";
 import { suggestDue } from "./backgroundChecks";
+import { leaderName, type LeadershipSection } from "./layout/leadership";
 
 /**
  * A believable congregation.
@@ -350,4 +351,39 @@ function blankPerson(id: string, stamp: string): PersonRow {
     created_at: stamp,
     updated_at: stamp,
   };
+}
+
+/**
+ * A leadership page for the sample, filled from its invented people.
+ *
+ * Adults only, taken in a fixed order from the seeded data so the sample
+ * prints the same page every time: a pastor, two elders and some deacons, a
+ * treasurer and its assistant, and one office held by a team rather than a
+ * person, which is the case the typed-in name is for.
+ */
+export function demoLeadership(people: PersonRow[]): LeadershipSection[] {
+  const adults = people.filter((person) => person.household_role !== "child");
+  let next = 0;
+  const take = (count: number) =>
+    adults
+      .slice(next, (next += count))
+      .map((person) => ({ personId: person.id, name: leaderName(person) }));
+  return [
+    { id: "demo-pastor", title: "Pastor", people: take(1) },
+    { id: "demo-elders", title: "Elders", people: take(4) },
+    { id: "demo-deacons", title: "Deacons", people: take(7) },
+    { id: "demo-deaconesses", title: "Deaconesses", people: take(5) },
+    { id: "demo-facilities", title: "Facilities Manager", people: take(1) },
+    { id: "demo-children", title: "Children's Ministry", people: take(1) },
+    { id: "demo-youth", title: "Youth Ministry", people: take(1) },
+    {
+      id: "demo-food",
+      title: "Food Services",
+      people: [{ personId: null, name: "Deaconess Team" }],
+    },
+    { id: "demo-worship", title: "Worship Ministry", people: take(1) },
+    { id: "demo-secretary", title: "Board Secretary", people: take(1) },
+    { id: "demo-treasurer", title: "Treasurer", people: take(1) },
+    { id: "demo-assistant", title: "Assistant Treasurer", people: take(1) },
+  ];
 }

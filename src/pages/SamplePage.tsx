@@ -4,7 +4,7 @@ import { BookPreview } from "@/components/BookPreview";
 import { PreviewZoom, usePreviewZoom } from "@/components/PreviewZoom";
 import { PrintAs, PrintAsNotice, SheetCount, usePrintAll, usePrintAs } from "@/components/PrintAs";
 import { LoadingScreen, Notice } from "@/components/ui";
-import { buildDemoData } from "@/lib/demo";
+import { buildDemoData, demoLeadership } from "@/lib/demo";
 import { makeDemoPortrait } from "@/lib/demoPortraits";
 import { buildEntries, type DirectoryEntry } from "@/lib/entries";
 import { failureMessage } from "@/lib/staleBuild";
@@ -77,6 +77,11 @@ export function SamplePage({ tags = false }: { tags?: boolean }) {
           footerText: "Sample directory",
           // Two ruled note pages at the back, so the sample shows them.
           notePages: 2,
+          // And a leadership page after the cover, so it shows that too.
+          includeLeadership: true,
+          leadershipTitle: "Church Leadership",
+          leadershipNote: "Please be praying for these individuals as they serve this year.",
+          leadership: demoLeadership(demo.people),
           showBirthdays: true,
           showAnniversary: true,
           // Only the tag sheet reads these, and only the sample sets them: a

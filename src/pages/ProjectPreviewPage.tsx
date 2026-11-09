@@ -13,6 +13,7 @@ import { loadMetrics, type Metrics } from "@/lib/layout/metrics";
 import { normalizeSettings, recordsPerSheet, type ProjectSettings } from "@/lib/layout/settings";
 import { composeTags, tagsPerSheet } from "@/lib/layout/tags";
 import { resolveEntries } from "@/lib/projectEntries";
+import { withCurrentNames } from "@/lib/layout/leadership";
 import { BATCH_PARAM, batchFromParam, onlyBatch } from "@/lib/tagBatch";
 import type { DirectoryEntry } from "@/lib/entries";
 import type { ProjectRow } from "@/lib/database.types";
@@ -23,7 +24,7 @@ const PREVIEW_SHEET_LIMIT = 40;
 
 export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
   const { id } = useParams();
-  const { entries } = useDirectory();
+  const { entries, personById } = useDirectory();
   /**
    * The batch of people chosen on the name tags screen, when only some of the
    * directory is getting a tag this time. Carried here in the address - see
@@ -97,7 +98,13 @@ export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
         if (!active) return;
         setProject(fetched.project);
 
-        const settings = normalizeSettings(fetched.project.settings);
+        // The leadership page prints people under the names their records
+        // have now, not the ones they had when the directory was saved.
+        const stored = normalizeSettings(fetched.project.settings);
+        const settings = {
+          ...stored,
+          leadership: withCurrentNames(stored.leadership, personById),
+        };
         const included = onlyBatch(
           resolveEntries(entries, {
             mode: fetched.project.selection_mode,
@@ -135,7 +142,7 @@ export function ProjectPreviewPage({ tags = false }: { tags?: boolean }) {
     return () => {
       active = false;
     };
-  }, [id, entries, tags, batchParam]);
+  }, [id, entries, personById, tags, batchParam]);
 
   const settings = useMemo(() => (project ? normalizeSettings(project.settings) : null), [project]);
 

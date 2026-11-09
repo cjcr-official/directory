@@ -5736,3 +5736,90 @@ body.moving-a-part {
 .bulk-summary .notice {
   margin-top: 12px;
 }
+
+/* --- the leadership page, on the directory's form -------------------------
+ *
+ * A list of offices, each a small box of its own: the office's name across
+ * the top with its arrows, who holds it, and the box that adds to them. Boxed
+ * so that where one office ends and the next begins is never a question - a
+ * row of names under "Deacons" and a row under "Elders" look alike otherwise.
+ * -------------------------------------------------------------------------- */
+
+.leader-explain {
+  display: block;
+  margin: 0 0 12px;
+}
+
+.leader-sections {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.leader-section {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px 12px;
+  background: var(--canvas);
+}
+
+.leader-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.leader-title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.leader-tools {
+  display: flex;
+  flex: none;
+  gap: 2px;
+}
+
+.leader-people {
+  margin-top: 4px;
+}
+.leader-people .member-row {
+  padding: 6px 0;
+}
+
+.leader-empty {
+  margin: 8px 0 0;
+}
+
+/* A deacon whose record has gone: still printed, and said so in the warning
+   colour, because it is the one row here that wants somebody to look at it. */
+.leader-gone {
+  color: var(--warn-deep);
+}
+
+.leader-add {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+.leader-add .member-list.picker {
+  background: var(--raised);
+}
+
+.stage-switch {
+  margin-left: auto;
+}
+
+/* A leader's arrow and Remove stay beside their name on a phone. The family
+   list drops its buttons to a line of their own there, because it has a role
+   select as well; here there are only two small buttons, and a line each would
+   double the height of a list of deacons. */
+.member-list.leader-people .member-row {
+  flex-wrap: nowrap;
+}
+.member-list.leader-people .member-name {
+  flex-basis: auto;
+}
