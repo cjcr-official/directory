@@ -1053,3 +1053,40 @@ console.log("\nwhich directory is the main one");
     "main",
   );
 }
+
+// ---------------------------------------------------------------------------
+// The leadership page is kept in a directory's settings, with the people in it
+// by id. A restore has to bring the whole list back - offices, order, ids and
+// the names saved beside them - or a church that restores loses its officers'
+// page without anything saying so.
+// ---------------------------------------------------------------------------
+
+console.log("\na directory's leadership page comes back with it");
+{
+  const leadership = [
+    { id: "s1", title: "Deacons", people: [{ personId: "p1", name: "Ann Smith" }] },
+    { id: "s2", title: "Food Services", people: [{ personId: null, name: "Deaconess Team" }] },
+  ];
+  const settings = {
+    includeLeadership: true,
+    leadershipTitle: "PAC Leadership",
+    leadershipNote: "Please be praying for these individuals.",
+    leadership,
+  };
+  const file = backup({
+    projects: [{ project: { ...project("pr1"), settings }, tagIds: [], entries: [] }],
+  });
+  for (const mode of ["missing", "replace"] as const) {
+    const written = selectRows(file, EMPTY, mode).projects[0]?.settings as typeof settings;
+    same(`${mode}: the offices and their people, in order`, written?.leadership, leadership);
+    same(`${mode}: the page stays switched on`, written?.includeLeadership, true);
+    same(`${mode}: and keeps its heading`, written?.leadershipTitle, "PAC Leadership");
+  }
+
+  const plan = await readBackup(archive(file), EMPTY);
+  same(
+    "read back out of a whole archive",
+    (plan.file.projects[0]?.project.settings as typeof settings)?.leadership,
+    leadership,
+  );
+}

@@ -26,6 +26,7 @@ import {
   type Typeface,
 } from "./settings";
 import { truncate, wrapText, type FontWeight, type Metrics } from "./metrics";
+import { printedSections } from "./leadership";
 
 // ---------------------------------------------------------------------------
 // Model
@@ -132,7 +133,7 @@ export interface FillModel {
 
 /** One page of the finished book - a half of a landscape sheet. */
 export interface BookPage {
-  kind: "cover" | "records" | "index" | "notes" | "blank";
+  kind: "cover" | "leadership" | "records" | "index" | "notes" | "blank";
   /** 1-based page number as printed. Blank filler pages carry 0. */
   number: number;
   box: Box;
@@ -1478,6 +1479,317 @@ function composeIndexPages(
   return pages;
 }
 
+// ---------------------------------------------------------------------------
+// Leadership
+// ---------------------------------------------------------------------------
+
+/**
+ * One piece of the leadership page, measured before anything is placed: a
+ * heading and the names under it, or a single office on its own line. The
+ * page is a stack of these, so it can be measured whole, fitted, and broken
+ * between two pages where it has to be without a heading being left at the
+ * foot of one page with its names over the leaf.
+ */
+interface LeadershipBlock {
+  height: number;
+  /** Air above it, when it is not the first thing on its page. */
+  gapBefore: number;
+  /** An office held by one person, set as a line of its own. */
+  single?: boolean;
+  draw(page: BookPage, top: number): void;
+}
+
+/**
+ * How far the type may come down to keep the page to one page, tried in this
+ * order. Not further: a list of the church's officers is read by everybody,
+ * and below this it is small print. A list longer than that turns the page.
+ */
+const LEADERSHIP_FIT = [1, 0.94, 0.88];
+
+/** The space between two offices, before a page with room to spare spreads them out. */
+const LEADERSHIP_GAP = 11;
+
+/**
+ * The leadership page, straight after the cover.
+ *
+ * Two shapes of office, chosen by how many hold it rather than by a setting
+ * somebody has to understand. An office of one - Treasurer, Facilities
+ * Manager - is a line of its own, the office on the left and the name on the
+ * right with dot leaders between, the way a programme lists who is doing
+ * what. An office of several - Deacons, Elders - is a heading with a rule
+ * under it and the names in two columns, filled down the first and then the
+ * second, which is how the page it replaces was laid out by hand.
+ *
+ * The page is first tried at full size, then a little smaller, to keep it to
+ * one page; past that it runs on to the next. A page with room to spare
+ * spreads its offices out instead of leaving a gap at the foot.
+ */
+function composeLeadershipPages(
+  settings: ProjectSettings,
+  geo: Geometry,
+  metrics: Metrics,
+): BookPage[] {
+  if (!settings.includeLeadership) return [];
+  const sections = printedSections(settings.leadership);
+  const title = settings.leadershipTitle.trim();
+  const note = settings.leadershipNote.trim();
+  if (!sections.length && !title && !note) return [];
+
+  const pad = 4;
+  const width = geo.pageWidth - pad * 2;
+  const top = geo.contentTop + 4;
+  const bottom = geo.contentTop + geo.contentHeight - 4;
+  const room = bottom - top;
+
+  const build = (fit: number) => {
+    const s = TEXT_SCALES[settings.textScale] * fit;
+    const titleSize = 15 * s;
+    const noteSize = 9 * s;
+    const headingSize = 8.6 * s;
+    const nameSize = 9.6 * s;
+    const nameLine = metrics.lineHeight(nameSize) + 2.2 * s;
+    const headingLine = metrics.lineHeight(headingSize);
+    const columnGap = 16;
+    const columnWidth = (width - columnGap) / 2;
+
+    // --- the head of the page: title, a short rule, the note ---------------
+    const head: LeadershipBlock[] = [];
+    if (title || note) {
+      const titleLines = wrapText(title, width, titleSize, "bold", metrics);
+      const noteLines = wrapText(note, width - 20, noteSize, "italic", metrics);
+      const titleLine = metrics.lineHeight(titleSize);
+      const noteLine = metrics.lineHeight(noteSize) + 1;
+      const ruleAt = titleLines.length * titleLine + 5;
+      const notesAt = titleLines.length ? ruleAt + 9 : 0;
+      head.push({
+        // Ending under the note, or under the rule when there is no note.
+        height: noteLines.length ? notesAt + noteLines.length * noteLine + 6 : ruleAt + 8,
+        gapBefore: 0,
+        draw(page, y) {
+          titleLines.forEach((line, i) => {
+            page.runs.push({
+              x: pad,
+              y: y + i * titleLine,
+              w: width,
+              size: titleSize,
+              weight: "bold",
+              color: COLORS.strong,
+              align: "center",
+              text: line,
+            });
+          });
+          if (titleLines.length) {
+            page.rules.push({
+              x: pad + width / 2 - 18,
+              y: y + ruleAt,
+              w: 36,
+              color: COLORS.accent,
+            });
+          }
+          noteLines.forEach((line, i) => {
+            page.runs.push({
+              x: pad,
+              y: y + notesAt + i * noteLine,
+              w: width,
+              size: noteSize,
+              weight: "italic",
+              color: COLORS.muted,
+              align: "center",
+              text: line,
+            });
+          });
+        },
+      });
+    }
+
+    // --- the offices --------------------------------------------------------
+    const blocks: LeadershipBlock[] = [];
+    for (const section of sections) {
+      if (section.names.length === 1 && section.title) {
+        // An office of one: "Treasurer . . . . . Kim Feiro".
+        const [only] = section.names;
+        const name = truncate(only, width * 0.6, nameSize, "regular", metrics);
+        const nameWidth = metrics.widthOf(name, nameSize, "regular");
+        const office = truncate(
+          section.title,
+          width - nameWidth - 14,
+          headingSize,
+          "bold",
+          metrics,
+        );
+        const officeWidth = metrics.widthOf(office, headingSize, "bold");
+        const officeDrop = (metrics.lineHeight(nameSize) - headingLine) * 0.6;
+        const previous = blocks[blocks.length - 1];
+        const block: LeadershipBlock = {
+          single: true,
+          height: nameLine + 2,
+          // A run of single offices reads as one list, set closer together
+          // than the space that sets off a heading and its names.
+          gapBefore: previous?.single ? 3 : LEADERSHIP_GAP,
+          draw(page, y) {
+            page.runs.push({
+              x: pad,
+              y: y + officeDrop,
+              w: officeWidth + 2,
+              size: headingSize,
+              weight: "bold",
+              color: COLORS.accent,
+              align: "left",
+              text: office,
+            });
+            const gap = width - officeWidth - nameWidth - 12;
+            const dotWidth = metrics.widthOf(" .", nameSize, "regular");
+            const dots = ". ".repeat(Math.max(0, Math.floor(gap / dotWidth))).trimEnd();
+            if (dots) {
+              // Set against the name, so every row's leaders stop the same
+              // distance short of it and the names read as one column.
+              page.runs.push({
+                x: pad + officeWidth + 4,
+                y,
+                w: gap,
+                size: nameSize,
+                weight: "regular",
+                color: COLORS.border,
+                align: "right",
+                text: dots,
+              });
+            }
+            page.runs.push({
+              x: pad,
+              y,
+              w: width,
+              size: nameSize,
+              weight: "regular",
+              color: COLORS.ink,
+              align: "right",
+              text: name,
+            });
+          },
+        };
+        blocks.push(block);
+        continue;
+      }
+
+      // An office of several: a heading, a rule, and the names in columns.
+      const twoColumns =
+        section.names.length > 1 &&
+        section.names.every((name) => metrics.widthOf(name, nameSize, "regular") <= columnWidth);
+      const columns = twoColumns ? 2 : 1;
+      const colWidth = twoColumns ? columnWidth : width;
+      const names = section.names.map((name) =>
+        truncate(name, colWidth, nameSize, "regular", metrics),
+      );
+      const heading = section.title
+        ? truncate(section.title.toUpperCase(), width, headingSize, "bold", metrics)
+        : "";
+      const headHeight = heading ? headingLine + 7 : 0;
+
+      // A list taller than a page is broken into pieces that each fit one,
+      // the heading over the first. Nothing real is this long; a directory
+      // that pasted a whole congregation in still has to print.
+      const perPiece = Math.max(columns, Math.floor((room - headHeight - 8) / nameLine) * columns);
+      for (let start = 0; start < names.length; start += perPiece) {
+        const piece = names.slice(start, start + perPiece);
+        const withHeading = start === 0 && !!heading;
+        const rows = Math.ceil(piece.length / columns);
+        const lift = withHeading ? headHeight : 0;
+        blocks.push({
+          height: lift + rows * nameLine,
+          gapBefore: start === 0 ? LEADERSHIP_GAP : 2,
+          draw(page, y) {
+            if (withHeading) {
+              page.runs.push({
+                x: pad,
+                y,
+                w: width,
+                size: headingSize,
+                weight: "bold",
+                color: COLORS.accent,
+                align: "left",
+                text: heading,
+              });
+              page.rules.push({ x: pad, y: y + headingLine + 2, w: width, color: COLORS.rule });
+            }
+            piece.forEach((name, i) => {
+              const column = Math.floor(i / rows);
+              const row = i % rows;
+              page.runs.push({
+                x: pad + column * (colWidth + columnGap),
+                y: y + lift + row * nameLine,
+                w: colWidth,
+                size: nameSize,
+                weight: "regular",
+                color: COLORS.ink,
+                align: "left",
+                text: name,
+              });
+            });
+          },
+        });
+      }
+    }
+
+    const height = [...head, ...blocks].reduce(
+      (sum, block, i) => sum + block.height + (i === 0 ? 0 : block.gapBefore),
+      0,
+    );
+    return { head, blocks, height };
+  };
+
+  // The largest type that keeps it to one page, or full size over several.
+  let layout = build(LEADERSHIP_FIT[0]);
+  for (const fit of LEADERSHIP_FIT) {
+    const attempt = build(fit);
+    if (attempt.height <= room) {
+      layout = attempt;
+      break;
+    }
+  }
+  const all = [...layout.head, ...layout.blocks];
+
+  const pages: BookPage[] = [];
+  const start = () => {
+    const page = blankPage(geo);
+    page.kind = "leadership";
+    pages.push(page);
+    return page;
+  };
+
+  if (layout.height <= room) {
+    // One page, with the spare room shared between the gaps above each
+    // office - up to half as much again, so a short list sits in the page
+    // rather than huddling at the top of it with the foot empty.
+    const gaps = all.slice(1).filter((block) => block.gapBefore >= LEADERSHIP_GAP);
+    const spare = room - layout.height;
+    const extra = gaps.length ? Math.min(spare / gaps.length, LEADERSHIP_GAP * 0.8) : 0;
+    const page = start();
+    let y = top;
+    all.forEach((block, i) => {
+      if (i > 0) y += block.gapBefore + (block.gapBefore >= LEADERSHIP_GAP ? extra : 0);
+      block.draw(page, y);
+      y += block.height;
+    });
+    return pages;
+  }
+
+  let page = start();
+  let y = top;
+  let first = true;
+  for (const block of all) {
+    const gap = first ? 0 : block.gapBefore;
+    if (!first && y + gap + block.height > bottom) {
+      page = start();
+      y = top;
+    } else {
+      y += gap;
+    }
+    block.draw(page, y);
+    y += block.height;
+    first = false;
+  }
+  return pages;
+}
+
 /**
  * How far apart the lines on a note page are, before they are spread to fill
  * the page evenly: a little over a quarter inch, between college and wide rule,
@@ -1656,7 +1968,9 @@ export function composeBook(
 
   // --- numbering ----------------------------------------------------------
   const cover = settings.includeCover ? composeCover(settings, geo, type, metrics).page : null;
-  const coverOffset = cover ? 1 : 0;
+  // Everything ahead of the first record: the cover, then the leadership.
+  const leadershipPages = composeLeadershipPages(settings, geo, metrics);
+  const coverOffset = (cover ? 1 : 0) + leadershipPages.length;
 
   // --- index --------------------------------------------------------------
   const indexRecords: IndexRecord[] = [];
@@ -1686,7 +2000,7 @@ export function composeBook(
   // --- assemble -----------------------------------------------------------
   const pages: BookPage[] = [];
   if (cover) pages.push(cover);
-  pages.push(...recordPages, ...indexPages, ...notePages);
+  pages.push(...leadershipPages, ...recordPages, ...indexPages, ...notePages);
 
   pages.forEach((page, i) => {
     page.number = i + 1;
@@ -1776,5 +2090,33 @@ export function composeCoverPage(
     typeface: settings.typeface,
     placed,
     boxes,
+  };
+}
+
+/**
+ * The leadership page on its own, in page coordinates, as the editor draws it
+ * beside the list that fills it in. The same composer the book uses - with the
+ * running header and page number it will print with - so a list that turns
+ * onto a second page here turns onto one on paper.
+ */
+export function composeLeadershipPreview(
+  settings: ProjectSettings,
+  metrics: Metrics,
+): { pages: BookPage[]; width: number; height: number; typeface: Typeface } {
+  const geo = computeGeometry(settings);
+  const pages = composeLeadershipPages({ ...settings, includeLeadership: true }, geo, metrics);
+  const first = settings.includeCover ? 2 : 1;
+  pages.forEach((page, i) => {
+    page.number = first + i;
+    addFurniture(page, null, settings, geo);
+  });
+  // With the paper's margin round it, as it will be cut: the running header
+  // runs to the very edge of the page's own box, and drawn without a margin
+  // the page looks crowded in a way the printed one is not.
+  return {
+    pages: pages.map((page) => translate(page, geo.margin, geo.margin)),
+    width: geo.pageWidth + geo.margin * 2,
+    height: geo.pageHeight + geo.margin * 2,
+    typeface: settings.typeface,
   };
 }

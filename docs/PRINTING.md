@@ -71,8 +71,9 @@ while does not print initials where the faces should be.
 
 ## How much paper?
 
-Six records to a sheet, plus a cover and an index. Ruled note pages at the back
-add one sheet for every four, though a folded booklet is made up to a multiple of
+Six records to a sheet, plus a cover and an index. A leadership page after the
+cover is one more page, and a long list of offices may run to two. Ruled note
+pages at the back add one sheet for every four, though a folded booklet is made up to a multiple of
 four pages anyway, so the first one or two often cost no paper at all.
 
 | Records | Sheets, double-sided |

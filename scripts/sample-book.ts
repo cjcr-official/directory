@@ -6,7 +6,7 @@ import { composeBook } from "../src/lib/layout/compose";
 import { composeTags, tagsPerSheet } from "../src/lib/layout/tags";
 import { pdfMetrics, renderPdf } from "../src/lib/layout/pdf";
 import { DEFAULT_SETTINGS, normalizeSettings, recordsPerSheet } from "../src/lib/layout/settings";
-import { buildDemoData } from "../src/lib/demo";
+import { buildDemoData, demoLeadership } from "../src/lib/demo";
 import { STANDARD_FONTS } from "../src/lib/layout/metrics";
 import { placeholderPortrait } from "./png";
 
@@ -50,6 +50,11 @@ async function main() {
     footerText: "Please keep this directory for church use only.",
     // Two ruled note pages at the back, so the sample shows them.
     notePages: 2,
+    // And a leadership page after the cover, so it shows that too.
+    includeLeadership: true,
+    leadershipTitle: "Church Leadership",
+    leadershipNote: "Please be praying for these individuals as they serve this year.",
+    leadership: demoLeadership(demo.people),
     showBirthdays: true,
     showAnniversary: true,
     // Read only by the tag sheet below, and set here so that CI renders a tag
