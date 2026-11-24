@@ -150,23 +150,23 @@ export function FamiliesPage() {
                       />
                     </td>
                     <td>
-                      <Link className="list-link" to={`/families/${household.id}`}>
-                        {household.display_name}
-                      </Link>
-                      {!household.is_active ? (
-                        <span className="pill" style={{ marginLeft: 6 }}>
-                          Archived
-                        </span>
-                      ) : null}
-                      {sharedNames.has(sortKey(household.display_name)) ? (
-                        <span
-                          className="pill warn"
-                          style={{ marginLeft: 6 }}
-                          title="Another family prints under this same name"
-                        >
-                          Shared name
-                        </span>
-                      ) : null}
+                      {/* Pills beside the name, not after it in the text: the
+                          cell is cut off where the column ends, and a long
+                          name would push them out of sight on a desktop. */}
+                      <span className="name-cell">
+                        <Link className="list-link" to={`/families/${household.id}`}>
+                          {household.display_name}
+                        </Link>
+                        {!household.is_active ? <span className="pill">Archived</span> : null}
+                        {sharedNames.has(sortKey(household.display_name)) ? (
+                          <span
+                            className="pill warn"
+                            title="Another family prints under this same name"
+                          >
+                            Shared name
+                          </span>
+                        ) : null}
+                      </span>
                     </td>
                     <td className="small muted">
                       {members.length
