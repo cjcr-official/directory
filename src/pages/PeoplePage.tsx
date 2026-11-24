@@ -21,6 +21,7 @@ import {
   alphaBucket,
   effectiveAddress,
   fileAsName,
+  formatNumericDate,
   formatPhone,
   formatShortDate,
   fullName,
@@ -54,6 +55,7 @@ type ColumnKey =
   | "anniversary"
   | "gender"
   | "check"
+  | "added"
   | "notes"
   | "groups";
 
@@ -200,6 +202,15 @@ const COLUMNS: {
       const flag = state === "overdue" ? "due-note late" : state === "due-soon" ? "due-note" : "";
       return <span className={flag}>{describeDue(person)}</span>;
     },
+  },
+  {
+    key: "added",
+    label: "Added",
+    width: "c-narrow",
+    cellClass: "small muted",
+    // With the year, unlike a birthday: when somebody joined is mostly a
+    // question of which year.
+    cell: (person) => (person.added_on ? formatNumericDate(person.added_on) : "—"),
   },
   {
     key: "notes",

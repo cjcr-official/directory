@@ -365,11 +365,29 @@ export function formatFullDate(iso: string | null | undefined): string {
   return `${parts.day} ${MONTHS[parts.month - 1]} ${parts.year}`;
 }
 
+/**
+ * Today as YYYY-MM-DD, on this device's calendar rather than UTC's - which
+ * toISOString would give, and which is already tomorrow by early evening
+ * anywhere in America.
+ */
+export function localToday(now: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
 /** "6/12" - the compact form for a crowded card. */
 export function formatShortDate(iso: string | null | undefined): string {
   const parts = parseDateParts(iso);
   if (!parts) return "";
   return `${parts.month}/${parts.day}`;
+}
+
+/** "6/12/2026" - the short form, where the year is the point. */
+export function formatNumericDate(iso: string | null | undefined): string {
+  const parts = parseDateParts(iso);
+  if (!parts) return "";
+  if (parts.year === NO_YEAR) return `${parts.month}/${parts.day}`;
+  return `${parts.month}/${parts.day}/${parts.year}`;
 }
 
 /** Day of the year, for birthday and anniversary lists. */

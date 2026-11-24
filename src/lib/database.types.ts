@@ -104,6 +104,14 @@ export type PersonRow = {
    */
   background_check_on: string | null;
   background_check_due: string | null;
+  /**
+   * The day they were added to the directory, as a bare YYYY-MM-DD. Editable,
+   * and blank for everybody already here when migration 0013 was run.
+   *
+   * Optional because a database that has not run 0013 returns rows without
+   * the key at all - which is also how the form knows not to send it.
+   */
+  added_on?: string | null;
   sort_order: number;
   is_active: boolean;
   created_at: string;

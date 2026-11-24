@@ -22,6 +22,7 @@ import { createPerson, deletePerson, isStaleWrite, setTags, updatePerson } from 
 import {
   addressLines,
   formatFullDate,
+  localToday,
   fullName,
   HOUSEHOLD_ROLES,
   labelledHouseholdName,
@@ -52,6 +53,7 @@ const BLANK: Omit<PersonRow, "id" | "created_at" | "updated_at"> = {
   notes: null,
   background_check_on: null,
   background_check_due: null,
+  added_on: null,
   sort_order: 0,
   is_active: true,
 };
@@ -100,9 +102,15 @@ export function PersonEditPage() {
 
   useEffect(() => {
     if (isNew) {
+      // Today, as it is where the office is. The database would fill it in
+      // itself, but with its own day, which is UTC - and an evening's new
+      // members in America would be dated tomorrow.
       const household = params.get("household");
-      if (household)
-        setForm((current) => ({ ...current, household_id: household, household_role: "other" }));
+      setForm((current) => ({
+        ...current,
+        added_on: localToday(),
+        ...(household ? { household_id: household, household_role: "other" as const } : {}),
+      }));
       return;
     }
     if (!existing) return;
@@ -242,6 +250,12 @@ export function PersonEditPage() {
         sort_order: sortOrder,
         photo_path: photoPath,
       };
+      // A database that has not run migration 0013 has nowhere to put the
+      // date, and refuses the whole save over it. Its rows come back without
+      // the key, which is how to tell; an empty directory is assumed to have
+      // it, since it is new enough to have been set up with every migration.
+      const hasAddedOn = !people.length || people.some((other) => "added_on" in other);
+      if (!hasAddedOn) delete payload.added_on;
 
       const person = existing
         ? await updatePerson(existing.id, payload, force ? null : openedAt)
@@ -595,11 +609,24 @@ export function PersonEditPage() {
                   onCreated={reload}
                   onChange={setTagIds}
                 />
-                <p className="hint" style={{ marginTop: 8 }}>
+                <p className="hint" style={{ marginTop: 8, marginBottom: 16 }}>
                   Groups are how you build a smaller directory later — tag the choir once, then
                   print a choir booklet in two clicks.
                 </p>
               </fieldset>
+
+              <Field
+                label="Added to the directory"
+                hint="Filled in with today for somebody new. Change it to when they really joined."
+                htmlFor="added_on"
+              >
+                <DateInput
+                  id="added_on"
+                  disabled={!canEdit}
+                  value={form.added_on ?? null}
+                  onChange={(added_on) => patch({ added_on })}
+                />
+              </Field>
 
               <div className="form-decision">
                 <Checkbox
