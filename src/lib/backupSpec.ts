@@ -155,6 +155,7 @@ export const PERSON_COLUMNS: Column<PersonRow>[] = [
     column: "background_check_due",
     value: (row) => row.background_check_due,
   },
+  { header: "Added to directory", column: "added_on", value: (row) => row.added_on ?? "" },
   { header: "In printed directories", column: "is_active", value: (row) => row.is_active },
   { header: "Photo file", column: "photo_path", value: (row) => photoFile(row.photo_path) },
   { header: "Photo shape", column: "photo_fit", value: (row) => row.photo_fit ?? "" },

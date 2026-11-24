@@ -978,6 +978,56 @@ console.log("\nrecords edited since the backup");
   );
 }
 
+// ---------------------------------------------------------------------------
+// The day a person was added (0013): kept, compared, and absent from older
+// backups without fuss.
+// ---------------------------------------------------------------------------
+
+console.log("\nthe date a person was added");
+{
+  const dated = (id: string, family: string, day: string | null): PersonRow => ({
+    ...person(id, family),
+    added_on: day,
+  });
+  const file = backup({
+    people: [dated("p1", "h1", "2019-04-07"), dated("p2", "h1", null), person("p3", "h2")],
+  });
+
+  const rows = selectRows(file, EMPTY, "missing");
+  same(
+    "comes back with the person, and blank stays blank",
+    rows.people.map((row) => [row.id, row.added_on]),
+    [
+      ["p1", "2019-04-07"],
+      ["p2", null],
+      ["p3", undefined],
+    ],
+  );
+
+  const changed = findChanged(file, {
+    ...EMPTY,
+    households: file.households,
+    people: [dated("p1", "h1", "2024-01-01"), dated("p2", "h1", null), person("p3", "h2")],
+  });
+  same(
+    "a changed date is listed by name",
+    changed.map((record) => [record.id, record.fields]),
+    [["p1", ["date added"]]],
+  );
+  same("and only the date is put back", changed[0]?.patch, { added_on: "2019-04-07" });
+
+  // A backup from before 0013 has no such key; a directory after it does.
+  same(
+    "a backup from before the date existed reports nothing changed",
+    findChanged(backup(), {
+      ...EMPTY,
+      households: backup().households,
+      people: backup().people.map((row) => ({ ...row, added_on: "2026-11-24" })),
+    }).length,
+    0,
+  );
+}
+
 console.log("\nthe archive as a Blob");
 {
   const entries = [

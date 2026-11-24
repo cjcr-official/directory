@@ -287,6 +287,7 @@ const FIELD_NAMES: Record<string, string> = {
   office_label: "office label",
   background_check_on: "background check",
   background_check_due: "background check",
+  added_on: "date added",
 };
 
 /**

@@ -131,6 +131,7 @@ addresses. What follows is the short form.
      "Replace everything" restore that lands whole or not at all
    - `0012_directory_kinds.sql` — main, group and event directories, and only
      one main
+   - `0013_date_added.sql` — the day a person was added to the directory
 3. From **Project Settings → API**, copy the **Project URL** and the
    **anon public** key.
 

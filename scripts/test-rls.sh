@@ -37,6 +37,7 @@ run migrations/0009_background_checks.sql
 run migrations/0010_photo_fit.sql
 run migrations/0011_backup_safety.sql
 run migrations/0012_directory_kinds.sql
+run migrations/0013_date_added.sql
 run tests/01_grants.sql
 
 echo "Running row level security tests…"

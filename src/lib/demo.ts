@@ -325,6 +325,14 @@ export function buildDemoData(householdCount = 34, individualCount = 9, seed = 2
     person.background_check_due = suggestDue(person.background_check_on);
   }
 
+  // When each person joined, scattered over the past twelve years, so the
+  // "Added" column and the date on the form have something real to show. A
+  // stream of its own again, for the same reason as the one above.
+  const join = makeRandom(seed + 2);
+  for (const person of people) {
+    person.added_on = isoDay(today - Math.floor(join() * 4380) * 86_400_000);
+  }
+
   return { households, people, tags, householdTags, personTags };
 }
 
