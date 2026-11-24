@@ -627,21 +627,24 @@ export function PeoplePage() {
                       )}
                     </td>
                     <td>
-                      {/* Not a link while choosing: the row is a tick box
-                          then, and a name that opened the record would be the
-                          one place on it that did something else. */}
-                      {selecting ? (
-                        <span className="list-link">{fileAsName(person)}</span>
-                      ) : (
-                        <Link className="list-link" to={`/people/${person.id}`}>
-                          {fileAsName(person)}
-                        </Link>
-                      )}
-                      {!person.is_active ? (
-                        <span className="pill" style={{ marginLeft: 6 }}>
-                          Archived
-                        </span>
-                      ) : null}
+                      {/* The pill sits beside the name rather than after it in
+                          the text: the cell is cut off where the column ends,
+                          and a long name used to push "Archived" out of sight
+                          on a desktop while a phone, which wraps, still said
+                          it. Now the name is what gets shortened. */}
+                      <span className="name-cell">
+                        {/* Not a link while choosing: the row is a tick box
+                            then, and a name that opened the record would be
+                            the one place on it that did something else. */}
+                        {selecting ? (
+                          <span className="list-link">{fileAsName(person)}</span>
+                        ) : (
+                          <Link className="list-link" to={`/people/${person.id}`}>
+                            {fileAsName(person)}
+                          </Link>
+                        )}
+                        {!person.is_active ? <span className="pill">Archived</span> : null}
+                      </span>
                     </td>
                     {visible.map((column) => (
                       <td

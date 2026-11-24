@@ -1944,6 +1944,24 @@ th.num {
   font-variant-numeric: tabular-nums;
 }
 
+/* A name and the pills that go with it ("Archived", "Shared name"). The cell
+   is cut off at the column's edge on a desktop, so the name is the part that
+   shortens and the pills always show. */
+.name-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.name-cell > .list-link {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.name-cell > .pill {
+  flex: none;
+}
+
 .list-link {
   color: var(--ink);
   text-decoration: none;
@@ -4469,6 +4487,11 @@ body.moving-a-part {
   .list-table td:nth-child(2) {
     grid-area: primary;
     font-size: 0.97rem;
+  }
+  /* A phone wraps a long name rather than clipping it, so the pills follow
+     it onto the next line as they always have. */
+  .name-cell {
+    flex-wrap: wrap;
   }
   .list-table td:nth-child(3) {
     grid-area: secondary;
